@@ -1,0 +1,67 @@
+# ────────────────────────────────────────────────────────────────────────────
+# SKELETON CONFIG — Search this file for "TODO" and replace each value
+# before first commit. The site builds without these changes but pages
+# will be unbranded.
+# ────────────────────────────────────────────────────────────────────────────
+
+# TODO: site identity
+title: "TODO: Your Tutorial Title"
+description: "TODO: One-sentence description of what this tutorial teaches."
+brand_emoji: "📘"   # Single emoji that appears next to the title in the header
+
+# TODO: GitHub identity for header link and example sourcing
+github_username: "TODO-your-github-username"
+github_repo: "TODO-your-repo-name"
+
+# TODO: baseurl
+# - On user/org Pages site (USERNAME.github.io): set to ""
+# - On project Pages site (USERNAME.github.io/PROJECT): set to "/PROJECT"
+# - For local dev override at runtime: bundle exec jekyll serve --baseurl ""
+baseurl: "/TODO-your-repo-name"
+
+# url is set at deploy time; leave blank for GitHub Pages auto-detection
+url: ""
+
+# ────────────────────────────────────────────────────────────────────────────
+# Build configuration — generally don't change these.
+# ────────────────────────────────────────────────────────────────────────────
+
+markdown: kramdown
+kramdown:
+  input: GFM
+  syntax_highlighter: rouge
+
+permalink: pretty
+
+# Collections — _docs and _plans are not Jekyll defaults; this enables them.
+collections:
+  docs:
+    output: true
+    permalink: /docs/:name/
+  plans:
+    output: true
+    permalink: /plans/:name/
+
+# Default front-matter — saves typing `layout: tutorial` on every doc.
+defaults:
+  - scope:
+      path: ""
+      type: docs
+    values:
+      layout: tutorial
+  - scope:
+      path: ""
+      type: plans
+    values:
+      layout: plan
+
+# Files that Jekyll should not process or include in the built site.
+exclude:
+  - Gemfile
+  - Gemfile.lock
+  - vendor/
+  - node_modules/
+  - examples/   # ← important: trailing slash; runnable code lives here, not site content
+  - scripts/
+  - README.md
+  - LICENSE
