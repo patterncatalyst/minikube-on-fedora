@@ -31,8 +31,9 @@ POD_WAIT_SECONDS=180
 
 # ── Cleanup trap ────────────────────────────────────────────────────────────
 cleanup() {
-    info "cleanup: deleting profile ${PROFILE}"
+    info "cleanup: deleting profile ${PROFILE} and its volume"
     minikube delete -p "${PROFILE}" >/dev/null 2>&1 || true
+    podman volume rm "${PROFILE}" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
@@ -43,16 +44,21 @@ command -v kubectl  >/dev/null 2>&1 || fail "kubectl not on PATH — see §2"
 command -v podman   >/dev/null 2>&1 || fail "podman not on PATH — see §1"
 pass "minikube, kubectl, podman all present"
 
-step "pre-flight: clear any pre-existing ${PROFILE} profile"
+step "pre-flight: clear any pre-existing ${PROFILE} profile and volume"
 minikube delete -p "${PROFILE}" >/dev/null 2>&1 || true
-pass "no stale ${PROFILE} profile"
+# minikube delete doesn't always reap orphaned volumes from failed starts.
+# Sweep explicitly so a previous failure doesn't block this run.
+podman volume rm "${PROFILE}" >/dev/null 2>&1 || true
+pass "no stale ${PROFILE} profile or volume"
 
 # ── Start ───────────────────────────────────────────────────────────────────
-step "starting cluster (profile=${PROFILE}, driver=podman, k8s=${KUBE_VERSION}, rootless)"
+step "starting cluster (profile=${PROFILE}, driver=podman/rootless, runtime=containerd, k8s=${KUBE_VERSION})"
 minikube start \
     --profile "${PROFILE}" \
     --driver=podman \
     --rootless \
+    --container-runtime=containerd \
+    --delete-on-failure \
     --cpus="${CPUS}" \
     --memory="${MEMORY_MB}" \
     --kubernetes-version="${KUBE_VERSION}" \

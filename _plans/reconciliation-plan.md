@@ -83,6 +83,7 @@ Fedora 44.
 | **verified (Fedora 44)** | mikefarah yq is `dnf install yq` on Fedora 44 (not python-yq)               | §2      | r05 user output: `dnf install yq` succeeded; package is 4.47.1 mikefarah ✓  |
 | unverified              | `minikube start --driver=podman` brings up a healthy cluster                 | §3      | r05 user output: failed without `--rootless`; r05b adds the flag, retry needed |
 | **verified (Fedora 44)** | minikube's podman driver requires `--rootless` (or `config set rootless true`) on Fedora 44 | §3 | r05 user output: rootful default failed with `sudo: a password is required`; r05b prose + config + demo flag added |
+| **verified (Fedora 44)** | minikube under rootless podman additionally requires `--container-runtime=containerd` | §3 | r05b user output: rootless+default(docker)-runtime failed with `docker.service` start error; r05c sets containerd explicitly |
 | unverified              | `minikube pause/unpause/stop/delete` cluster-lifecycle commands work         | §3      | Pause/stop not exercised in driver-check; defer or add lifecycle demo later |
 
 ## C. Testing matrix
@@ -175,6 +176,29 @@ and what's next.
      `~/.krew/bin/kubectl-<plugin>` paths explicitly for
      krew-managed tools, reports them as `kubectl <plugin>`
      to reflect actual invocation
+- **r05c** (2026-05-17, demo-fix + prose-correction) — Issues
+  from the r05b user run:
+  1. With `--rootless` accepted, `minikube start` got further
+     but failed during in-cluster provisioning with
+     `Job for docker.service failed`. Root cause: minikube
+     v1.38.x picks **docker** as the in-cluster container
+     runtime by default for the podman driver, and the
+     in-container Docker daemon needs systemd-managed cgroup
+     delegation that doesn't initialize cleanly in a rootless
+     container. The minikube output itself flagged the v1.39
+     pivot to containerd. Fix: r05c adds
+     `minikube config set container-runtime containerd` to §3
+     defaults, `--container-runtime=containerd` to demo.sh,
+     and rewrites §3's "In-cluster container runtime" section
+     (which had wrongly claimed containerd was the v1.38.x
+     default)
+  2. The failed-first-attempt left an orphaned podman volume
+     named `driver-check`, which blocked the second attempt
+     with `volume already exists`. Fix: demo.sh's pre-flight
+     and trap-cleanup now both call `podman volume rm
+     ${PROFILE}` in addition to `minikube delete`. Also added
+     `--delete-on-failure` to `minikube start` so minikube's
+     own retry logic cleans up before retrying
 
 **Open, priority-ordered:**
 

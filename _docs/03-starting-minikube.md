@@ -29,6 +29,7 @@ minikube config set cpus 6
 minikube config set memory 16384
 minikube config set driver podman
 minikube config set rootless true
+minikube config set container-runtime containerd
 ```
 
 These get written to `~/.minikube/config/config.json` and are
@@ -103,7 +104,7 @@ Three layers stacked up:
 | Layer                      | Implementation                              | Inspect with                              |
 |----------------------------|---------------------------------------------|-------------------------------------------|
 | Host container engine      | Podman (rootless, on Fedora 44)             | `podman ps` (shows the `minikube` container) |
-| In-cluster container runtime | containerd (the default)                  | `minikube ssh -- crictl info`             |
+| In-cluster container runtime | containerd (set explicitly in defaults; see below) | `minikube ssh -- crictl info` |
 | Kubernetes itself          | One node running kubelet + control plane    | `kubectl get nodes`                       |
 
 Most readers don't need to think about the bottom two layers
@@ -175,27 +176,82 @@ a separate profile (covered in §4):
 minikube start -p docker-profile --driver=docker
 ```
 
-## In-cluster container runtime (briefly)
+## In-cluster container runtime
 
 Separate from the driver above is the container runtime *inside*
-the cluster — what the kubelet uses to run Pods. Default is
-`containerd`. Alternative is `cri-o`:
+the cluster — what the kubelet uses to run Pods.
+
+The defaults block above sets `container-runtime=containerd`
+explicitly. This is worth a small detour to explain, because
+minikube v1.38.x's default behavior here surprises people.
+
+### What minikube picks if you don't choose
+
+minikube v1.38.x picks the in-cluster runtime based on the driver
+and other factors, and for the podman driver it historically
+defaults to **docker as the in-cluster runtime**. minikube's own
+v1.38 release notes flag that this is about to change:
+
+> Starting v1.39.0, minikube will default to "containerd"
+> container runtime.
+
+We're getting ahead of that — and avoiding a real failure mode in
+the meantime.
+
+### Why docker-as-in-cluster-runtime fails under rootless podman
+
+Inside the kicbase container, minikube has to start `dockerd` as a
+systemd service if you've selected the docker runtime. systemd
+expects to manage cgroup delegation, network namespaces, and a
+few other things in a way that **doesn't work cleanly inside a
+rootless container** (the kicbase container is rootless because
+the host's podman is rootless). The symptom is a failure during
+`minikube start` along the lines of:
+
+```
+Job for docker.service failed because the control process exited
+with error code.
+```
+
+`containerd` is simpler — no systemd-managed daemon to bring up,
+no cgroup-delegation dance — so it initializes cleanly in
+rootless mode.
+
+### Putting the layers together
+
+Three independent runtime choices, easy to conflate:
+
+| Layer                            | What we use here                         | Why                                                              |
+|----------------------------------|------------------------------------------|------------------------------------------------------------------|
+| Host container engine            | **Podman, rootless**                     | Default on Fedora 44; no `sudo` needed                            |
+| minikube driver                  | **`--driver=podman --rootless`**         | Talks to the host podman in rootless mode                         |
+| In-cluster container runtime     | **`--container-runtime=containerd`**     | Initializes cleanly in rootless; matches minikube's v1.39 default |
+
+The first two are about the host's relationship with minikube.
+The third is what the kubelet uses inside the cluster to run
+Pods — *independent* of the first two.
+
+### Alternative in-cluster runtime: cri-o
+
+If you have a specific reason to run cri-o instead (matching a
+production environment that uses it, for example):
 
 ```bash
 minikube start --container-runtime=cri-o
 ```
 
-You'll rarely need to change this. The two notable points:
+You'll rarely need this. Stick with containerd.
 
-1. **Docker is not an in-cluster runtime anymore.** The dockershim
-   was removed in Kubernetes 1.24 (2022). minikube still accepts
-   `--container-runtime=docker` for legacy reasons, but it
-   bridges to containerd under the hood
-2. **Don't confuse driver with runtime.** `--driver=docker` says
-   "use Docker on the host to run the kicbase container that
-   contains the cluster". `--container-runtime=docker` says
-   "use the (legacy) docker runtime inside the kubelet". They're
-   independent layers
+### A note on docker-as-runtime in modern Kubernetes
+
+Docker as the in-cluster runtime has been deprecated since
+Kubernetes 1.24 (2022) — that release removed the dockershim that
+had bridged the kubelet's CRI interface to Docker's non-CRI
+socket. minikube's `--container-runtime=docker` still works, but
+it routes through `cri-dockerd`, an external shim that adds
+moving parts without buying you anything for tutorial-scale work.
+There's no reason to prefer docker over containerd as an
+in-cluster runtime today.
 
 ## Cluster lifecycle
 
