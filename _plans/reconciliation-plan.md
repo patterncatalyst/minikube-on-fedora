@@ -1378,13 +1378,89 @@ have to derive them.
   notes below; user will splice in this commit or a
   follow-up r16a.
 
+- **r16a** (2026-05-17, §14 FAQ rendering bug + §3 diagram
+  clarification) — two fixes from user review:
+
+  **§14 rendering bug.** User caught the FAQ "degenerating"
+  partway through. Root cause: kramdown (Jekyll's Markdown
+  processor) interprets `<placeholder>` inside inline
+  backticks as an HTML opening tag and tries to consume
+  forward until it finds a matching close. The triggering
+  case was `` `helm rollback <release>\n<revision>` `` — a
+  multi-line inline backtick span with two `<word>`
+  patterns. The cascade swallowed `<release> <revision>`
+  itself, then collapsed the following Q&A headers into a
+  single run-on paragraph (Strimzi version, Istio
+  injection, KEDA HPA-zero, etc.) until kramdown finally
+  recovered.
+
+  Fix: replaced ALL `<placeholder>` patterns with
+  `[placeholder]` throughout the FAQ — both inline (where
+  they were buggy) and in fenced code blocks (for
+  consistency). Square brackets render literally in
+  Markdown and don't trigger HTML parsing, and they match
+  common CLI / man-page convention for "fill in your
+  value". Also collapsed the multi-line inline backtick
+  to a single line as belt-and-suspenders. Sed pass
+  covered: `<pod-name>`, `<pvc-name>`, `<release>`,
+  `<revision>`, `<name>` (bare). Lint pass verified
+  zero remaining bare-angle-bracket placeholders in §14.
+
+  **§3 diagram clarification.** User noted the topology
+  diagram showed containerd inside the minikube container,
+  and asked whether Podman actually uses containerd
+  (rather than crun). Research confirmed the diagram is
+  technically accurate but the layering was implicit:
+  - Host Podman uses **crun** to run containers (no
+    containerd anywhere on the host)
+  - One of those containers IS the minikube node
+  - **Inside** the minikube node, Kubernetes' kubelet
+    needs a CRI runtime, configured via
+    `--container-runtime`. We chose `containerd` in §3
+  - Per [minikube docs](https://minikube.sigs.k8s.io/docs/drivers/podman/):
+    rootless Podman → containerd (recommended);
+    rootful Podman → CRI-O (recommended)
+
+  Diagram updates: the "rootless Podman" sublabel now
+  reads "runs containers via crun, no daemon"; the
+  "containerd" sublabel now reads "Kubernetes CRI runtime
+  — chosen via `--container-runtime=containerd`" (with the
+  flag in mono); the footnote now reads "Two container
+  runtimes, not one: Podman (host) runs the node container
+  via crun; containerd (inside the node) runs the Pods."
+  All three changes make the dual-layer architecture
+  explicit on the face of the diagram.
+
+  **Also added new FAQ entry** "I thought Podman uses
+  crun — why does the diagram show containerd?" before
+  the "image built locally" question, since the layering
+  confusion is exactly the kind of question a careful
+  reader hits. The answer cross-references the minikube
+  docs explicitly.
+
+  Bug-finder credit: user spotted both issues during the
+  r15+r16 review pass. The kramdown collision is the kind
+  of thing that's hard to spot until rendered — local
+  `jekyll serve` would have shown it, but we verify via
+  `gh run watch` only, which surfaces build failures but
+  not rendering quality. Worth a future r17 editorial-pass
+  item: render every section in a deployed-preview branch
+  before declaring it done.
+
+  Files updated:
+  - `_docs/14-faq.md` (now 2085 words / +130 words from
+    new Q&A; 22+1 = 23 Q&A entries)
+  - `assets/diagrams/03-minikube-topology.svg` (sublabel
+    and footnote text tweaked; structure unchanged)
+
+  Verified row count unchanged at **107**.
+
 **Open, priority-ordered:**
 
-1. **r16a (optional)** — Prose splices for §3, §6, §11, §12
-   to embed the SVGs. Single-line markdown additions or
-   replacements per section; user can do these inline with
-   the r16 apply step or pass me the current ASCII text and
-   I'll do them in a follow-up
+1. **Prose splices for §3, §6, §11, §12** — embed the
+   SVGs into the relevant section prose. User can do these
+   inline with the r16/r16a apply step or pass me the
+   current ASCII text and I'll do them in a follow-up
 2. **r17** — Editorial pass. Read every section's prose
    front-to-back. Tighten word choice, ensure consistent
    voice ("you" for reader, passive otherwise), verify

@@ -28,7 +28,7 @@
 
   <rect x="70" y="130" width="780" height="300" rx="5" class="neutral"/>
   <text x="88" y="152" class="label">rootless Podman</text>
-  <text x="88" y="168" class="sublabel">user-namespaced container engine, no system daemon</text>
+  <text x="88" y="168" class="sublabel">user-namespaced container engine — runs containers via crun, no daemon</text>
 
   <rect x="100" y="190" width="720" height="220" rx="4" class="neutral-2"/>
   <text x="118" y="212" class="label">minikube node container</text>
@@ -36,7 +36,7 @@
 
   <rect x="130" y="250" width="660" height="140" rx="3" class="neutral-3"/>
   <text x="148" y="272" class="label">containerd</text>
-  <text x="148" y="288" class="sublabel">CRI runtime — manages Pod containers via OCI runc</text>
+  <text x="148" y="288" class="sublabel">Kubernetes CRI runtime — chosen via <tspan font-family="ui-monospace, SFMono-Regular, Menlo, monospace" fill="#2c2c2c">--container-runtime=containerd</tspan></text>
 
   <rect x="170" y="310" width="140" height="60" rx="3" class="blue"/>
   <text x="240" y="334" text-anchor="middle" class="label">Pod</text>
@@ -52,5 +52,5 @@
 
   <text x="700" y="345" class="sublabel">… and so on</text>
 
-  <text x="460" y="475" text-anchor="middle" class="footnote">No root daemon. The host kernel sees only podman processes; everything Kubernetes-shaped lives in the user namespace.</text>
+  <text x="460" y="475" text-anchor="middle" class="footnote">Two container runtimes, not one: Podman (host) runs the node container via crun; containerd (inside the node) runs the Pods.</text>
 </svg>

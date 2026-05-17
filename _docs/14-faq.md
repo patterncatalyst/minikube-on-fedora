@@ -58,7 +58,7 @@ scratch.
 ### Q: Pods stuck in `ImagePullBackOff` or `ErrImagePull`
 
 ```bash
-kubectl describe pod <pod-name> | grep -A 5 Events
+kubectl describe pod [pod-name] | grep -A 5 Events
 ```
 
 The Events block will tell you what went wrong. Most common
@@ -68,11 +68,29 @@ you haven't configured, or your minikube profile can't reach
 the internet (try `minikube ssh -p minikube -- ping -c 2
 8.8.8.8`).
 
+### Q: I thought Podman uses crun — why does the diagram show containerd?
+
+Both are correct, and they live at different layers. On the
+host, **rootless Podman** uses **crun** to run containers — one
+of which is the "minikube node" container. Inside that
+container, Kubernetes is installed with its own CRI
+runtime that the kubelet talks to. The `--container-runtime`
+flag we passed in §3 chose **containerd** for that inner
+layer; alternatives are `cri-o` (recommended for rootful
+Podman, but problematic in rootless mode) or `docker`
+(deprecated). So Podman+crun runs the outer node container;
+containerd inside that container runs the actual Pods.
+
+The minikube docs spell out the recommendation:
+[rootless Podman → containerd, rootful Podman → CRI-O](https://minikube.sigs.k8s.io/docs/drivers/podman/).
+We're rootless, so containerd is the right inner choice.
+
 ### Q: my image built locally but Kubernetes can't find it
 
 Locally-built images live in your host's container runtime
 (Docker or Podman). Kubernetes inside minikube uses a
-*different* runtime (containerd in the minikube VM). To make
+*different* container runtime — containerd, running inside
+the minikube node container, not on your host. To make
 local images visible, either:
 
 ```bash
@@ -90,9 +108,9 @@ when the image is local.
 ### Q: Pod is Running but the app inside isn't responding
 
 ```bash
-kubectl logs <pod-name>                    # stdout/stderr
-kubectl exec -it <pod-name> -- /bin/sh     # shell inside the container
-kubectl describe pod <pod-name>            # readiness/liveness probe status
+kubectl logs [pod-name]                    # stdout/stderr
+kubectl exec -it [pod-name] -- /bin/sh     # shell inside the container
+kubectl describe pod [pod-name]            # readiness/liveness probe status
 ```
 
 Common causes: the app isn't binding to `0.0.0.0` (only
@@ -103,7 +121,7 @@ isn't being routed to the Pod yet.
 
 ### Q: the Pod restarts every few seconds (CrashLoopBackOff)
 
-`kubectl logs <pod-name> --previous` shows the logs from the
+`kubectl logs [pod-name] --previous` shows the logs from the
 previous (crashed) instance, which usually contains the
 actual error. If the logs don't show anything useful, the
 crash is happening so fast the app hasn't logged anything —
@@ -116,7 +134,7 @@ flag if the container ran out of memory.
 
 Rootless minikube networking puts the cluster IP behind
 slirp4netns, which isn't routable from the host directly. Use
-`minikube service <name> --url -p minikube` instead of trying
+`minikube service [name] --url -p minikube` instead of trying
 to hit the NodePort by IP — it sets up a tunnel for you. See
 §7 for the full pattern.
 
@@ -144,7 +162,7 @@ expose specific services via `kubectl port-forward --address
 
 ```bash
 kubectl get pv,pvc -A
-kubectl describe pvc <pvc-name>
+kubectl describe pvc [pvc-name]
 ```
 
 The Events on the PVC will tell you why it's not binding. Most
@@ -158,7 +176,7 @@ indefinitely.
 
 PVCs are not removed when the Deployment that uses them goes
 away — that's intentional, so you don't lose data accidentally.
-`kubectl delete pvc <name>` removes it explicitly. The
+`kubectl delete pvc [name]` removes it explicitly. The
 underlying PV's behavior on PVC delete depends on the
 PV's `persistentVolumeReclaimPolicy` (typically `Delete` for
 dynamically-provisioned, `Retain` for hand-created).
@@ -217,7 +235,7 @@ when the Pod is recreated. Three options:
 {% raw %}
 ```bash
 # Option 1: force a restart
-kubectl rollout restart deployment/<name>
+kubectl rollout restart deployment/[name]
 
 # Option 2: use a checksum annotation in the Pod template
 #         (helm pattern, see §9)
@@ -237,13 +255,12 @@ rollouts.
 ### Q: I want to roll back a Deployment to a previous version
 
 ```bash
-kubectl rollout history deployment/<name>
-kubectl rollout undo deployment/<name>             # last revision
-kubectl rollout undo deployment/<name> --to-revision=3
+kubectl rollout history deployment/[name]
+kubectl rollout undo deployment/[name]             # last revision
+kubectl rollout undo deployment/[name] --to-revision=3
 ```
 
-For helm-managed deployments, `helm rollback <release>
-<revision>` is the equivalent.
+For helm-managed deployments, `helm rollback [release] [revision]` is the equivalent.
 
 ## Operator-specific issues
 
@@ -270,7 +287,7 @@ Three things to verify, in order:
 
 Note: in Istio 1.29+, the sidecar appears as an **initContainer
 with `restartPolicy: Always`** (KEP-753 native sidecars), not
-as a regular container. `kubectl get pod <name> -o
+as a regular container. `kubectl get pod [name] -o
 jsonpath='{.spec.initContainers[*].name}'` is the check that
 works on both old and new Istio versions.
 
@@ -281,7 +298,7 @@ Deployment to zero by deleting the underlying HPA (HPA can't
 manage 0-replica Deployments). When traffic returns, KEDA
 recreates the HPA. If your workload IS running but the
 ScaledObject shows 0 desired replicas, check
-`kubectl describe scaledobject <name>` — the conditions block
+`kubectl describe scaledobject [name]` — the conditions block
 shows why KEDA disagrees with the current state.
 
 ## System-level
