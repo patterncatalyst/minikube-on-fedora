@@ -1,239 +1,146 @@
-# Jekyll Tutorial Skeleton
+# Minikube Tutorial on Fedora
 
-A reusable starting point for technical tutorial sites with runnable
-examples, built on Jekyll, deployed to GitHub Pages, and designed to be
-extended interactively with Claude or another AI assistant.
+A hands-on tutorial for installing and using [minikube][minikube] on
+Fedora 44 with `kubectl` and `helm`, plus reference material for
+[Istio][istio] and (optionally) [KEDA][keda] with the HTTP add-on.
 
-This skeleton was extracted from the [Project Hummingbird tutorial](https://patterncatalyst.github.io/hummingbird-tutorial/)
-after a long collaborative build-out — it captures the structure,
-conventions, and tooling that worked well in that build, with the
-project-specific content stripped.
+The published tutorial lives at:
+**https://patterncatalyst.github.io/minikube-on-fedora/**
 
-> **Quick start:** see [GETTING-STARTED.md](GETTING-STARTED.md) for the
-> step-by-step setup. This README explains what's here and why.
+[minikube]: https://minikube.sigs.k8s.io/
+[istio]: https://istio.io/
+[keda]: https://keda.sh/
 
 ---
 
-## What this skeleton gives you
+## What this tutorial teaches
 
-A working Jekyll project that, once configured, produces a site with:
+A developer who works on Fedora with Podman, podman-compose, and
+Podman Desktop will, by the end:
 
-- **A landing page** with hero, "what you'll learn" section, and card grid
-  pointing into the tutorial sections
-- **A tutorial section structure** organized as numbered Markdown files in
-  `_docs/` that Jekyll renders with consistent layout, navigation, and
-  duration estimates
-- **A reconciliation plan** in `_plans/` that tracks what's been verified
-  vs. what hasn't — critical for honest documentation when using AI
-  assistants who may produce plausible-looking but unverified content
-- **A diagrams directory** with paired `.svg` (rendered) and `.excalidraw`
-  (editable source) files, included via a single Liquid include
-- **A runnable examples directory** structured to live alongside the
-  tutorial without being included in the published site
-- **A scripts directory** with a tested pattern for end-to-end
-  build-and-test scripts and an aggregator
-- **A GitHub Actions workflow** that builds and deploys to GitHub Pages
-  with a working Ruby/Jekyll setup
-- **CSS** with a clean, opinionated, accessible design — nav, cards,
-  body type, code blocks, callouts, tables
+- Install minikube on Fedora 44 from standard repositories where
+  possible
+- Start a local Kubernetes cluster with the podman driver
+- Deploy applications imperatively with `kubectl` and declaratively
+  with helm charts (using public charts and authoring a small one)
+- Expose services, manage persistent volumes, run multiple
+  clusters via profiles, and use minikube's addons
+- Use the Istio service mesh and KEDA HTTP-driven autoscaling on a
+  local cluster as a reference for applying them elsewhere
 
-The total file count of the skeleton is ~25 files. Most are short.
+Sections 11 (Istio) and 12 (KEDA) are skippable for readers who
+only want the core minikube workflow.
 
-## Directory tour
+## Audience
+
+Primary: a working developer on Fedora 44 with paragraph-level
+familiarity with Kubernetes concepts (Pod, Deployment, Service)
+who wants a single coherent reference for getting work done on a
+local cluster.
+
+Secondary: developers on Fedora derivatives (RHEL, Rocky, Alma),
+developers on macOS who occasionally need local Kubernetes
+(advisory notes only, not a tested platform), and readers learning
+helm/istio/KEDA who want a low-friction local environment.
+
+Not for: complete Kubernetes newcomers (read the upstream "Learn
+Kubernetes Basics" walkthrough first), production cluster
+operators, or Windows users (WSL not tested).
+
+## Repository layout
 
 ```
 .
-├── _config.yml              ← Jekyll config; edit branding here
-├── Gemfile                  ← Ruby deps; pinned to Pages-compatible versions
-├── README.md                ← This file (replace with your project's README)
-├── PRD.md                   ← Product requirements doc — fill in before writing
-├── GETTING-STARTED.md       ← Step-by-step setup instructions
-├── STARTING-WITH-CLAUDE.md  ← How to use this skeleton with Claude on new projects
-├── LESSONS-LEARNED.md       ← Empirical wisdom about Podman, Jekyll, AI workflows
-├── LICENSE                  ← Apache 2.0 (replace with your license)
-│
-├── .github/
-│   └── workflows/
-│       └── pages.yml        ← Build-and-deploy workflow for GitHub Pages
-│
-├── _layouts/                ← Wrapper HTML around content
-│   ├── default.html         ← Base shell with header/footer
-│   ├── tutorial.html        ← Tutorial sections (with section nav, duration)
-│   └── plan.html            ← Reconciliation/planning docs
-│
-├── _includes/               ← Reusable HTML fragments
-│   ├── header.html          ← Top nav (uses _config.yml values)
-│   ├── footer.html          ← Bottom of every page
-│   └── excalidraw.html      ← <figure> with SVG + .excalidraw download link
-│
-├── _data/                   ← YAML data accessible as `site.data.*`
-│   └── (empty, expand as needed)
-│
-├── _docs/                   ← Tutorial content (Markdown collection)
-│   ├── 00-outline.md        ← Stub with table of contents
-│   └── 01-prerequisites.md  ← Stub with structure guidance
-│
-├── _plans/                  ← Planning/reconciliation docs (Markdown collection)
-│   └── reconciliation-plan.md ← The audit-trail document
-│
+├── _config.yml                  ← Jekyll site config
+├── _docs/                       ← Tutorial sections (00-outline.md, 01-prerequisites.md, …)
+├── _plans/
+│   └── reconciliation-plan.md   ← Audit trail: what's verified vs. unverified
+├── _includes/, _layouts/        ← HTML wrappers
 ├── assets/
-│   ├── css/
-│   │   └── site.css         ← All site styles in one file
-│   ├── diagrams/            ← Paired .svg + .excalidraw files
-│   │   └── README.md        ← Conventions for adding diagrams
-│   └── images/              ← Photos, screenshots, hero images
-│
-├── examples/                ← Runnable code that lives alongside the tutorial
-│   └── README.md            ← Conventions for adding examples
-│
-├── scripts/                 ← Developer-facing scripts
-│   ├── README.md            ← Index of what each script does
-│   ├── lib/
-│   │   └── _helpers.sh      ← Sourced by every test script
-│   └── test-template.sh     ← Copy-and-edit template for new test scripts
-│
-├── index.html               ← Homepage with hero + cards
-├── examples.html            ← Optional listing page for the examples/
-└── diagrams.html            ← Optional gallery page for the diagrams/
+│   ├── css/site.css
+│   └── diagrams/                ← Paired .svg (rendered) + .excalidraw (editable)
+├── examples/                    ← Runnable code per tutorial section
+│   └── NN-name/
+│       ├── README.md            ← Narrated walkthrough
+│       ├── demo.sh              ← Strict end-to-end script (also serves as test)
+│       └── *.yaml               ← Manifests, helm values, etc.
+├── scripts/
+│   ├── lib/_helpers.sh
+│   ├── test-all-examples.sh     ← Aggregator across every example
+│   └── test-NN-name.sh          ← (optional) maintainer test wrappers
+├── PRD.md                       ← Product requirements doc
+├── LESSONS-LEARNED.md           ← Hard-won empirical guidance
+├── GETTING-STARTED.md           ← Skeleton setup instructions (carryover)
+└── STARTING-WITH-CLAUDE.md      ← How to work with Claude on this project
 ```
 
-## Conventions worth knowing
+`examples/` is excluded from the published site by `_config.yml`
+(`exclude: examples/`) — it lives in the repo as runnable code,
+not as web content.
 
-These were learned the expensive way during the Hummingbird build. They
-apply to most projects you'd build on this skeleton.
+## Running the site locally
 
-### Numbered tutorial files
+The site is a Jekyll project. To build and view it locally:
 
-Tutorial sections live in `_docs/` and are numbered: `00-outline.md`,
-`01-prerequisites.md`, `02-introduction.md`, etc. The number prefix:
-
-- Sorts files in editor and on disk in reading order
-- Becomes part of the URL slug (`/docs/01-prerequisites/`)
-- Lets you reorganize by renaming numbers (with care for cross-links)
-
-Front-matter on each section follows this pattern:
-
-```yaml
----
-title: Prerequisites
-order: 1
-description: One-sentence description for cards and meta tags.
-duration: 15 minutes
----
+```bash
+bundle install
+bundle exec jekyll serve --baseurl ""
 ```
 
-The `order` field controls the prev/next nav; the `duration` is
-displayed in the layout to set reader expectations.
+Open http://localhost:4000/ — `--baseurl ""` overrides the
+production `/minikube-on-fedora` prefix so URLs resolve from the
+root during dev.
 
-### `_docs/` and `_plans/` are Jekyll collections
+If `bundle install` fails on Fedora with native extension errors,
+install the build deps once:
 
-These are **not** Jekyll defaults — they're configured as collections in
-`_config.yml`. The `defaults:` block gives every file in `_docs/` the
-`tutorial` layout automatically, so you don't repeat `layout: tutorial`
-in every front-matter block.
+```bash
+sudo dnf install -y ruby ruby-devel @development-tools
+```
 
-If you rename either, update `_config.yml`'s `collections:` and
-`defaults:` sections to match.
+## Running the examples
 
-### Examples directory is excluded from the build
+Each tutorial section that includes runnable code has a matching
+directory under `examples/`. To run one:
 
-The `examples/` directory holds runnable Containerfiles, source code,
-and configurations the tutorial references — but it is **not** part of
-the published site. This is enforced by `exclude: examples/` (with the
-trailing slash; without it the rule doesn't fire) in `_config.yml`.
+```bash
+cd examples/06-deploy-nginx-kubectl   # or whichever
+./demo.sh
+```
 
-The pattern: write the tutorial section, write a corresponding
-`examples/<name>/` directory with a working Containerfile, write a test
-script that builds and runs it. The tutorial references commands the
-reader can copy-paste; the examples directory holds the same code in
-runnable form.
+To run every example and tally results:
 
-### Diagram pairing
+```bash
+./scripts/test-all-examples.sh
+```
 
-Every diagram lives in `assets/diagrams/` as **two files** with the same
-base name:
+The aggregator does not fail-fast — it runs every example even if
+earlier ones fail, then reports pass/fail per script at the end.
 
-- `<name>.svg` — the rendered diagram, what appears on the site
-- `<name>.excalidraw` — the editable JSON source
+## Verification status
 
-The `excalidraw.html` include renders the SVG inline as a `<figure>` and
-adds a "Download Excalidraw source" link below it, so anyone can edit
-the diagram in [excalidraw.com](https://excalidraw.com) and re-export.
+Honest accounting of what's been tested vs. what's claimed lives
+in [`_plans/reconciliation-plan.md`][plan]. Default status for any
+new claim is `unverified`; promotion to `verified` requires a real
+test run by a human.
 
-Diagram naming convention: `<section-number>-<topic>-<thing>.svg`. So
-the multi-stage build pattern diagram from section 4 is
-`04-multi-stage-builds-pattern.svg`. This lets you find diagrams from
-the section number alone.
+[plan]: ./_plans/reconciliation-plan.md
 
-### The reconciliation plan is honest about what's verified
+## Contributing
 
-`_plans/reconciliation-plan.md` is the **audit trail**. As you write
-tutorial content, you'll inevitably make claims you haven't tested. The
-reconciliation plan tracks each one as `verified`, `verified (Fedora 43)`,
-`in flight`, `unverified`, or `out of scope`.
+This started as a personal/team reference. Issues and pull
+requests are welcome at
+[github.com/patterncatalyst/minikube-on-fedora][repo].
 
-This is most valuable when AI is helping write content — AI is excellent
-at producing plausible-looking technical claims, and the reconciliation
-plan is where those claims get either promoted to verified or flagged
-for testing.
-
-The header banner at the top of the testing matrix (G.2 in the
-Hummingbird version) gives a clear at-a-glance status. This is the first
-thing a reviewer or future you should look at.
-
-### Test script naming and structure
-
-Every `examples/<name>/` should have a corresponding
-`scripts/test-<name>.sh` that builds, runs, validates response, and
-tears down — even if all six examples share 90% of the script content.
-The aggregator `scripts/test-all-examples.sh` runs them all and reports
-pass/fail per script.
-
-Test scripts:
-
-- Source `scripts/lib/_helpers.sh` for color output, `repo_root`,
-  `wait_for_http`
-- Use `set -euo pipefail` so failures surface
-- Use `trap "cleanup_container ..." EXIT` to tear down even on failure
-- Use `127.0.0.1` not `localhost` (avoids IPv4/IPv6 dual-stack issues)
-- Use distinct ports per test (1808x range works) so they don't collide
-- Exit non-zero on failure so the aggregator can tally
-
-### The aggregator does not fail-fast
-
-`test-all-examples.sh` runs every test even if earlier ones fail, then
-prints a final summary. Useful when you want to see all problems at
-once after a refactor instead of fixing them one re-run at a time.
-
-## What's NOT in the skeleton
-
-Deliberately omitted, because they're project-specific:
-
-- The actual tutorial content (you'll write your own)
-- The actual examples (project-dependent)
-- The actual diagrams (project-dependent)
-- A specific color scheme branded to one project (the CSS is neutral)
-- A specific test runtime — the helper supports any HTTP-serving
-  container; non-HTTP examples need their own validators
-
-## When to use this skeleton
-
-Good fit:
-
-- Multi-section technical tutorials with running code
-- Documentation projects where examples need to be verifiable
-- Projects where you'll be working with AI assistants and want a clear
-  "verified vs. claimed" boundary
-- Project Pages on GitHub (`USERNAME.github.io/PROJECT`)
-
-Not a great fit (better tools exist):
-
-- API reference documentation (use OpenAPI/Swagger or similar)
-- Single-page reference cards (overkill — just write a Markdown gist)
-- Marketing sites (the design is technical, not promotional)
+[repo]: https://github.com/patterncatalyst/minikube-on-fedora
 
 ## License
 
-The skeleton itself is Apache 2.0; replace with whatever license your
-project uses. The `LICENSE` file should be updated to match your
-project before first commit.
+Apache License, Version 2.0. See [`LICENSE`](./LICENSE).
+
+The 2023 predecessor of this tutorial lives at
+[github.com/patterncatalyst/minikube][old-repo] for historical
+reference; it covers Kubernetes 1.22 and the docker / containerd
+driver path, which are stale for current work.
+
+[old-repo]: https://github.com/patterncatalyst/minikube

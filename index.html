@@ -21,33 +21,39 @@ title: Home
   <div class="container">
     <h2 class="section-heading">What you'll learn</h2>
     <p class="section-sub">
-      <!-- TODO: replace with a one-paragraph summary of the tutorial's
-           outcomes. What does the reader know how to do after finishing? -->
-      A one-paragraph summary of what the reader will know how to do
-      after working through the tutorial.
+      How to install minikube on Fedora 44, run a local Kubernetes
+      cluster with the podman driver, and deploy applications with
+      both <code>kubectl</code> and <code>helm</code>. Later sections
+      cover Istio service mesh and (optionally) KEDA HTTP-driven
+      autoscaling — reference material for using those tools against
+      a local cluster. All container images are UBI-based and do not
+      require Red Hat subscription registration.
     </p>
 
     <div class="cards">
-      <!-- TODO: replace these placeholder cards with cards pointing at
-           the tutorial's main sections. Three to six cards usually works
-           best. -->
-
-      <a class="card" href="{{ '/docs/01-prerequisites/' | relative_url }}">
-        <div class="card__eyebrow">Section 1</div>
-        <h3 class="card__title">Prerequisites</h3>
-        <p class="card__desc">What you need installed before starting.</p>
-        <div class="card__meta">
-          <span>15 min</span>
-          <span>Read →</span>
-        </div>
-      </a>
+      <!--
+        Three live cards for now. Add more (Installation §2, Helm §9,
+        Istio §11, KEDA §12, etc.) as those sections get drafted —
+        each card must point to a path that already resolves, or
+        the published site will show 404s.
+      -->
 
       <a class="card" href="{{ '/docs/00-outline/' | relative_url }}">
         <div class="card__eyebrow">Overview</div>
         <h3 class="card__title">Tutorial outline</h3>
-        <p class="card__desc">All sections and what each one covers.</p>
+        <p class="card__desc">All 15 sections and how they build on each other.</p>
         <div class="card__meta">
           <span>2 min</span>
+          <span>Read →</span>
+        </div>
+      </a>
+
+      <a class="card" href="{{ '/docs/01-prerequisites/' | relative_url }}">
+        <div class="card__eyebrow">Section 1</div>
+        <h3 class="card__title">Prerequisites</h3>
+        <p class="card__desc">Hardware, OS, and tool checks before you start.</p>
+        <div class="card__meta">
+          <span>10 min</span>
           <span>Read →</span>
         </div>
       </a>

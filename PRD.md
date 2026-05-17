@@ -311,8 +311,8 @@ guaranteed to make the cut:
 
 - All examples' `demo.sh` pass under `scripts/test-all-examples.sh`
   on Fedora 44 with the podman driver
-- Reconciliation plan shows all G.2 rows as
-  `verified (Fedora 44)`
+- Reconciliation plan shows all Section C (testing matrix) rows
+  as `verified (Fedora 44)`
 - §1 prerequisites tested on a fresh Fedora 44 install or VM
 - Each section reads end-to-end without forcing a reader to
   context-switch into vendor docs for basic steps
