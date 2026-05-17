@@ -1,0 +1,30 @@
+# Default values for the nginx-helm chart.
+# Override at install time with --values <file> or --set key=value
+
+replicaCount: 1
+
+image:
+  # Built in §6's example, cached in minikube's image store.
+  repository: nginx-custom
+  tag: v1
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 80
+
+# Content rendered into the index.html ConfigMap.
+# These are the values you'd typically override per environment.
+content:
+  title: "Test Page from helm chart"
+  message: "Content served from a templated ConfigMap"
+  customLine: "Override this with --set content.customLine=..."
+
+# Resources for the nginx container
+resources:
+  requests:
+    cpu: "100m"
+    memory: "64Mi"
+  limits:
+    cpu: "500m"
+    memory: "256Mi"
