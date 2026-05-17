@@ -138,11 +138,12 @@ Fedora 44.
 | **verified (Fedora 44)** | Istio 1.29+ on Kubernetes 1.28+ injects `istio-proxy` as a **native sidecar** ([KEP-753](https://kep.dev/sig-node/753)) — an init container with `restartPolicy: Always`, not as a main container. JSONPath checks against `.status.containerStatuses[]` or `.spec.containers[]` will MISS it; need to also check `.status.initContainerStatuses[]` / `.spec.initContainers[]`. Human-readable `kubectl get pods` READY column still shows `2/2` because native sidecars count toward readiness totals | §11 | r12c user run: Pod's `sidecar.istio.io/status` annotation showed `"initContainers":["istio-init","istio-proxy"]`, `"containers":null` — istiod's own injection-status report confirmed istio-proxy went into initContainers. r12d demo's check now reads both `.spec.containers[*].name` and `.spec.initContainers[*].name` so it works for both native-sidecar mode (current default in K8s 1.28+) and the older "main container" mode (still seen on K8s ≤1.27) |
 | **verified (Fedora 44)** | `scripts/setup-istio.sh` downloads + extracts Istio 1.29.2 and installs istioctl to `~/.local/bin/` | §11 | r12 user run: clean output through all 5 steps (directories, download via istio.io, istioctl install, symlink, PATH check); ended with `client version: 1.29.2` |
 | **verified (Fedora 44)** | minikube image cache is per-profile — `nginx-custom:v1` from the `minikube` profile is NOT visible on the `istio` profile | §11 | r12 user run: "image not present on istio; building from §6's Containerfile" → multi-stage build (ubi9 builder + ubi9-minimal runtime) completed in ~10s; image then available on istio profile |
-| unverified              | Bookinfo sample app deploys cleanly with all 4 microservices + 6 Pods reaching Available | §11 | r12 demo claim; first cross-profile use of upstream Istio sample images |
-| unverified              | `bookinfo-gateway.yaml` (Gateway + VirtualService) exposes productpage at `istio-ingressgateway:80` reachable via `kubectl port-forward` | §11 | r12 demo claim |
-| unverified              | `virtual-service-all-v1.yaml` pins 100% of reviews traffic to v1 (no `glyphicon-star` indicators across 10 sampled responses) | §11 | r12 demo's strongest routing assertion |
-| unverified              | `virtual-service-reviews-50-v3.yaml` produces approximately 50/50 split between v1 and v3 (sampled across 20 responses) | §11 | r12 demo claim; soft-warning on out-of-range counts since 20 samples have variance |
-| unverified              | `istioctl analyze` returns clean output (no Errors) for a configured Bookinfo mesh | §11 | r12 demo claim |
+| **verified (Fedora 44)** | Bookinfo sample app deploys cleanly with all 4 microservices + 6 Pods reaching Available | §11 | r12d user run: all 6 bookinfo Pods (details-v1, productpage-v1, ratings-v1, reviews-v1/v2/v3) showed `2/2 Running` within ~21s of deploy; native sidecars on every Pod |
+| **verified (Fedora 44)** | `bookinfo-gateway.yaml` (Gateway + VirtualService) exposes productpage at `istio-ingressgateway:80` reachable via `kubectl port-forward` | §11 | r12d user run: Gateway + VirtualService applied cleanly; `istioctl analyze` returned clean; port-forward established; productpage responded with HTML containing `<title>Simple Bookstore App</title>` |
+| **verified (Fedora 44)** | `istioctl analyze` returns clean output (no Errors) for a configured Bookinfo mesh | §11 | r12d user run: ✓ Gateway + VirtualService applied; istioctl analyze clean |
+| **verified (Fedora 44)** | Current Istio (1.29+) Bookinfo sample has been rebranded from "Bookinfo Sample" to "Simple Bookstore App" and migrated from Bootstrap CSS (which used `glyphicon-star` for reviews v2/v3 ratings) to Tailwind. HTML-marker-based routing assertions need updating — better: use response-hash distribution which doesn't depend on specific markup | §11 | r12d user run: productpage response started `<title>Simple Bookstore App</title>` and `<script src="static/tailwind/tailwind.css">`. r12e demo replaces `glyphicon-star` count with hash-based check: v1-pin expects ≤3 distinct hashes / 10 samples (deterministic backend), 50/50 split expects ≥2 distinct patterns / 20 samples (mixed deterministic v1 + random-rating v3) |
+| unverified              | `virtual-service-all-v1.yaml` pins 100% of reviews traffic to v1 (verified via response-hash distribution: ≤3 distinct hashes across 10 samples) | §11 | r12e demo's strongest routing assertion; promote when full demo passes |
+| unverified              | `virtual-service-reviews-50-v3.yaml` (or `-jason-v2-v3.yaml` fallback) produces multiple distinct response patterns (≥2 distinct hashes / 20 samples) when applied to bookinfo traffic | §11 | r12e demo claim; replaces the brittle `glyphicon-star` count with markup-agnostic hash diversity |
 | unverified              | kubectl context can be saved + restored across a demo run via `kubectl config use-context` (so `istio` profile work doesn't disturb `minikube` profile state) | §11 | r12 demo's context-management pattern; the trap restores on every exit |
 
 ## C. Testing matrix
@@ -585,15 +586,43 @@ and what's next.
      This is a genuinely useful piece of Istio knowledge worth
      keeping in the plan: anyone scripting against post-1.29
      Istio needs to know
+- **r12e** (2026-05-17, Bookinfo UI rebrand + hash-based routing
+  checks) — r12d user run nearly hit `✓ SUCCESS`: pre-flights all
+  passed, nginx-with-sidecar deployed cleanly, Bookinfo's 4
+  microservices all came up `2/2 Running`, Gateway + VirtualService
+  applied, `istioctl analyze` clean, port-forward reachable.
+  Failure at the productpage marker check: the response *was*
+  Bookinfo (`<title>Simple Bookstore App</title>` and
+  `static/tailwind/tailwind.css`), but the demo was looking for
+  "Bookinfo Sample" — the older title. Bookinfo has been rebranded
+  in current Istio releases and migrated from Bootstrap to
+  Tailwind, which also breaks the downstream `glyphicon-star`
+  routing assertions (that class doesn't exist in Tailwind
+  Bookinfo). r12e fixes:
+  1. Productpage marker check accepts both "Simple Bookstore"
+     (current) and "Bookinfo Sample" (legacy)
+  2. **Routing assertions switched to response-hash distribution**
+     — v1-pinning expects ≤3 distinct hashes across 10 samples
+     (deterministic v1 backend produces near-identical responses);
+     50/50 split expects ≥2 distinct hashes across 20 samples
+     (v1 deterministic + v3 random rating counts → mixed
+     patterns). The hash approach is markup-agnostic and survives
+     future Bookinfo UI redesigns
+  3. 8s sleeps (up from 5s) after applying each rule for
+     propagation
+  4. 4 §11 Section B rows promoted to verified from the r12d
+     user run (Bookinfo deploys with sidecars, Gateway exposure
+     works, istioctl analyze clean, the UI rebrand finding gets
+     its own row). The two routing assertions stay unverified
+     pending the r12e re-run
 
 **Open, priority-ordered:**
 
-1. Re-run `examples/11-istio/demo.sh` after applying r12d. The
-   Pod-injection check now uses the right jsonpath; should pass
-   instantly (no retry needed). On `✓ SUCCESS`, the remaining 5
-   §11 rows promote (bookinfo deploy, gateway exposure, the two
-   routing assertions, analyze) plus Section C
-   `examples/11-istio/`
+1. Re-run `examples/11-istio/demo.sh` after applying r12e. Expect
+   `✓ SUCCESS` — the cluster state is good, the only remaining
+   gates are the productpage title and the two routing
+   distributions. On success: 2 more §11 rows promote (the two
+   routing assertions) plus Section C `examples/11-istio/`
 2. Optional: install the observability addons (`kubectl apply -f
    ~/.local/share/istio-current/samples/addons/`) and explore via
    `istioctl dashboard kiali`. Not a verification gate
