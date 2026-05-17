@@ -5,14 +5,16 @@
 # End-to-end smoke test for §7:
 #   1. ensure cluster is up
 #   2. ensure nginx-custom:v1 is in the cluster's image cache; if
-#      not, build it automatically from §6's Containerfile (so this
-#      demo is runnable without having run §6's demo first)
+#      not, build it from §6's Containerfile automatically
 #   3. clear any prior nginx-np Deployment/Service
 #   4. apply manifests
 #   5. wait for Deployment Available (with log-dump-on-timeout)
-#   6. retrieve URL via `minikube service nginx-np --url`
+#   6. start `minikube service --url` in the background and watch
+#      its output for the tunnel URL — under rootless podman the
+#      cluster IP isn't host-routable, so minikube auto-tunnels and
+#      prints a 127.0.0.1:<random-port> URL once the tunnel is up
 #   7. curl the URL, check for the sentinel string
-#   8. clean up Deployment + Service on exit (success or failure)
+#   8. clean up Deployment + Service + tunnel on exit
 #
 # Uses your default minikube cluster. The image nginx-custom:v1
 # stays cached across runs; cluster stays running for next demo.
@@ -31,10 +33,25 @@ IMAGE_TAG="nginx-custom:v1"
 MANIFESTS_DIR="${SCRIPT_DIR}/manifests"
 SECTION6_DIR="${REPO_ROOT}/examples/06-deploy-nginx-kubectl"
 WAIT_DEPLOY_SECONDS=180
+TUNNEL_WAIT_SECONDS=90
+
+# ── State that cleanup() needs to see (declared globally) ───────────────────
+TUNNEL_PID=""
+TUNNEL_LOG=""
 
 # ── Cleanup trap ────────────────────────────────────────────────────────────
 cleanup() {
-    info "cleanup: removing ${APP_NAME} Deployment and Service"
+    info "cleanup: stopping tunnel and removing ${APP_NAME} resources"
+    if [[ -n "${TUNNEL_PID}" ]] && kill -0 "${TUNNEL_PID}" 2>/dev/null; then
+        kill "${TUNNEL_PID}" 2>/dev/null || true
+        wait "${TUNNEL_PID}" 2>/dev/null || true
+    fi
+    # Some `minikube service` builds spawn children (kubectl
+    # port-forward under the hood); sweep any lingering ones.
+    pkill -f "minikube service ${APP_NAME}" 2>/dev/null || true
+    if [[ -n "${TUNNEL_LOG}" && -f "${TUNNEL_LOG}" ]]; then
+        rm -f "${TUNNEL_LOG}"
+    fi
     kubectl delete -f "${MANIFESTS_DIR}/" --ignore-not-found=true \
         >/dev/null 2>&1 || true
 }
@@ -99,29 +116,47 @@ fi
 kubectl get deployment,pods -l "app=${APP_NAME}" | sed 's/^/    /'
 pass "Deployment Available"
 
-# ── Retrieve URL via minikube service ───────────────────────────────────────
-step "retrieving NodePort URL via 'minikube service ${APP_NAME} --url'"
-# minikube service can take a few seconds to find the endpoint right
-# after the Deployment becomes Available; poll a few times.
+# ── Start tunnel via 'minikube service --url' (background) ──────────────────
+# Under rootless podman, the cluster's node IP (192.168.49.2) lives
+# in a user network namespace and isn't host-routable, so minikube
+# auto-starts a tunnel via kubectl port-forward equivalent and
+# prints http://127.0.0.1:<random-port>. We run it in the background
+# and watch the log file for the URL line, then kill on cleanup.
+step "starting tunnel via 'minikube service ${APP_NAME} --url' (background)"
+TUNNEL_LOG="$(mktemp)"
+minikube service "${APP_NAME}" --url > "${TUNNEL_LOG}" 2>&1 &
+TUNNEL_PID=$!
+info "tunnel PID: ${TUNNEL_PID}, log: ${TUNNEL_LOG}"
+
+# Poll the log file for an http:// line. Tunnel setup typically
+# takes 20-30s on rootless podman the first time.
 URL=""
-for _ in {1..10}; do
-    URL=$(minikube service "${APP_NAME}" --url 2>/dev/null | head -1 || true)
+for i in $(seq 1 "${TUNNEL_WAIT_SECONDS}"); do
+    # Check if the tunnel process died unexpectedly
+    if ! kill -0 "${TUNNEL_PID}" 2>/dev/null; then
+        info "tunnel process exited unexpectedly; output:"
+        sed 's/^/    /' "${TUNNEL_LOG}"
+        fail "minikube service exited before printing a URL"
+    fi
+    URL=$(grep -m1 '^http://' "${TUNNEL_LOG}" 2>/dev/null || true)
     if [[ -n "${URL}" ]]; then
+        info "tunnel ready after ${i}s"
         break
     fi
     sleep 1
 done
+
 if [[ -z "${URL}" ]]; then
-    info "minikube service output (full):"
-    minikube service "${APP_NAME}" --url 2>&1 | sed 's/^/    /' || true
-    fail "minikube service did not return a URL within 10 attempts"
+    info "tunnel still establishing after ${TUNNEL_WAIT_SECONDS}s; log so far:"
+    sed 's/^/    /' "${TUNNEL_LOG}"
+    fail "minikube service did not print a URL within ${TUNNEL_WAIT_SECONDS}s"
 fi
-info "NodePort URL: ${URL}"
-pass "URL retrieved"
+
+info "NodePort URL (via auto-tunnel): ${URL}"
+pass "tunnel established"
 
 # ── Curl the URL ────────────────────────────────────────────────────────────
 step "curling NodePort URL ${URL}/"
-# Poll briefly — kube-proxy can take a moment to wire up after Deployment Available
 RESP=""
 for _ in {1..15}; do
     if RESP=$(curl -fsS --max-time 3 "${URL}/" 2>/dev/null); then
@@ -134,7 +169,7 @@ if [[ -z "${RESP}" ]]; then
 fi
 case "${RESP}" in
     *"Test Page for nginx on UBI 9 Minimal"*)
-        pass "nginx served the baked-in index.html via NodePort"
+        pass "nginx served the baked-in index.html via NodePort tunnel"
         ;;
     *)
         info "unexpected response (first 200 chars):"
@@ -144,10 +179,13 @@ case "${RESP}" in
 esac
 
 # ── Done ────────────────────────────────────────────────────────────────────
-step "SUCCESS — NodePort Service exposes ${APP_NAME} at ${URL}"
+step "SUCCESS — NodePort Service for ${APP_NAME} reachable at ${URL}"
 echo
-echo "  This URL is host-reachable directly (no kubectl port-forward)."
-echo "  Cleanup on exit removes the Deployment and Service; the image"
-echo "  stays cached for the next demo."
+echo "  Under rootless podman, minikube auto-tunneled the NodePort to"
+echo "  a localhost port (the cluster IP isn't host-routable from the"
+echo "  user network namespace). With rootful podman or kvm2 the URL"
+echo "  would be http://<minikube ip>:30808 directly — no tunnel."
+echo "  Cleanup on exit kills the tunnel and removes Deployment/Service;"
+echo "  the image stays cached for the next demo."
 echo
 exit 0

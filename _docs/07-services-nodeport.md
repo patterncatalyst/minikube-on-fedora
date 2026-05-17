@@ -101,62 +101,95 @@ kubectl apply -f examples/07-nodeport-service/manifests/
 
 ## Reaching the NodePort
 
-Three patterns, listed in order of preference for minikube on Linux:
+Here's where the story branches by how your minikube driver
+networks the cluster node — and where my earlier framing in this
+section had a subtle bug worth calling out, because it shapes how
+the rest of the tutorial talks about Service exposure.
 
-### 1. `minikube service <name> --url`
+### The two cases
 
-The cleanest path. minikube knows about its own node IPs and
-assembles the URL:
+In a real-world or production Kubernetes cluster, every node has
+an IP your client can reach. NodePort works by opening a port on
+each of those node IPs. In minikube, "each node IP" means the one
+minikube node, and whether that IP is reachable from your host
+depends on the driver:
+
+- **Host-routable node IP** — rootful podman (with bridge
+  networking), kvm2, virtualbox. The minikube node IP (typically
+  `192.168.49.2` for podman, `192.168.39.x` for kvm2) is on a
+  network bridge your host can reach. `curl http://<minikube
+  ip>:30808/` works directly
+- **Non-routable node IP** — **rootless podman (our default)**,
+  qemu, macOS with the docker driver, Podman Desktop's VM. The
+  cluster lives in a user network namespace (slirp4netns or
+  pasta for rootless podman) or behind a hypervisor; the IP
+  exists but isn't on a bridge your host can reach. `curl` to
+  the node IP fails with "no route to host" or hangs
+
+Our §1 prerequisites and §3 startup both put us firmly in the
+**rootless podman** camp — that's the right default for Fedora
+(no kernel modules to load, no privilege escalation). So the
+non-routable case applies to this tutorial throughout. NodePort
+still works inside the cluster; it just needs a tunnel to be
+reached from your host shell.
+
+### `minikube service <name> --url` — the right tool
+
+`minikube service` knows which case applies and handles both:
 
 ```bash
 minikube service nginx-np --url
 ```
 
-On Linux with the podman driver, you'll see something like:
+In the **host-routable** case, it prints the URL and exits:
 
 ```
 http://192.168.49.2:30808
 ```
 
-Hit it:
+In our **non-routable** (rootless) case, it sets up an auto-tunnel
+via the equivalent of `kubectl port-forward`, prints a localhost
+URL once the tunnel is up, and **keeps running** until you Ctrl-C
+it:
 
-```bash
-curl http://192.168.49.2:30808/
+```
+🏃  Starting tunnel for service nginx-np.
+|-----------|----------|-------------|------------------------|
+| NAMESPACE |   NAME   | TARGET PORT |          URL           |
+|-----------|----------|-------------|------------------------|
+| default   | nginx-np |             | http://127.0.0.1:42367 |
+|-----------|----------|-------------|------------------------|
+http://127.0.0.1:42367
+❗  Because you are using a Docker driver on linux, the terminal
+needs to be open to run it.
 ```
 
-You should see the same baked-in nginx page from §6 — same image,
-just a different way of reaching it.
+Tunnel setup is 20-30 seconds on first run. The URL works from the
+moment the tunnel is up until you Ctrl-C the `minikube service`
+process.
 
-### 2. `minikube ip` + the nodePort
+For scripting, run it in the background and watch its stdout for
+the URL line — that's exactly what the §7 demo does. The pattern
+is the same one §6's demo uses for `kubectl port-forward`.
 
-If you'd rather construct the URL yourself:
+### Other approaches and when they apply
 
-```bash
-curl "http://$(minikube ip):30808/"
-```
-
-Same result, slightly more explicit about what's happening.
-
-### 3. `minikube service <name>` (without `--url`)
-
-Opens the URL in your default browser. Convenient for interactive
-debugging; less useful for scripts.
-
-### A note about macOS and Podman Desktop's VM
-
-On macOS — or on Linux with the qemu driver — the minikube node
-lives inside a VM whose IP isn't directly routable from your host.
-In that case:
-
-- `minikube service <name> --url` still returns a working URL, but
-  it's `127.0.0.1:<random-port>` from a tunnel minikube auto-starts
-- The tunnel persists until you Ctrl-C `minikube service`
-- For scripts, the URL from stdout still works; you just need to
-  keep the parent `minikube service` process alive
-
-The §1 hardware section called out Fedora-on-Linux as the primary
-tested platform; the macOS path is conceptually identical but the
-URL is a tunnel, not a direct IP.
+- **`minikube ip` + the NodePort directly** — `curl
+  "http://$(minikube ip):30808/"`. Works on rootful podman, kvm2.
+  Hangs on rootless podman because the IP isn't routable
+- **`minikube service <name>` (no `--url`)** — opens the URL in
+  your browser. Convenient interactively; useless for scripts.
+  Same auto-tunnel behavior under rootless
+- **`minikube tunnel`** (separate command, not to be confused with
+  the `--url` auto-tunnel) — sets up a LoadBalancer-style tunnel
+  that grants reachability to all cluster Service IPs at once,
+  not just one NodePort. Runs as a long-lived process. Useful
+  when you have several services to expose; overkill for a single
+  NodePort
+- **`kubectl port-forward`** (§6's pattern) — works regardless of
+  driver/networking, because it tunnels through the kube-apiserver
+  rather than relying on host-cluster routing. The most portable
+  fallback when none of the above work
 
 ## NodePort gotchas
 

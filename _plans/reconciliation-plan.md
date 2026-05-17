@@ -94,15 +94,17 @@ Fedora 44.
 | **verified (Fedora 44)** | `minikube addons enable dashboard` + `minikube dashboard --url` returns a URL | §5     | r06 verification recipe: enabled dashboard, `minikube dashboard --url` returned `http://127.0.0.1:40735/...` ✓ |
 | **verified (Fedora 44)** | UBI application images (e.g. `ubi9/nginx-124`) are s2i builders — not directly runnable in plain Kubernetes | §6 | r07 user run: default CMD `/usr/libexec/s2i/run` crashloops; correct approach is to build our own image from a standard UBI base (r07a) |
 | **verified (Fedora 44)** | RHEL/UBI nginx 1.20 (`microdnf install nginx`) defaults to logging to `/var/log/nginx/*.log` files, not stdout/stderr | §6 | r07a user run: container crashloop only surfaced a startup warning via `kubectl logs`; runtime errors went to files invisible to kubectl. Custom `nginx.conf` in r07c logs to `/dev/stdout` and `/dev/stderr` |
-| unverified              | `minikube image build` builds and caches an image visible to the cluster's kubelet | §6 | r07a demo step; promote when `examples/06-deploy-nginx-kubectl/demo.sh` passes |
-| unverified              | A two-stage Containerfile (ubi9 → ubi9-minimal) produces a working nginx image | §6 | r07a Containerfile; promote on demo pass |
-| unverified              | `ubi9/ubi-minimal` installs nginx via `microdnf` without subscription-manager | §6 | r07a build step; promote on demo pass |
-| unverified              | A two-replica Deployment with the manifest in §6 becomes `Available` within 3 minutes | §6 | r07a manifest claim; promote on demo pass |
-| unverified              | `kubectl port-forward service/nginx 18080:80` opens a working tunnel        | §6      | r07 demo claim; promote on demo pass                                        |
-| unverified              | `kubectl scale deployment/nginx --replicas=3` brings count to 3 Running pods | §6     | r07 demo claim; promote on demo pass                                        |
-| unverified              | Baked-in index.html serves the sentinel string `Test Page for nginx on UBI 9 Minimal` | §6 | r07a demo response check; promote on demo pass                              |
+| **verified (Fedora 44)** | `minikube image build` builds and caches an image visible to the cluster's kubelet | §6 | r07c user run: build produced `docker.io/library/nginx-custom:v1` visible to Deployment without push to a registry |
+| **verified (Fedora 44)** | A two-stage Containerfile (ubi9 → ubi9-minimal) produces a working nginx image | §6 | r07c user run: builder stages index.html, runtime serves it; image ~150MB |
+| **verified (Fedora 44)** | `ubi9/ubi-minimal` installs nginx via `microdnf` without subscription-manager | §6 | r07c user run: nginx 1.20.1 from ubi-9-appstream-rpms installed cleanly |
+| **verified (Fedora 44)** | A two-replica Deployment with the manifest in §6 becomes `Available` within 3 minutes | §6 | r07c user run: Available in 8 seconds |
+| **verified (Fedora 44)** | `kubectl port-forward service/nginx 18080:80` opens a working tunnel        | §6      | r07c user run: localhost:18080 served sentinel string                       |
+| **verified (Fedora 44)** | `kubectl scale deployment/nginx --replicas=3` brings count to 3 Running pods | §6     | r07c user run: 3/3 Running after scale                                      |
+| **verified (Fedora 44)** | Baked-in index.html serves the sentinel string `Test Page for nginx on UBI 9 Minimal` | §6 | r07c user run: HTTP response matched expected substring                     |
+| **verified (Fedora 44)** | Under rootless podman, the cluster node IP (e.g. `192.168.49.2`) is NOT host-routable; lives in a slirp4netns/pasta user network namespace | §7 | Learned in r08 user run: `minikube service --url` auto-tunnels and prints `127.0.0.1:<random-port>` instead of returning the node IP directly. r08a corrects §7 prose to acknowledge this |
+| **verified (Fedora 44)** | `minikube service <name> --url` blocks for ~20-30s during tunnel setup on rootless podman, then prints the URL and stays running until Ctrl-C | §7 | Learned in r08 user run: the demo's polling loop with `head -1` deadlocked because each iteration re-established the tunnel. r08a uses a single background invocation with output-file polling |
 | unverified              | NodePort Service exposes a workload at `<nodeIP>:<nodePort>` on minikube     | §7      | r08 manifest claim; promote when `examples/07-nodeport-service/demo.sh` passes |
-| unverified              | `minikube service <name> --url` returns a host-reachable URL                 | §7      | r08 demo claim; promote on demo pass                                        |
+| unverified              | `minikube service <name> --url` returns a host-reachable URL (tunneled under rootless podman) | §7 | r08a demo claim; promote on demo pass after r08a applied                   |
 | unverified              | NodePort values must be in 30000-32767 range (enforced by kube-apiserver)    | §7      | r08 prose claim; promote on attempt to apply a manifest with an out-of-range nodePort |
 | unverified              | A Deployment with a different name + label can coexist with §6's nginx       | §7      | r08 design choice; promote when demos for §6 and §7 can be run back-to-back without interference |
 
@@ -116,9 +118,8 @@ are still aspirational.
 | Status     | Example                              | Section | Notes                                                 |
 |------------|--------------------------------------|---------|-------------------------------------------------------|
 | **verified (Fedora 44)** | `examples/03-driver-check/`        | §3      | r05c user run: cluster up, all 8 kube-system pods Running, ✓ SUCCESS |
-| **in flight** | `examples/06-deploy-nginx-kubectl`   | §6      | r07a pivot (multi-stage build); awaiting user demo run on Fedora 44     |
-| **in flight** | `examples/07-nodeport-service`        | §7      | Shipped in r08; awaiting user demo run on Fedora 44                     |
-| unverified | `examples/07-nodeport-service`       | §7      | Expose Deployment via NodePort, retrieve URL          |
+| **verified (Fedora 44)** | `examples/06-deploy-nginx-kubectl` | §6      | r07c user run: image built, Deployment Available in 8s, port-forward + curl + scale to 3 all worked |
+| **in flight** | `examples/07-nodeport-service`        | §7      | Shipped in r08; r08 demo hung on tunnel; r08a fixes the demo design; awaiting re-run |
 | unverified | `examples/08-persistent-volume`      | §8      | `hostPath` PV + dynamic PVC                           |
 | unverified | `examples/09-deploy-nginx-helm`      | §9      | Same UBI nginx via an authored small helm chart       |
 | unverified | `examples/11-istio-bookinfo`         | §11     | Istio sample app with sidecar + Gateway + VS          |
@@ -216,110 +217,99 @@ and what's next.
 
 **In flight:**
 
-- **r07a** (2026-05-17, architectural-pivot) — Demo from r07
-  failed: nginx Pods in `CrashLoopBackOff`. Initial diagnosis was
-  correct (UBI nginx-124 is an s2i builder, expects content at
-  `/opt/app-root/src`), but the first proposed fix (ConfigMap-
-  mounted content + `command: ["nginx", "-g", "daemon off;"]`) was
-  the wrong architecture. The user redirected to the right
-  approach: **build our own image** from a standard UBI base via a
-  multi-stage Containerfile (confirmed by LESSONS-LEARNED.md:
-  "Mixing UBI builder + minimal runtime in a multi-stage build is
-  common — the breadth of UBI helps build, the minimalism of
-  Hummingbird helps deploy"). r07a delivers the pivoted approach:
-  1. New `examples/06-deploy-nginx-kubectl/Containerfile` — two-
-     stage build: `ubi9/ubi` builder stages the index.html, then
-     `ubi9/ubi-minimal` runtime installs nginx via `microdnf`,
-     reconfigures it for non-root + port 8080 (group-0-writable
-     dirs, /tmp pid file, USER 1001 — OpenShift-compatible
-     pattern), and copies the staged content. Both base images
-     freely redistributable, no subscription-manager required
-  2. New `examples/06-deploy-nginx-kubectl/index.html` — the
-     baked-in sentinel content
-  3. `manifests/deployment.yaml` rewritten — references
-     `nginx-custom:v1` with `imagePullPolicy: IfNotPresent`; no
-     command override, no volume mount, no ConfigMap dependency
-  4. `demo.sh` adds a `minikube image build -t nginx-custom:v1
-     -f Containerfile .` step before applying manifests. Also
-     enhanced (carried over from the abandoned first r07a draft):
-     `kubectl wait` timeout path now dumps logs from current and
-     previous containers — so future similar failures
-     self-diagnose without a separate log-capture round-trip
-  5. §6 prose rewritten — "A small detour: building our own
-     image" replaces the s2i-workaround discussion. Walks through
-     the multi-stage Containerfile rationale, the three UBI
-     variants (ubi / ubi-minimal / ubi-micro) and when to pick
-     each, the OpenShift-compatible non-root pattern, and
-     `minikube image build`. New "A note on SELinux" subsection
-     introduces the `:Z` flag for the §8 PersistentVolume work to
-     come — §6 itself doesn't need `:Z` (no host bind mounts) but
-     this is where the convention enters the tutorial.
-     Reconciliation plan: stale s2i-workaround claim removed;
-     new `verified` claim recorded that UBI app images aren't
-     directly runnable in plain Kubernetes (learned from the r07
-     failure)
-- **r07c** (2026-05-17, demo-fix + diagnostic-improvement) — r07a
+- ✅ **r07a** (2026-05-17, architectural-pivot — confirmed in r07c
+  user run) — Demo from r07 failed: nginx Pods in `CrashLoopBackOff`.
+  Initial diagnosis was correct (UBI nginx-124 is an s2i builder,
+  expects content at `/opt/app-root/src`); first proposed fix
+  (ConfigMap-mounted content + command override) was the wrong
+  architecture; user redirected to the right approach: **build our
+  own image** from a standard UBI base via a multi-stage
+  Containerfile. r07a delivered: new `Containerfile` (multi-stage
+  ubi9 → ubi9-minimal, microdnf install nginx, sed-patch for
+  non-root + port 8080); new `index.html` sentinel content;
+  `manifests/deployment.yaml` references `nginx-custom:v1`;
+  `demo.sh` adds `minikube image build` step + log-dump-on-failure;
+  §6 prose rewritten to teach the multi-stage build pattern + UBI
+  variants (ubi / ubi-minimal / ubi-micro) + introduction of
+  `:Z` SELinux convention for §8 work to come. The r07a Containerfile
+  itself had a bug (sed substitution + file-logging) that was
+  found and fixed in r07c — but the architectural pivot was right
+- ✅ **r07c** (2026-05-17, demo-fix + diagnostic-improvement) — r07a
   demo failed with `CrashLoopBackOff`; `kubectl logs` showed only
-  a startup warning (`the "user" directive makes sense only if
-  the master process runs with super-user privileges`) followed
-  by silence. The build itself succeeded and the multi-stage
-  Containerfile worked as designed. Root cause identified from
-  the silence: **RHEL/UBI nginx writes access.log and error.log
-  to `/var/log/nginx/*.log` files by default, not stdout/stderr**
-  — so any runtime failure (the most likely being a port-bind
-  permission denial because my sed substitutions in r07a didn't
+  the "user directive" startup warning followed by silence. Root
+  cause: **RHEL/UBI nginx writes access.log and error.log to
+  `/var/log/nginx/*.log` files by default, not stdout/stderr** —
+  so any runtime failure (the most likely being a port-bind
+  permission denial because the r07a sed substitutions didn't
   reliably patch the nginx.conf format) lands in a file kubectl
-  logs can't see. The fix abandons the sed approach entirely:
-  1. New `examples/06-deploy-nginx-kubectl/nginx.conf` — a
-     custom minimal config: logs to `/dev/stdout` and
-     `/dev/stderr`, pid file in `/tmp`, all `*_temp_path`
-     directives in `/tmp`, single server block on `:8080`, no
-     `user` directive at all. Generally useful as a starting
-     point for any containerized nginx
-  2. `Containerfile` simplified — drops the brittle sed pipeline
-     in favor of `COPY nginx.conf /etc/nginx/nginx.conf`. No
-     more dependence on the package's nginx.conf formatting
-  3. `USER 1001:0` (with explicit GID 0) replaces `USER 1001`
-     — the bare form may resolve to GID 1001 on container
-     runtimes that treat unknown UIDs that way, defeating any
-     group-0 permission scheme. With the new nginx.conf the
-     issue is mostly moot (logs and pid go to world-writable
-     paths) but the explicit `:0` is the right OpenShift-
-     compatible pattern
-  4. §6 prose updated with a new "Why we ship our own nginx.conf"
-     subsection that explains the three problems with the
-     package default (file-logging hides runtime errors, /run
-     pid path, user directive warning) and shows the full
-     custom config. The diagnostic story is itself a useful
-     teaching point for anyone deploying a packaged daemon to
-     Kubernetes
-- **r08** (2026-05-17) — `_docs/07-services-nodeport.md` drafted
-  (20-min section covering Service types comparison, NodePort
-  mechanics, three patterns for reaching the NodePort, the
-  30000-32767 range constraint, when NodePort isn't the right
-  answer). `examples/07-nodeport-service/` shipped with its own
-  Deployment + NodePort Service manifests, demo.sh, README.
-  Reuses §6's `nginx-custom:v1` image (builds from §6's
-  Containerfile automatically if not cached, so the demo is
-  runnable without having run §6's first). Distinct resource
-  names (`nginx-np`) and label (`app: nginx-np`) so it coexists
-  with §6's `nginx` resources without selector confusion. Demo
-  gets URL via `minikube service nginx-np --url` and curls it
-  directly — no port-forward needed. Reconciliation: four new
-  `unverified` §7 rows added; Section C
-  `examples/07-nodeport-service/` set to `in flight`
+  logs can't see. Fix abandoned the sed approach: new minimal
+  `nginx.conf` shipped via `COPY`; Containerfile simplified to one
+  `COPY` line; `USER 1001:0` (explicit GID 0); §6 prose updated
+  with "Why we ship our own nginx.conf" subsection. **r07c demo
+  PASSED on user's Fedora 44** — image built, Deployment Available
+  in 8 seconds, port-forward + curl + scale to 3 all green. Seven
+  §6 Section B rows promoted, Section C `examples/06-deploy-nginx-kubectl/`
+  promoted
+
+**In flight:**
+
+- **r08** (2026-05-17, shipped; §7 prose has rootless-podman bug
+  corrected in r08a; demo design bug corrected in r08a) —
+  `_docs/07-services-nodeport.md` drafted (20-min section covering
+  Service types comparison, NodePort mechanics, three patterns for
+  reaching the NodePort, the 30000-32767 range constraint, when
+  NodePort isn't the right answer). `examples/07-nodeport-service/`
+  shipped with its own Deployment + NodePort Service manifests,
+  demo.sh, README. Reuses §6's `nginx-custom:v1` image (builds from
+  §6's Containerfile if not cached). Distinct resource names
+  (`nginx-np`) and label (`app: nginx-np`) so it coexists with §6.
+  **Two correctness bugs surfaced in user run**:
+  1. §7 prose framed "Linux with podman driver" as the
+     direct-route case, with "macOS/qemu" as the tunnel case.
+     Wrong — **rootless podman** (our default throughout) is
+     also a tunnel case because the cluster IP lives in a
+     slirp4netns/pasta user network namespace. The unifying frame
+     is "any time the cluster IP isn't host-routable, minikube
+     tunnels," which includes rootless Linux
+  2. Demo.sh's URL-fetch polling loop ran `minikube service --url
+     | head -1` in a loop, expecting near-instant return. On
+     rootless podman each invocation re-established a tunnel
+     (~20-30s), and `head -1` blocked until output appeared, so
+     10 iterations spent ~5 minutes "hanging"
+- **r08a** (2026-05-17, prose-correction + demo-fix for r08) —
+  1. `_docs/07-services-nodeport.md` "Reaching the NodePort"
+     section rewritten with the corrected two-case framing
+     (host-routable vs not-routable, and which drivers fall in
+     which bucket). Includes the actual `minikube service --url`
+     output for the rootless case showing the auto-tunnel banner
+  2. `examples/07-nodeport-service/demo.sh` rewritten — runs
+     `minikube service --url` **once** in the background,
+     captures stdout to a temp file, polls the file for an
+     `^http://` line for up to 90 seconds, checks the background
+     process is still alive. Cleanup trap kills the tunnel
+     process and any lingering `minikube service nginx-np`
+     children, removes the temp file
+  3. `examples/07-nodeport-service/README.md` updated — removes
+     the "no port-forwarding, no tunnel" claim that was wrong
+     for rootless. Adds a "tunnel, briefly" section explaining
+     the two cases
+  4. Reconciliation plan: two new `verified` Section B claims
+     recording what we learned about rootless podman networking
+     and `minikube service --url` timing. The four §7
+     `unverified` rows stay pending re-run of the (now fixed)
+     demo
 
 **Open, priority-ordered:**
 
-1. Run `examples/06-deploy-nginx-kubectl/demo.sh` against the
-   default minikube cluster. On `✓ SUCCESS`, five §6 Section B
-   rows promote plus Section C
-2. Run `examples/07-nodeport-service/demo.sh`. On `✓ SUCCESS`,
-   four §7 Section B rows promote plus Section C. (Can be run
-   independently of §6's demo; will auto-build the image if §6's
-   demo hasn't been run yet)
+1. Apply r08a; re-run `examples/07-nodeport-service/demo.sh`. On
+   `✓ SUCCESS`, four §7 Section B rows promote plus Section C
+   (`examples/07-nodeport-service/`)
+2. Optional: run the manual coexist test (apply both §6 and §7
+   manifests simultaneously). On success, the "coexist" §7
+   Section B row promotes
 3. **r09** — §8 PVs + `examples/08-persistent-volume/`. First
-   section to need `:Z` for SELinux on Fedora hostPath mounts
+   section to need `:Z` for SELinux on Fedora hostPath mounts;
+   the §6 SELinux explainer becomes load-bearing here
 4. **r10** — §9 helm + authored small chart; helm-4-against-
    helm-3-chart compat claim from Section B promotes here
 5. **r11** — §10 editor/shell/terminal; will request local-setup
