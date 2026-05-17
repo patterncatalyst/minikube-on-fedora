@@ -1,0 +1,56 @@
+<svg width="100%" viewBox="0 0 920 500" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, -apple-system, sans-serif" font-size="14">
+  <defs>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 L 0 40" fill="none" stroke="#ebe5d6" stroke-width="0.5"/>
+    </pattern>
+  </defs>
+  <style>
+    .blue    { fill: #dbe6f1; stroke: #4a7bb8; stroke-width: 1.5; }
+    .tan     { fill: #ebe1cc; stroke: #a08456; stroke-width: 1.5; }
+    .neutral { fill: #ebebe5; stroke: #5e5e5e; stroke-width: 1.2; }
+    .neutral-2 { fill: #f1eee4; stroke: #5e5e5e; stroke-width: 1.2; }
+    .neutral-3 { fill: #e6e3d8; stroke: #5e5e5e; stroke-width: 1.2; }
+    .label    { fill: #2c2c2c; }
+    .sublabel { fill: #5e5e5e; font-size: 11px; }
+    .title    { fill: #2c2c2c; font-weight: 600; font-size: 16px; }
+    .mono     { font-family: ui-monospace, SFMono-Regular, Menlo, "Courier New", monospace; font-size: 12px; fill: #2c2c2c; }
+    .footnote { fill: #5e5e5e; font-size: 11px; font-style: italic; }
+  </style>
+
+  <rect width="920" height="500" fill="#fdfbf7"/>
+  <rect width="920" height="500" fill="url(#grid)"/>
+
+  <text x="460" y="40" text-anchor="middle" class="title">minikube on Fedora 44 (rootless Podman driver)</text>
+
+  <rect x="40" y="70" width="840" height="380" rx="6" class="tan"/>
+  <text x="58" y="92" class="label">Fedora 44 host</text>
+  <text x="58" y="108" class="sublabel">cgroups v2 · SELinux enforcing · user namespaces enabled</text>
+
+  <rect x="70" y="130" width="780" height="300" rx="5" class="neutral"/>
+  <text x="88" y="152" class="label">rootless Podman</text>
+  <text x="88" y="168" class="sublabel">user-namespaced container engine, no system daemon</text>
+
+  <rect x="100" y="190" width="720" height="220" rx="4" class="neutral-2"/>
+  <text x="118" y="212" class="label">minikube node container</text>
+  <text x="118" y="228" class="sublabel">single-node Kubernetes — kubelet · kube-proxy · API server · etcd</text>
+
+  <rect x="130" y="250" width="660" height="140" rx="3" class="neutral-3"/>
+  <text x="148" y="272" class="label">containerd</text>
+  <text x="148" y="288" class="sublabel">CRI runtime — manages Pod containers via OCI runc</text>
+
+  <rect x="170" y="310" width="140" height="60" rx="3" class="blue"/>
+  <text x="240" y="334" text-anchor="middle" class="label">Pod</text>
+  <text x="240" y="354" text-anchor="middle" class="mono">nginx-custom</text>
+
+  <rect x="340" y="310" width="140" height="60" rx="3" class="blue"/>
+  <text x="410" y="334" text-anchor="middle" class="label">Pod</text>
+  <text x="410" y="354" text-anchor="middle" class="mono">order-processor</text>
+
+  <rect x="510" y="310" width="140" height="60" rx="3" class="blue"/>
+  <text x="580" y="334" text-anchor="middle" class="label">Pod</text>
+  <text x="580" y="354" text-anchor="middle" class="mono">kube-system pods</text>
+
+  <text x="700" y="345" class="sublabel">… and so on</text>
+
+  <text x="460" y="475" text-anchor="middle" class="footnote">No root daemon. The host kernel sees only podman processes; everything Kubernetes-shaped lives in the user namespace.</text>
+</svg>

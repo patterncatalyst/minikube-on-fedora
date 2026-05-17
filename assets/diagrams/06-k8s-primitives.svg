@@ -1,0 +1,79 @@
+<svg width="100%" viewBox="0 0 920 500" xmlns="http://www.w3.org/2000/svg" font-family="system-ui, -apple-system, sans-serif" font-size="14">
+  <defs>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 L 0 40" fill="none" stroke="#ebe5d6" stroke-width="0.5"/>
+    </pattern>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#5e5e5e"/>
+    </marker>
+  </defs>
+  <style>
+    .blue    { fill: #dbe6f1; stroke: #4a7bb8; stroke-width: 1.5; }
+    .green   { fill: #dde7d3; stroke: #5f8c4d; stroke-width: 1.5; }
+    .label    { fill: #2c2c2c; }
+    .sublabel { fill: #5e5e5e; font-size: 11px; }
+    .title    { fill: #2c2c2c; font-weight: 600; font-size: 16px; }
+    .mono     { font-family: ui-monospace, SFMono-Regular, Menlo, "Courier New", monospace; font-size: 12px; fill: #2c2c2c; }
+    .mono-sm  { font-family: ui-monospace, SFMono-Regular, Menlo, "Courier New", monospace; font-size: 10px; fill: #5e5e5e; }
+    .arrow    { stroke: #5e5e5e; stroke-width: 1.5; fill: none; }
+    .arrow-dashed { stroke: #5e5e5e; stroke-width: 1.5; fill: none; stroke-dasharray: 4 3; }
+    .arrow-label { fill: #5e5e5e; font-size: 11px; font-style: italic; }
+    .footnote { fill: #5e5e5e; font-size: 11px; font-style: italic; }
+  </style>
+
+  <rect width="920" height="500" fill="#fdfbf7"/>
+  <rect width="920" height="500" fill="url(#grid)"/>
+
+  <text x="460" y="40" text-anchor="middle" class="title">Kubernetes workload primitives — ownership and selection</text>
+
+  <rect x="120" y="80" width="180" height="58" rx="4" class="blue"/>
+  <text x="210" y="104" text-anchor="middle" class="label">Deployment</text>
+  <text x="210" y="124" text-anchor="middle" class="mono-sm">apps/v1</text>
+
+  <rect x="120" y="180" width="180" height="58" rx="4" class="blue"/>
+  <text x="210" y="204" text-anchor="middle" class="label">ReplicaSet</text>
+  <text x="210" y="224" text-anchor="middle" class="mono-sm">apps/v1</text>
+
+  <rect x="50" y="290" width="120" height="60" rx="3" class="blue"/>
+  <text x="110" y="313" text-anchor="middle" class="label">Pod</text>
+  <text x="110" y="332" text-anchor="middle" class="mono-sm">app=web</text>
+
+  <rect x="190" y="290" width="120" height="60" rx="3" class="blue"/>
+  <text x="250" y="313" text-anchor="middle" class="label">Pod</text>
+  <text x="250" y="332" text-anchor="middle" class="mono-sm">app=web</text>
+
+  <rect x="330" y="290" width="120" height="60" rx="3" class="blue"/>
+  <text x="390" y="313" text-anchor="middle" class="label">Pod</text>
+  <text x="390" y="332" text-anchor="middle" class="mono-sm">app=web</text>
+
+  <rect x="600" y="180" width="180" height="58" rx="4" class="blue"/>
+  <text x="690" y="204" text-anchor="middle" class="label">Service</text>
+  <text x="690" y="224" text-anchor="middle" class="mono-sm">selector: app=web</text>
+
+  <rect x="500" y="400" width="160" height="56" rx="4" class="green"/>
+  <text x="580" y="424" text-anchor="middle" class="label">PVC</text>
+  <text x="580" y="442" text-anchor="middle" class="mono-sm">claim 5 Gi</text>
+
+  <rect x="710" y="400" width="160" height="56" rx="4" class="green"/>
+  <text x="790" y="424" text-anchor="middle" class="label">PV</text>
+  <text x="790" y="442" text-anchor="middle" class="mono-sm">/data/disk-01</text>
+
+  <path d="M 210 138 L 210 176" class="arrow" marker-end="url(#arrow)"/>
+  <text x="225" y="160" class="arrow-label">owns</text>
+
+  <path d="M 180 238 Q 140 270 130 286" class="arrow" marker-end="url(#arrow)"/>
+  <path d="M 210 238 L 230 286" class="arrow" marker-end="url(#arrow)"/>
+  <path d="M 250 238 Q 320 270 370 286" class="arrow" marker-end="url(#arrow)"/>
+  <text x="320" y="265" class="arrow-label">manages</text>
+
+  <path d="M 596 218 L 454 318" class="arrow-dashed" marker-end="url(#arrow)"/>
+  <text x="500" y="245" class="arrow-label">selects via label</text>
+
+  <path d="M 390 350 Q 460 380 540 396" class="arrow" marker-end="url(#arrow)"/>
+  <text x="440" y="385" class="arrow-label">uses</text>
+
+  <path d="M 660 428 L 706 428" class="arrow" marker-end="url(#arrow)"/>
+  <text x="683" y="420" text-anchor="middle" class="arrow-label">binds</text>
+
+  <text x="460" y="478" text-anchor="middle" class="footnote">Deployments don't manage Pods directly — they own a ReplicaSet, which owns the Pods. Services find Pods by label, not by name.</text>
+</svg>

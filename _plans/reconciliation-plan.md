@@ -1170,16 +1170,16 @@ have to derive them.
 |---|---|---|
 | §1  Prerequisites | ✓ | Including inotify limits (from r12a finding) |
 | §2  Tooling install | ✓ | minikube/kubectl/helm/yq/hey/krew |
-| §3  Starting minikube | ✓ | rootless containerd via podman driver |
+| §3  Starting minikube | ✓ | rootless containerd via podman driver · topology diagram added r16 |
 | §4  Profiles + multi-node | ✓ | |
 | §5  Addons + dashboard | ✓ | |
-| §6  Deploy via kubectl | ✓ | nginx-custom multi-stage UBI build |
+| §6  Deploy via kubectl | ✓ | nginx-custom multi-stage UBI build · primitives diagram added r16 |
 | §7  NodePort | ✓ | minikube service auto-tunnel via slirp4netns |
 | §8  Persistent Volumes | ✓ | initContainer-seeds-PV pattern |
 | §9  helm | ✓ | checksum-annotation rollout trigger |
 | §10 Editor/shell/terminal | (mostly verified, some `which`-tier rows still unverified — low-value) |
-| §11 Istio | ✓ | Bookinfo + native sidecars + Kiali addons |
-| §12 KEDA | ✓ | Strimzi Kafka 4.1.0 lag scaling + HTTP add-on |
+| §11 Istio | ✓ | Bookinfo + native sidecars + Kiali addons · mesh diagram added r16 |
+| §12 KEDA | ✓ | Strimzi Kafka 4.1.0 lag scaling + HTTP add-on · HPA-vs-KEDA + HTTP-addon diagrams added r16 |
 | §13 Alternatives | ✓ (prose) | Tour of kind/k3s/microk8s/MicroShift with honest Fedora-compatibility notes; shipped r14a |
 | §14 FAQ | ✓ (prose) | 22 Q&A entries grounded in actual tutorial-development pain points; cleanup recipes in three tiers; shipped r15 |
 | §15 Where to go next | ✓ (prose) | Two-track recommendations (deepen-what-you-built / move-toward-production), bookmarkable resources, follow-on tutorial ideas; shipped r15 |
@@ -1310,23 +1310,81 @@ have to derive them.
   **All written content for the tutorial is now in place.**
   Only diagrams (r16) and editorial pass (r17) remain.
 
+- **r16** (2026-05-17, diagrams — Phase 7) — five paired
+  `.svg` + `.excalidraw` files in `assets/diagrams/`,
+  matching the cross-tutorial visual style (920×500
+  viewBox, warm off-white `#fdfbf7` background with 40px
+  subtle grid, two-tone color coding, sans for prose +
+  mono for code/CRD identifiers).
+
+  Color semantic mapping for K8s context:
+  - **blue** (`#dbe6f1` fill / `#4a7bb8` stroke) — workload
+    resources being managed (Pods, Deployments, Services,
+    ReplicaSets, gateway Pods)
+  - **tan** (`#ebe1cc` fill / `#a08456` stroke) — things
+    outside the cluster (external clients, external event
+    sources, the Fedora host itself)
+  - **neutral gray** (`#ebebe5` fill / `#5e5e5e` stroke) —
+    internal K8s machinery (controllers, metrics adapters,
+    operators, istiod)
+  - **green** (`#dde7d3` fill / `#5f8c4d` stroke) — storage
+    primitives that outlive workloads (PVC, PV)
+  - red reserved for diagrams showing failure modes (not
+    used in this batch)
+
+  Diagrams shipped:
+  - `03-minikube-topology.svg` (3.1 KB) — nested-container
+    view of the stack: Fedora host (tan, outermost) →
+    rootless Podman → minikube node container → containerd
+    → 3 example Pods (blue). Footnote calls out that no
+    system-level daemon is involved
+  - `06-k8s-primitives.svg` (4.5 KB) — Deployment owns
+    ReplicaSet owns 3 Pods (with `app=web` label).
+    Service on the right with a dashed selector arrow to
+    the Pods. PVC and PV on the bottom (green) with a "uses"
+    arrow from one Pod and a "binds" arrow between PVC and PV
+  - `11-istio-mesh.svg` (6.0 KB) — istiod alone at top
+    (neutral, control plane). Horizontal dashed plane
+    divider. Data plane band shows external client (tan) →
+    Ingress GW → 2 App Pods (each with app container + envoy
+    sidecar visible) → Egress GW → external service (tan).
+    Solid arrows for traffic, dashed control arrows from
+    istiod down to each sidecar
+  - `12-hpa-vs-keda.svg` (5.2 KB) — the diagram from the
+    style-sign-off, saved as a file. Two-panel comparison
+    split by a vertical dashed divider
+  - `12-keda-http-addon.svg` (5.5 KB) — external client
+    (tan) → interceptor (blue, with 6 small queued-request
+    boxes visualized inside) → 2 backend Pods (blue). KEDA
+    scaler (neutral) on the upper right reads queue depth;
+    KEDA operator (neutral) on the lower right reconciles
+    `HTTPScaledObject` and scales the backend Deployment.
+    Footnote explains the cold-start latency contract
+
+  Paired `.excalidraw` placeholders (minimal JSON stubs with
+  `viewBackgroundColor: "#fdfbf7"` and `gridSize: 20`) ship
+  alongside each SVG. Future edits can use Excalidraw's
+  web/desktop client and re-export to SVG; the placeholder
+  ensures the canvas starts with the right background and
+  grid settings.
+
+  File sizes 3.1–6.0 KB, under the 7.2–9.1 KB reference
+  range but each diagram is sized for its actual content
+  rather than padded to hit a byte target.
+
+  **Pending prose splices** — §3, §6, §11, §12 each gain an
+  inline SVG embed where they currently have ASCII art or
+  no diagram. The Markdown snippet for each is in the apply
+  notes below; user will splice in this commit or a
+  follow-up r16a.
+
 **Open, priority-ordered:**
 
-1. **r16** — Diagrams. Paired `.svg` + `.excalidraw` source
-   files in `assets/diagrams/`. Anticipated set:
-   (a) §3-§5 minikube topology overview — host machine →
-       podman → minikube VM → containerd → Pods,
-   (b) §6-§9 K8s primitives relationships — Deployment owns
-       ReplicaSet owns Pods; Service selects via label; PVC
-       binds PV,
-   (c) §11 Istio mesh architecture — istiod (control plane)
-       + sidecars + ingress/egress gateways,
-   (d) §12 HPA vs KEDA scaling models — side-by-side flow,
-   (e) §12 KEDA HTTP add-on architecture — interceptor with
-       request queue + scaler + operator.
-   Current ASCII art in §11 + §12 prose is serviceable but
-   doesn't scale to hi-DPI; SVG renders properly,
-   `.excalidraw` JSON makes future revision possible
+1. **r16a (optional)** — Prose splices for §3, §6, §11, §12
+   to embed the SVGs. Single-line markdown additions or
+   replacements per section; user can do these inline with
+   the r16 apply step or pass me the current ASCII text and
+   I'll do them in a follow-up
 2. **r17** — Editorial pass. Read every section's prose
    front-to-back. Tighten word choice, ensure consistent
    voice ("you" for reader, passive otherwise), verify
