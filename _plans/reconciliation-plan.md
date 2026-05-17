@@ -1181,6 +1181,8 @@ have to derive them.
 | §11 Istio | ✓ | Bookinfo + native sidecars + Kiali addons |
 | §12 KEDA | ✓ | Strimzi Kafka 4.1.0 lag scaling + HTTP add-on |
 | §13 Alternatives | ✓ (prose) | Tour of kind/k3s/microk8s/MicroShift with honest Fedora-compatibility notes; shipped r14a |
+| §14 FAQ | ✓ (prose) | 22 Q&A entries grounded in actual tutorial-development pain points; cleanup recipes in three tiers; shipped r15 |
+| §15 Where to go next | ✓ (prose) | Two-track recommendations (deepen-what-you-built / move-toward-production), bookmarkable resources, follow-on tutorial ideas; shipped r15 |
 
 - **r14** (2026-05-17, §13 wrap-up — RETRACTED) —
   shipped a "Wrap-up" section that wasn't on the outline.
@@ -1241,33 +1243,102 @@ have to derive them.
   **107** (no demo content — comparison prose with external
   links).
 
+- **r15** (2026-05-17, §14 FAQ + §15 Where to go next —
+  tail prose complete) — both remaining prose sections
+  shipped in one iteration since neither has demo content:
+
+  `_docs/14-faq.md` (~1950 words / FAQ format):
+  - 22 Q&A entries organized into 7 categories: installation
+    + startup (4), running containers + Pods (4), networking
+    (3), storage (2), multi-cluster/multi-profile (3),
+    updates and rollouts (2), operator-specific (3),
+    system-level (2)
+  - **Every Q is grounded in a real pain point hit during
+    the tutorial's development** — not hypothetical. Notable:
+    - "requests through the KEDA HTTP interceptor return
+      404" → the `hey -host` vs `-H 'Host:'` gotcha (r13d)
+    - "Strimzi says Unsupported Kafka.spec.kafka.version" →
+      the 4.1+ lesson (r13a)
+    - "I'm getting Too many open files from operators" →
+      inotify limits (r12a)
+    - "I changed a ConfigMap but the Pod still shows the
+      old value" → §9 helm checksum-annotation pattern
+    - "Istio sidecar isn't getting injected" → native
+      sidecar check via `.spec.initContainers[*]` (r12d)
+  - Helm-checksum example uses `{% raw %}` wrapping for the
+    Go template inside (Liquid-collision pre-empted)
+  - **Cleanup recipes section** at the end consolidates the
+    `cleanup.sh` scripts from r13c into a three-tier
+    reference: just the demo (auto trap), section's heavy
+    state (per-example-dir `cleanup.sh`), full reset
+    (`minikube delete --all --purge` + state removal). The
+    section makes the existing scripts more discoverable
+    via the search-friendly FAQ format
+
+  `_docs/15-where-to-go-next.md` (~1370 words / 5 min):
+  - **Track A — going deeper on what you built**: 4
+    concrete extensions of existing demos (real workload
+    instead of WORK_SLEEP_S in §12 Kafka, sustained `hey -z
+    30s` in §12 HTTP, header-based routing in §11 Istio,
+    multi-broker Kafka via Strimzi node-pool split)
+  - **Track B — moving toward production-like**: 5 paths
+    forward (Ingress + cert-manager replaces NodePort,
+    ArgoCD/Flux GitOps, kube-prometheus-stack for real
+    observability, k3s/kubeadm/managed-service for real
+    cluster, GitHub Actions + ko + ArgoCD for CI)
+  - **Bookmarkable resources**: 7 external links worth
+    keeping (kubernetes.io, CNCF landscape, Istio docs, KEDA
+    scalers catalog, Strimzi docs, Programming Kubernetes
+    book, Kubernetes the Hard Way)
+  - **Possible follow-on tutorials**: 4 gaps in the Fedora-
+    Kubernetes landscape worth filling (production single-
+    node home cluster, air-gapped K8s on Fedora, GPU
+    workloads on minikube, "what changed" upgrade tutorials)
+  - Brief one-paragraph close — no preachy retrospective,
+    just the same hands-on framing the tutorial used
+
+  Footer link on §15 goes back to the outline (this is the
+  end). Cross-reference from end of §14 points to §15. Both
+  cross-references from r13c-era prose (end of §12 → §13,
+  start of §13 → §13) now resolve correctly through the
+  full chain §12 → §13 → §14 → §15 → outline.
+
+  Phase coverage map: §14 + §15 rows added, both marked ✓
+  (prose). Verified row count unchanged at **107** — no
+  demo content to verify in these sections.
+
+  **All written content for the tutorial is now in place.**
+  Only diagrams (r16) and editorial pass (r17) remain.
+
 **Open, priority-ordered:**
 
-1. **r15 — §14 FAQ + cleanup recipes.** Common pain points
-   readers might hit, organized as Q&A. Should cover:
-   "minikube won't start", "Pods stuck in ImagePullBackOff",
-   "the demo I just ran left behind state — how do I clean
-   it up", "kubectl context confusion between minikube and
-   istio profiles", "inotify limits hit", "I changed a
-   ConfigMap but the Pod still has the old value", and the
-   cleanup recipes consolidated in one place (point to the
-   per-example-dir `cleanup.sh` scripts from r13c)
-2. **r16 — §15 Where to go next.** The content I'd
-   incorrectly written into the wrap-up — moved here
-   properly. Pointers to deeper resources (kubernetes.io,
-   CNCF landscape, Istio docs, KEDA scalers catalog,
-   Strimzi docs), and concrete next-step suggestions
-   (ingress-nginx + cert-manager replaces NodePort, GitOps
-   via ArgoCD/Flux, real observability with
-   kube-prometheus-stack, real multi-node with k3s/kubeadm,
-   CI pipelines)
-3. **r17** — Diagrams. Paired `.svg` + `.excalidraw` source
-   files in `assets/diagrams/`
-4. **r18** — Editorial pass across all section prose
-5. Optional: §10 row promotions, §8 PV auto-delete, §7
-   leftovers — low priority
-
-
+1. **r16** — Diagrams. Paired `.svg` + `.excalidraw` source
+   files in `assets/diagrams/`. Anticipated set:
+   (a) §3-§5 minikube topology overview — host machine →
+       podman → minikube VM → containerd → Pods,
+   (b) §6-§9 K8s primitives relationships — Deployment owns
+       ReplicaSet owns Pods; Service selects via label; PVC
+       binds PV,
+   (c) §11 Istio mesh architecture — istiod (control plane)
+       + sidecars + ingress/egress gateways,
+   (d) §12 HPA vs KEDA scaling models — side-by-side flow,
+   (e) §12 KEDA HTTP add-on architecture — interceptor with
+       request queue + scaler + operator.
+   Current ASCII art in §11 + §12 prose is serviceable but
+   doesn't scale to hi-DPI; SVG renders properly,
+   `.excalidraw` JSON makes future revision possible
+2. **r17** — Editorial pass. Read every section's prose
+   front-to-back. Tighten word choice, ensure consistent
+   voice ("you" for reader, passive otherwise), verify
+   cross-references between sections, sweep for stale TODO
+   markers, ensure each section's "Verification" subsection
+   points to the right example dir. Update the homepage's
+   section list if it was auto-generated from `_docs/*.md`
+   to reflect the now-complete §1-§15 set
+3. Optional: §10 row promotions (`which k9s` etc.) — low
+   priority, can stay unverified
+4. Optional: §8 PV auto-delete row, §7 leftovers — low
+   priority, can stay unverified
 4. Optional: §10 row promotions (`which k9s` etc.) — low
    priority, can stay unverified
 5. Optional: §8 PV auto-delete row, §7 leftovers — low
