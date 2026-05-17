@@ -338,6 +338,43 @@ Apply via `examples/12-keda-kafka/demo.sh`; the cluster takes
 60-90 seconds to come up the first time (image pull + KRaft
 formatting + readiness checks).
 
+### What a healthy cluster looks like
+
+Once the Strimzi operator has reconciled the `Kafka` CR,
+`kubectl get kafka,kafkanodepool,pod -n kafka` shows the
+fully-converged state:
+
+![Strimzi Kafka cluster Ready, version 4.1.0, metadata version 4.1-IV1]({% raw %}{{ "/assets/screenshots/strimzi-kafka-cluster-ready.png" | relative_url }}{% endraw %})
+
+Reading top to bottom:
+
+- `kafka/my-kafka  True  4.1.0  4.1-IV1` — the Kafka CR is
+  Ready, running Kafka **4.1.0**, with Strimzi having
+  defaulted the metadata version to **4.1-IV1** (the manifest
+  doesn't specify it explicitly, which is why dropping that
+  field was safe)
+- `kafkanodepool/dual-role  1  ["controller","broker"]  [0]` —
+  one node pool with one replica playing both controller and
+  broker roles, with assigned node ID `0`
+- `pod/my-kafka-dual-role-0  1/1  Running` — the actual Kafka
+  broker Pod (single-broker development cluster)
+- `pod/my-kafka-entity-operator-...  2/2  Running` — the Topic
+  Operator and User Operator running together as a 2-container
+  Pod, reconciling `KafkaTopic` and `KafkaUser` CRs into real
+  Kafka topics and ACLs
+- `pod/strimzi-cluster-operator-...  1/1  Running` — the
+  Cluster Operator itself, watching for `Kafka`-shaped CRs and
+  reconciling them. AGE here is much higher because the
+  operator was installed earlier via `setup-strimzi.sh`
+
+If you see this output, everything is wired correctly and the
+Kafka demo will work. If the `kafka/my-kafka` row shows
+`READY=False`, the `WARNINGS` and conditions block in
+`kubectl describe kafka/my-kafka -n kafka` will tell you what's
+wrong — most commonly an unsupported version (the error caught
+us during r13's first run before this section was pinned to
+4.1.0).
+
 ### Define the topic
 
 {% raw %}

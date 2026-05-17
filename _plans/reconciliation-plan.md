@@ -58,8 +58,8 @@ in the document implicitly assumes these.
 | **verified (Fedora 44)** | kubectx / kubens (krew names: ctx, ns) | latest (krew) | §2 install (`kubectl krew install ctx ns`) | `~/.krew/bin/kubectl-{ctx,ns}` exist ✓ r05 install |
 | **verified (Fedora 44)** | hey              | latest (Go)   | §2 install (`go install`); pre-existing acceptable | `~/go/bin/hey` exists ✓ r05 audit              |
 | unverified              | istioctl         | TBD           | §11 install commands  | `istioctl version` matches                                 |
-| unverified              | KEDA             | TBD           | §12 helm install args | `helm list -n keda` shows the documented chart version     |
-| unverified              | KEDA HTTP add-on | TBD           | §12 helm install args | `helm list -n keda` shows the add-on chart version         |
+| **verified (Fedora 44)** | KEDA             | 2.19.0        | §12 helm install args | r13b user run: `helm list -n keda` shows `keda  keda  1  ...  2.19.0  2.19.0` |
+| **verified (Fedora 44)** | KEDA HTTP add-on | 0.12.2        | §12 helm install args | r13b user run: install output confirmed `KEDA HTTP add-on 0.12.2 installed` (BETA — see prose) |
 
 ## B. Per-section claims
 
@@ -147,21 +147,22 @@ Fedora 44.
 | **verified (Fedora 44)** | kubectl context can be saved + restored across a demo run via `kubectl config use-context` (so `istio` profile work doesn't disturb `minikube` profile state) | §11 | r12e user run: demo started with `current kubectl context: minikube`, switched to `istio` for the work, and on exit ("cleanup: stopping port-forward..." → "restoring kubectl context to minikube") restored cleanly. §6-§9 demos remain runnable without manual switching |
 | **verified (Fedora 44)** | `kubectl apply -f $ISTIO_DIR/samples/addons/` installs Kiali, Prometheus, Grafana, Jaeger, and Loki cleanly on the `istio` profile in ~3-5 minutes | §11 | r12g user run: `deployment.apps/kiali condition met`, `prometheus condition met`, `grafana condition met`, `jaeger condition met` returned within timeout; `loki-0` StatefulSet `2/2 Running`. Current `samples/addons/` includes Loki alongside the canonical four; Kiali integrates with Prometheus + Loki + Jaeger for the unified observability view |
 | **verified (Fedora 44)** | Kiali Traffic Graph renders a live mesh visualization with traffic animation, success/error rates per edge, and namespace-scoped filtering. Switching the namespace dropdown from `istio-system` to `default` reveals the application call graph (productpage → details / reviews → ratings) with live request rates | §11 | r12g user run: 200-curl traffic loop against `/productpage` produced a Kiali Overview with 4 applications, climbing inbound-traffic sparkline, and a Traffic Graph showing istio-ingressgateway → productpage with 1.89 req/s sustained at 100% success. Screenshots captured in `assets/screenshots/kiali-{overview,traffic-graph}.png` |
-| unverified              | `scripts/setup-keda.sh` installs KEDA core 2.19.0 + KEDA HTTP add-on 0.12.2 into the `keda` namespace via helm | §12 | r13 setup script claim; promote when first §12 demo passes |
-| unverified              | `scripts/setup-strimzi.sh` installs Strimzi Cluster Operator 0.51.0 into the `kafka` namespace via helm | §12 | r13 setup script claim |
+| **verified (Fedora 44)** | `scripts/setup-keda.sh` installs KEDA core 2.19.0 + KEDA HTTP add-on 0.12.2 into the `keda` namespace via helm | §12 | r13b user run: clean idempotent install, 10 Pods Running (some have multiple replicas — see Pod-count row below). One restart on `keda-operator` shortly after start is expected (probe timing during initial reconciliation) |
+| **verified (Fedora 44)** | `scripts/setup-strimzi.sh` installs Strimzi Cluster Operator 0.51.0 into the `kafka` namespace via helm | §12 | r13b user run: 1 Cluster Operator Pod Available within 40s |
 | **verified (Fedora 44)** | Strimzi 0.51.0 supports ONLY Kafka **4.1.0, 4.1.1, 4.2.0** — the 3.x line was dropped entirely. Mis-pinning to 3.x manifests as a `Kafka` CR `NotReady` condition with `reason: UnsupportedKafkaVersionException` and `message: Unsupported Kafka.spec.kafka.version: X.Y.Z. Supported versions are: [4.1.0, 4.1.1, 4.2.0]`. Kafka 4.x removed ZooKeeper completely — KRaft is the only mode. The `metadataVersion` field can be omitted; Strimzi defaults it to match the Kafka version on first cluster creation | §12 | r13 → r13a: original ship pinned Kafka 3.9.0 based on a misread of Strimzi 0.51 release notes (which were actually flagging a 3.9.2-specific upgrade-path bug, not establishing 3.x as supported). r13a corrected to 4.1.0 and recorded the finding |
-| unverified              | A single-node Strimzi Kafka cluster (combined controller+broker role) with Kafka **4.1.0** reaches `condition=Ready` within 5 minutes on minikube | §12 | r13a manifest claim (was 3.9.0 in r13, which failed); the most likely flaky step in the tutorial per Strimzi's historic reconciliation quirks |
-| unverified              | A `KafkaTopic` CR with 3 partitions reaches `condition=Ready` via Strimzi's Topic Operator | §12 | r13 manifest claim |
-| unverified              | The Python `order-processor` consumer image builds cleanly from a multi-stage UBI Containerfile (ubi9 builder + ubi9-minimal runtime, kafka-python==2.0.6 in venv) | §12 | r13 image claim; follows same pattern as §6 nginx-custom |
-| unverified              | A KEDA `ScaledObject` with `minReplicaCount: 0` and a Kafka trigger results in **zero replicas at idle** (no consumer Pods running until messages arrive) | §12 | r13 demo claim; the core scale-to-zero assertion for Pattern A |
-| unverified              | Producing 200 messages to a Kafka topic causes KEDA to scale the consumer Deployment from 0 to ≥1 replicas within 120 seconds | §12 | r13 demo claim; the core scale-up assertion |
-| unverified              | After the topic drains and `cooldownPeriod` (30s) elapses, KEDA scales the consumer back to 0 replicas | §12 | r13 demo claim; the core scale-down assertion completing the 0→N→0 lifecycle |
+| **verified (Fedora 44)** | A single-node Strimzi Kafka cluster (combined controller+broker role) with Kafka **4.1.0** reaches `condition=Ready` within 5 minutes on minikube. Strimzi defaults `metadataVersion` to **4.1-IV1** when the field is omitted from the manifest | §12 | r13b user run: cluster Ready in ~63s on a profile where the Strimzi `kafka:0.51.0-kafka-4.1.0` image had to be pulled fresh. Screenshot captured at `assets/screenshots/strimzi-kafka-cluster-ready.png` |
+| **verified (Fedora 44)** | A `KafkaTopic` CR with 3 partitions reaches `condition=Ready` via Strimzi's Topic Operator | §12 | r13b user run: topic 'orders' Ready immediately after Kafka cluster Ready |
+| **verified (Fedora 44)** | The Python `order-processor` consumer image builds cleanly from a multi-stage UBI Containerfile (ubi9 builder + ubi9-minimal runtime, kafka-python==2.0.6 in venv on Python 3.9.25) | §12 | r13b user run: image built in ~7s end-to-end on the minikube profile. UBI 9 ships Python 3.9 (NOT 3.11 — earlier assistant claim corrected); kafka-python 2.0.6 is protocol-compatible with Kafka 4.x brokers per upstream docs |
+| **verified (Fedora 44)** | A KEDA `ScaledObject` with `minReplicaCount: 0` and a Kafka trigger results in **zero replicas at idle** (no consumer Pods running until messages arrive) | §12 | r13b user run: assertion passed immediately after applying the manifests |
+| **verified (Fedora 44)** | Producing 200 messages to a Kafka topic causes KEDA to scale the consumer Deployment from 0 to ≥1 replicas within 120 seconds. Peak replicas bounded by `maxReplicaCount: 3` (also bounded by 3 topic partitions) | §12 | r13b user run: replicas climbed to 1 at the 5s polling tick; peaked at 3 by the 10s tick. With `lagThreshold: "5"` and 200 messages of lag, HPA would ask for 40 replicas but caps at 3 |
+| **verified (Fedora 44)** | After the topic drains and `cooldownPeriod` (30s) elapses, KEDA scales the consumer back to 0 replicas | §12 | r13b user run: scaled back to 0 at 62s after drain wait. The cooldown is wall-clock from "lag-reaches-0" not from "scale-up-completed", so the observed time = drain delay + cooldownPeriod + small reconciliation lag |
 | unverified              | KEDA HTTP add-on `HTTPScaledObject` (CRD: `http.keda.sh/v1alpha1`) with `replicas.min: 0` results in zero replicas at idle | §12 | r13 HTTPScaledObject claim |
 | unverified              | The HTTP add-on **interceptor buffers a cold-start request** until the workload Pod is Ready, returning a 200 response instead of a 5xx (typically 3-8s on minikube) | §12 | r13 demo claim; the interceptor's killer feature vs naive scale-to-zero |
 | unverified              | `hey -n 500 -c 50` sustained HTTP load drives the HTTPScaledObject's concurrency metric, scaling nginx from 0 to N replicas within 120s | §12 | r13 demo claim |
 | unverified              | After `scaledownPeriod` (30s) of zero traffic, the HTTP add-on scales the workload back to 0 replicas | §12 | r13 demo claim; completes the HTTP scale-from-zero lifecycle |
-| unverified              | KEDA Pod count after both demos run cleanly: 7 in the `keda` namespace (1 operator, 1 metrics-apiserver, 1 admission-webhook, 4 HTTP add-on Pods: controller-manager, external-scaler, interceptor, operator-webhook) | §12 | r13 setup-keda.sh claim; promote on observation |
-| unverified              | KEDA does not conflict with HPA — KEDA `ScaledObject` creates its own HPA backed by KEDA's metrics-apiserver, and the AKS docs explicitly warn against mixing pre-existing HPAs on the same target. The §12 demos use ONLY KEDA, no manual HPAs | §12 | r13 prose claim |
+| **verified (Fedora 44)** | KEDA Pod count after `setup-keda.sh` completes: **10 Pods** in the `keda` namespace — 1 keda-operator, 1 keda-admission-webhooks, 1 keda-operator-metrics-apiserver (KEDA core, 3 Pods), 1 keda-add-ons-http-controller-manager, 3 keda-add-ons-http-external-scaler (replicated by default), 3 keda-add-ons-http-interceptor (replicated by default) (HTTP add-on, 7 Pods) | §12 | r13b user run: the r13 plan row said 7 Pods which assumed single replicas for all components. The HTTP add-on's helm chart actually deploys the external-scaler and interceptor with 3 replicas each by default for HA. Row corrected on promotion |
+| **verified (Fedora 44)** | KEDA does not conflict with HPA — KEDA `ScaledObject` creates its own HPA backed by KEDA's metrics-apiserver, and the AKS docs explicitly warn against mixing pre-existing HPAs on the same target. The §12 demos use ONLY KEDA, no manual HPAs | §12 | r13b user run: KEDA-managed HPA reconciliation worked cleanly. The full 0→N→0 lifecycle would have failed silently or noisily if there were an HPA conflict, so the demo passing constitutes evidence |
+| **verified (Fedora 44)** | The §12 prose embeds a screenshot at `assets/screenshots/strimzi-kafka-cluster-ready.png` showing the converged Kafka cluster state: `kafka/my-kafka READY=True KAFKA VERSION=4.1.0 METADATA VERSION=4.1-IV1`, `kafkanodepool/dual-role 1 ["controller","broker"] [0]`, and three Running Pods (broker, entity-operator, cluster-operator). Caption walks readers through each row | §12 | r13b user-provided screenshot from successful demo run |
 
 ## C. Testing matrix
 
@@ -178,7 +179,7 @@ are still aspirational.
 | **verified (Fedora 44)** | `examples/08-persistent-volume`    | §8      | r09 user run: Deployment Available in 3s, PVC bound, timestamps matched before/after `kubectl delete pod` — PV persistence confirmed |
 | **verified (Fedora 44)** | `examples/09-deploy-nginx-helm`     | §9      | r10d user run: lint + template + install + curl-install-title + upgrade + rollout + curl-upgrade-title + history + uninstall + zero-leftovers (after 2s of polling) all green |
 | **verified (Fedora 44)** | `examples/11-istio`                   | §11     | r12e user run: full §11 happy path passed — 13 phases from pre-flight through routing assertions. v1-pin proven by 1/10 distinct hashes, 50/50 split proven by 2/20 with 55/45 distribution. SUCCESS banner with verified counts; cleanup trap restored kubectl context |
-| **in flight** | `examples/12-keda-kafka`              | §12     | Shipped in r13; Kafka consumer-lag scaling demo. Awaiting first user run on minikube profile |
+| **verified (Fedora 44)** | `examples/12-keda-kafka`              | §12     | r13b user run: full demo passed end-to-end. 0→3→0 replica lifecycle with 200 messages produced and drained. See `_plans/reconciliation-plan.md` Section B for individual claim promotions |
 | **in flight** | `examples/12-keda-http`               | §12     | Shipped in r13; HTTP add-on scaling demo. Awaiting first user run on minikube profile |
 
 **Aggregator status:** `scripts/test-all-examples.sh` does not
@@ -870,21 +871,70 @@ have to derive them.
   unverified; r13a's is also unverified pending the next
   demo run.
 
+- **r13b** (2026-05-17, §12 Kafka demo verified +
+  screenshot) — second Phase 5 sub-iteration, all Pattern A
+  claims promoted. User re-ran the Kafka demo on Fedora 44
+  with the r13a manifest. Full 0→3→0 lifecycle observed:
+  - Kafka cluster Ready in **63s** on first cold install
+    (image pull dominated)
+  - KafkaTopic 'orders' Ready immediately after
+  - Consumer image (UBI 9 / Python **3.9.25** / kafka-python
+    2.0.6 — corrected: earlier assistant claim of Python
+    3.11 was wrong; UBI 9 ships Python 3.9 as the system
+    default) built in ~7s
+  - Replicas climbed 0→1 at 5s polling tick, then 1→3 at
+    10s tick (capped at maxReplicaCount=3 ≤ partition count)
+  - 200 messages drained
+  - Scaled back to 0 at 62s (drain delay + 30s cooldown +
+    reconciliation lag)
+
+  Promotions (10 §12 Section B rows + Section C
+  `examples/12-keda-kafka/` + 1 new screenshot row):
+  - setup-keda.sh verified (10 Pods Running — see below for
+    Pod-count correction)
+  - setup-strimzi.sh verified (1 Pod Available within 40s)
+  - Kafka cluster Ready (4.1.0, metadataVersion defaulted
+    to 4.1-IV1) verified
+  - KafkaTopic Ready verified
+  - Consumer image build verified
+  - Scale-to-zero at idle verified
+  - Scale-up on lag verified
+  - Scale-down after cooldown verified
+  - Pod count: r13's "7 Pods" claim was **wrong** — actual
+    count is **10 Pods** because the HTTP add-on's
+    external-scaler and interceptor each default to 3
+    replicas. Row corrected on promotion
+  - No-HPA-conflict claim verified by demonstration
+
+  New deliverables in r13b:
+  - `assets/screenshots/strimzi-kafka-cluster-ready.png` —
+    user-provided screenshot of converged Kafka cluster
+    state, captioned in prose with row-by-row walkthrough
+  - `_docs/12-keda.md`: new "What a healthy cluster looks
+    like" subsection between Kafka-cluster definition and
+    topic definition. Mirrors §11's Kiali-screenshot pattern
+    — gives readers a visual checkpoint between manifest
+    apply and demo run
+  - New verified row recording the screenshot evidence
+
+  Verified row count: **96** (up from 86 in r13a).
+  Per-section coverage: §1-§11 complete, §12 Pattern A
+  complete, §12 Pattern B (HTTP add-on) still unverified
+  pending user run
+
 **Open, priority-ordered:**
 
-1. Run `./scripts/setup-keda.sh` (one-time KEDA install)
-2. Run `./scripts/setup-strimzi.sh` (one-time Strimzi install
-   — only needed for the Kafka demo)
-3. Run `examples/12-keda-kafka/demo.sh`. Expect first run to
-   be slow (Kafka cluster bring-up). On `✓ SUCCESS`, 8 §12
-   Kafka rows promote plus Section C
-   `examples/12-keda-kafka/`
-4. Run `examples/12-keda-http/demo.sh`. Faster than the Kafka
-   demo. On `✓ SUCCESS`, 6 §12 HTTP rows promote plus Section
-   C `examples/12-keda-http/`
-5. Optional: §10 row promotions, §8 PV auto-delete, §7
+1. **Run `examples/12-keda-http/demo.sh`** — the HTTP
+   add-on demo. KEDA + HTTP add-on already installed (no
+   setup script needed). nginx-custom:v1 should already be
+   cached from §6. Expected: ~90-150s, 0→N→0 lifecycle with
+   `hey -n 500 -c 50` driving the load. On `✓ SUCCESS`,
+   6 §12 HTTP rows promote + Section C
+   `examples/12-keda-http/` promotes
+2. Optional: §10 row promotions, §8 PV auto-delete, §7
    leftovers — low priority
-6. **r14–r16** — tail sections (§13 wrap-up, §14
+3. **r14–r16** — tail sections (§13 wrap-up, §14
    troubleshooting?, §15 where-next-pointers), diagrams
-   (paired `.svg` + `.excalidraw`), editorial pass across
-   all section prose, final reconciliation refresh
+   (paired `.svg` + `.excalidraw` in `assets/diagrams/`),
+   editorial pass across all section prose, final
+   reconciliation refresh
