@@ -129,7 +129,9 @@ Fedora 44.
 | unverified              | `k9s` installs cleanly via `sudo dnf install -y k9s` on Fedora 44 | §10 | r11 prose claim; verifiable in seconds with `which k9s && k9s version` |
 | unverified              | `tmux` installs cleanly via `sudo dnf install -y tmux` on Fedora 44 | §10 | r11 prose claim |
 | unverified              | Pulsar's `.rpm` from pulsar-edit.dev installs cleanly on Fedora 44 with YAML highlighting working out of the box | §10 | r11 prose claim; the author's working setup |
-| unverified              | A dedicated `istio` minikube profile with `--memory=6g --cpus=4 --rootless=true --container-runtime=containerd` starts cleanly on Fedora 44 | §11 | r12 prose claim; promote when `examples/11-istio/demo.sh` passes |
+| **verified (Fedora 44)** | Running a SECOND minikube profile on Fedora 44 requires `fs.inotify.max_user_instances` ≥ 256 (and `max_user_watches` ≥ 131072); defaults are sized for one cluster. Symptom of too-low: `Failed to create control group inotify object: Too many open files` from the cluster container during `minikube start` | §1, §11 | r12 user run: §11 `minikube start -p istio` failed with the exact error above; raising via `/etc/sysctl.d/99-kubernetes.conf` resolves. r12a's demo pre-flight checks these values |
+| **verified (Fedora 44)** | A failed `minikube start -p <profile>` can leave a stale `podman volume <profile>` artifact that causes the retry to fail with `volume already exists` | §11 | r12 user run: first start failed (inotify); retry hit `Error: volume with name istio already exists`. r12a demo pre-flight cleans stale volumes before retry via `minikube delete -p <profile>` + `podman volume rm <profile>` |
+| unverified              | A dedicated `istio` minikube profile with `--memory=6g --cpus=4 --rootless=true --container-runtime=containerd` starts cleanly on Fedora 44 | §11 | r12 prose claim; r12a fixes the inotify + stale-volume issues; promote when `examples/11-istio/demo.sh` passes |
 | unverified              | `scripts/setup-istio.sh` downloads + extracts Istio 1.29.2 and installs istioctl to `~/.local/bin/` | §11 | r12 setup script claim |
 | unverified              | `istioctl install --set profile=demo -y` brings up istiod + ingressgateway + egressgateway within 60s | §11 | r12 demo claim |
 | unverified              | Labeling `default` namespace `istio-injection=enabled` causes new Pods to be sidecar-injected (`READY 2/2`) | §11 | r12 demo claim; the central mesh-injection mechanism |
@@ -443,6 +445,33 @@ and what's next.
   `docker.io/istio/*` images — vendor-neutral PRD constraint
   was about *our* examples; upstream sample apps using their own
   images is conventional. Demo expected 8-12 min first run
+- **r12a** (2026-05-17, kernel-limits + stale-state pre-flight)
+  — r12 user run failed at `minikube start -p istio` with
+  `Failed to create control group inotify object: Too many open
+  files`. Root cause: `fs.inotify.max_user_instances` (default
+  on Fedora 44 is ~128) is sized for ONE containerized systemd
+  instance. The §3 `minikube` profile already consumed that
+  budget; the second profile (`istio`) blew the limit. Not a
+  RLIMIT_NOFILE issue. Standard kind/minikube workaround:
+  `sudo sysctl fs.inotify.max_user_instances=512
+  fs.inotify.max_user_watches=524288`. Cascade failure on
+  retry: stale `podman volume istio` from the partial start
+  blocked `minikube start` with `volume already exists`. r12a
+  fixes:
+  1. `examples/11-istio/demo.sh` pre-flight now checks inotify
+     limits (warn floor: 256 instances / 131072 watches); fails
+     loudly with the `/etc/sysctl.d/99-kubernetes.conf` recipe
+     if too low
+  2. Demo's profile-startup logic is more defensive — if the
+     profile exists but isn't running cleanly, it's deleted
+     first; stale podman volumes are explicitly removed before
+     retry
+  3. `_docs/11-istio.md` gains a "Before you start: kernel
+     inotify limits" subsection at the top of profile setup,
+     explaining the problem + fix
+  4. Two new `verified` Section B rows record both findings —
+     the inotify limit floor for multi-cluster minikube on
+     Fedora, and the stale-volume cascade failure mode
 
 **Open, priority-ordered:**
 

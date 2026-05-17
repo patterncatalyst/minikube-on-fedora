@@ -86,6 +86,45 @@ Sidecar injection is **opt-in per namespace**. We'll label the
 `default` namespace to enable injection, and any Pod created
 there will get the sidecar automatically.
 
+## Before you start: kernel inotify limits
+
+minikube containers run systemd as PID 1, which uses inotify watches
+for cgroup management. **Fedora's default settings are sized for one
+such container** — and you already have one running (the `minikube`
+profile from §3). Starting a second cluster on the same host pushes
+past the limits and the new container's systemd fails to initialize.
+
+The symptom looks like this during `minikube start`:
+
+```
+Failed to create control group inotify object: Too many open files
+Failed to allocate manager object: Too many open files
+[!!!!!!] Failed to allocate manager object.
+Exiting PID 1...: container exited unexpectedly
+```
+
+This is **not** the per-process file descriptor limit (RLIMIT_NOFILE).
+It's `fs.inotify.max_user_instances` (a kernel sysctl). Bump it:
+
+```bash
+sysctl fs.inotify.max_user_instances fs.inotify.max_user_watches
+```
+
+If `max_user_instances` is below 256 or `max_user_watches` is below
+131072, raise them (one-time, persistent across reboots):
+
+```bash
+sudo tee /etc/sysctl.d/99-kubernetes.conf <<EOF
+fs.inotify.max_user_instances = 512
+fs.inotify.max_user_watches = 524288
+EOF
+sudo sysctl -p /etc/sysctl.d/99-kubernetes.conf
+```
+
+The `examples/11-istio/demo.sh` pre-flight checks these values and
+fails loudly with the same instructions if they're too low — so if
+you skip this section now, the demo tells you about it later.
+
 ## Profile setup
 
 Istio is heavier than anything in §6-§9. The control plane needs

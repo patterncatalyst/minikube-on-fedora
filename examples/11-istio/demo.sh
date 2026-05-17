@@ -77,14 +77,62 @@ cleanup() {
 trap cleanup EXIT
 
 # ── Phase 1: Pre-flight ─────────────────────────────────────────────────────
+step "pre-flight: kernel inotify limits sufficient for a second minikube cluster"
+# minikube containers run systemd as PID 1, which wants its own inotify
+# watches for cgroup management. Default Fedora settings are enough for
+# ONE cluster (the §3 `minikube` profile already consumed that budget);
+# starting a SECOND cluster needs raised limits. Symptoms when too low:
+# "Failed to create control group inotify object: Too many open files"
+# from the container during minikube start.
+INOTIFY_INSTANCES=$(sysctl -n fs.inotify.max_user_instances 2>/dev/null || echo 0)
+INOTIFY_WATCHES=$(sysctl -n fs.inotify.max_user_watches 2>/dev/null || echo 0)
+info "fs.inotify.max_user_instances = ${INOTIFY_INSTANCES}"
+info "fs.inotify.max_user_watches   = ${INOTIFY_WATCHES}"
+if [[ "${INOTIFY_INSTANCES}" -lt 256 ]] || [[ "${INOTIFY_WATCHES}" -lt 131072 ]]; then
+    info ""
+    info "inotify limits are too low for a second minikube cluster on this host."
+    info "Symptoms: 'Failed to create control group inotify object: Too many open"
+    info "files' from the cluster container during minikube start."
+    info ""
+    info "One-time fix (persists across reboots):"
+    info ""
+    info "    sudo tee /etc/sysctl.d/99-kubernetes.conf <<EOF"
+    info "    fs.inotify.max_user_instances = 512"
+    info "    fs.inotify.max_user_watches = 524288"
+    info "    EOF"
+    info "    sudo sysctl -p /etc/sysctl.d/99-kubernetes.conf"
+    info ""
+    info "Then re-run this demo."
+    fail "inotify limits below minimum (need ≥256 instances, ≥131072 watches)"
+fi
+pass "inotify limits OK for multi-cluster"
+
 step "pre-flight: istio minikube profile up + tooling in place"
 
 # Save current context so we can restore on exit
 ORIGINAL_CONTEXT=$(kubectl config current-context 2>/dev/null || true)
 info "current kubectl context: ${ORIGINAL_CONTEXT:-<none>}"
 
-# Ensure the istio profile is running
-if ! minikube status -p "${PROFILE_NAME}" >/dev/null 2>&1; then
+# Ensure the istio profile is healthy. Three cases:
+#   (a) profile is running cleanly → skip start
+#   (b) profile exists but isn't running (stopped or partial-start
+#       leftover with stale podman volume) → delete + recreate
+#   (c) profile doesn't exist → create fresh
+if minikube status -p "${PROFILE_NAME}" 2>/dev/null | grep -q "host: Running"; then
+    info "${PROFILE_NAME} profile already running"
+else
+    # If a profile exists in any state, delete it first to avoid the
+    # "volume with name istio already exists" cascade from a previous
+    # failed start.
+    if minikube profile list 2>/dev/null | grep -q "${PROFILE_NAME}"; then
+        info "${PROFILE_NAME} profile exists but isn't healthy; deleting before fresh start"
+        minikube delete -p "${PROFILE_NAME}" >/dev/null 2>&1 || true
+    fi
+    # Belt-and-suspenders: clean up any orphaned podman volume
+    if podman volume exists "${PROFILE_NAME}" 2>/dev/null; then
+        info "removing stale podman volume '${PROFILE_NAME}'"
+        podman volume rm "${PROFILE_NAME}" 2>/dev/null || true
+    fi
     info "starting ${PROFILE_NAME} profile (6 GB / 4 CPU)"
     minikube start -p "${PROFILE_NAME}" \
         --memory=6g \
