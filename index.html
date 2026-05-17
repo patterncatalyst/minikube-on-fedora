@@ -30,40 +30,61 @@ title: Home
       require Red Hat subscription registration.
     </p>
 
+    {%- comment -%}
+      Section cards are auto-generated from the _docs collection sorted
+      by `order` (the front-matter field on each section file). New
+      sections appear on the homepage just by being published — no
+      need to edit this file when adding §7, §8, etc.
+
+      Each card pulls its title, description, and duration from the
+      doc's front matter. The eyebrow is "Overview" for §0 and
+      "Section N" for everything else.
+    {%- endcomment -%}
     <div class="cards">
-      <!--
-        Three live cards for now. Add more (Installation §2, Helm §9,
-        Istio §11, KEDA §12, etc.) as those sections get drafted —
-        each card must point to a path that already resolves, or
-        the published site will show 404s.
-      -->
-
-      <a class="card" href="{{ '/docs/00-outline/' | relative_url }}">
-        <div class="card__eyebrow">Overview</div>
-        <h3 class="card__title">Tutorial outline</h3>
-        <p class="card__desc">All 15 sections and how they build on each other.</p>
+      {% assign sections = site.docs | sort: "order" %}
+      {% for section in sections %}
+      <a class="card" href="{{ section.url | relative_url }}">
+        <div class="card__eyebrow">
+          {% if section.order == 0 %}Overview{% else %}Section {{ section.order }}{% endif %}
+        </div>
+        <h3 class="card__title">{{ section.title }}</h3>
+        {% if section.description %}
+        <p class="card__desc">{{ section.description }}</p>
+        {% endif %}
         <div class="card__meta">
-          <span>2 min</span>
+          {% if section.duration %}<span>{{ section.duration }}</span>{% endif %}
           <span>Read →</span>
         </div>
       </a>
+      {% endfor %}
+    </div>
+  </div>
+</section>
 
-      <a class="card" href="{{ '/docs/01-prerequisites/' | relative_url }}">
-        <div class="card__eyebrow">Section 1</div>
-        <h3 class="card__title">Prerequisites</h3>
-        <p class="card__desc">Hardware, OS, and tool checks before you start.</p>
-        <div class="card__meta">
-          <span>10 min</span>
-          <span>Read →</span>
-        </div>
-      </a>
-
+<section class="section">
+  <div class="container">
+    <h2 class="section-heading">Project plans</h2>
+    <p class="section-sub">
+      Meta-documents that track project state: what's been built,
+      what's verified, and what's planned next.
+    </p>
+    <div class="cards">
       <a class="card" href="{{ '/plans/reconciliation-plan/' | relative_url }}">
         <div class="card__eyebrow">Audit</div>
         <h3 class="card__title">Reconciliation plan</h3>
-        <p class="card__desc">What's verified, what's not, and what's next.</p>
+        <p class="card__desc">What's verified on real Fedora 44 hardware, what's not, and what's next.</p>
         <div class="card__meta">
           <span>5 min</span>
+          <span>Read →</span>
+        </div>
+      </a>
+
+      <a class="card" href="{{ '/plans/iteration-plan/' | relative_url }}">
+        <div class="card__eyebrow">Roadmap</div>
+        <h3 class="card__title">Iteration plan</h3>
+        <p class="card__desc">Six phases from PRD to launch, with verification rhythm and flex points.</p>
+        <div class="card__meta">
+          <span>3 min</span>
           <span>Read →</span>
         </div>
       </a>
