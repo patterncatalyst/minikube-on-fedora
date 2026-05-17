@@ -124,6 +124,11 @@ Fedora 44.
 | unverified              | `helm uninstall` removes all chart-created resources within 30s (async deletion) | §9 | r10 user run: leftover Pod in `Terminating` state caught the demo's one-shot check (failed); r10d demo polls for 30s; promote on demo re-run pass |
 | **verified (Fedora 44)** | Helm 4 reads charts authored against the Helm 3 chart format (`apiVersion: v2`) | §2, §9 | r10 user run with helm `v4.1.1+g5caf004` cleanly handled the v2-format chart through lint, template, install, upgrade, history, uninstall |
 | **verified (Fedora 44)** | `helm uninstall` is asynchronous — returns success once delete operations are submitted; actual Pod termination follows `terminationGracePeriodSeconds` (default 30s) | §9 | Learned in r10 user run: leftover check ran 0ms after uninstall returned, caught a Pod still `Terminating` (3s old). r10d's demo polls for 30s after uninstall to account for the async behavior |
+| unverified              | `kubectl completion zsh`, `helm completion zsh`, `minikube completion zsh` produce working tab completion when sourced in `~/.zshrc` | §10 | r11 prose claim; promote on demonstration (e.g., `kubectl get po<TAB>` showing pod kinds) |
+| unverified              | `compdef __start_kubectl k` makes the `k=kubectl` alias inherit kubectl's tab completion under zsh | §10 | r11 prose claim |
+| unverified              | `k9s` installs cleanly via `sudo dnf install -y k9s` on Fedora 44 | §10 | r11 prose claim; verifiable in seconds with `which k9s && k9s version` |
+| unverified              | `tmux` installs cleanly via `sudo dnf install -y tmux` on Fedora 44 | §10 | r11 prose claim |
+| unverified              | Pulsar's `.rpm` from pulsar-edit.dev installs cleanly on Fedora 44 with YAML highlighting working out of the box | §10 | r11 prose claim; the author's working setup |
 
 ## C. Testing matrix
 
@@ -388,6 +393,26 @@ and what's next.
   one new `verified` row recording the async-uninstall finding.
   `helm uninstall removes all resources within 30s` row stays
   in flight pending re-run
+- **r11** (2026-05-17, §10 Editor, shell, terminal) —
+  `_docs/10-editor-shell-terminal.md` drafted (20-min section
+  on practical tooling for k8s work). Specific to user's setup
+  per r10c convo: **Pulsar** as the editor recommendation (the
+  community-maintained Atom successor) with alternatives
+  (VS Code, Neovim, IntelliJ, nano) noted for the editor-
+  agnostic reader; **zsh** as the recommended shell with
+  bash-compatibility footnotes; tab completion incantations for
+  kubectl/helm/minikube; a curated alias set (`k=kubectl`, the
+  `kg*`/`kd*`/`kl*` family) with `compdef` lines so the aliases
+  inherit kubectl's tab completion; brief recaps of stern,
+  kubectx/kubens from §2; **k9s** as the single most-recommended
+  optional tool; tmux/zellij for terminal multiplexing.
+  Deliberately no `examples/10-*/` dir — §10 is reference
+  material, "verification" is "open a new zsh and tab-complete
+  works." Reconciliation plan: 5 new `unverified` §10 rows
+  added to Section B (completion, alias completion, k9s + tmux
+  install via dnf, Pulsar setup). User noted aliases aren't
+  their personal default; prose presents them as "worth knowing
+  the convention" rather than mandatory
 
 **Open, priority-ordered:**
 
@@ -402,8 +427,9 @@ and what's next.
    priority
 3. Optional: §7 leftovers (range enforcement, coexist) — low
    priority, can stay `unverified` indefinitely
-4. **r11** — §10 editor/shell/terminal; will request local-setup
-   specifics (your CLion / warp.dev / shell-of-choice details)
+4. Optional: §10 row promotions are easy individually
+   (`which k9s`, `kubectl completion zsh | head`, etc.) but
+   low priority — §10 is reference, not a verification gate
 5. **r12** — §11 Istio (resource bump pre-flight; expect Section B
    resource claims to surface here)
 6. **r13** — §12 KEDA (optional section)
