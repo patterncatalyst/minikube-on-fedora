@@ -34,46 +34,21 @@ is the right primitive. By the end you'll have:
    based on HTTP traffic (via the KEDA HTTP add-on), then back
    to 0 after the load stops
 
-![HPA vs KEDA scaling models]({{ "/assets/diagrams/12-hpa-vs-keda.svg" | relative_url }})
-
 ## HPA vs KEDA
 
-The default HPA looks like this:
+The default HPA reads resource metrics from kubelet via
+metrics-server, then asks the Deployment to scale up or down
+based on CPU/memory pressure. The Pod has to be **running** to
+contribute its CPU number — so HPA can never legitimately scale
+to zero, because there'd be nothing to measure.
 
-```
-+------------+      +----------------+      +--------------+
-|   Pods     |─────►| metrics-server |─────►|     HPA      |
-| (CPU/mem)  |      |   (kubelet     |      | (controller) |
-+------------+      |  cAdvisor)     |      +------┬-------+
-                    +----------------+             │
-                                                   ▼
-                                          +-----------------+
-                                          | Deployment      |
-                                          |  scale up/down  |
-                                          +-----------------+
-```
+KEDA inverts the model: instead of measuring the Pods, it
+measures **external events** (Kafka consumer lag, HTTP request
+rate, queue depth, etc.) and asks for replicas based on those.
+Because the metric source is outside the Pods, the workload
+can sit at zero during quiet periods.
 
-CPU and memory come from kubelet via metrics-server; HPA reads
-them via the Resource Metrics API; HPA adjusts the Deployment's
-replicas. The Pod has to be **running** to contribute its CPU
-number — so HPA can never legitimately scale to zero, because
-there'd be nothing to measure.
-
-KEDA inverts the model:
-
-```
-+-------------+      +-------------+      +-------------+      +----------------+
-| External    |─────►| KEDA        |─────►| KEDA        |─────►| HPA            |
-| event       |      | ScaledObject|      | metrics-    |      | (uses External |
-| (Kafka lag, |      | controller  |      | apiserver   |      |  Metrics API)  |
-|  HTTP queue,|      | (reconciles)|      | (serves     |      +-------+--------+
-|  cron, etc) |      +-------------+      |  External   |              │
-+-------------+                           |  Metrics    |              ▼
-                                          |  API)       |    +------------------+
-                                          +-------------+    | Deployment       |
-                                                             |  scale 0 ↔ N     |
-                                                             +------------------+
-```
+![HPA vs KEDA scaling models]({{ "/assets/diagrams/12-hpa-vs-keda.svg" | relative_url }})
 
 The clever part: **KEDA doesn't replace HPA** — it provides the
 External Metrics API that HPA was already designed to consume.
@@ -523,8 +498,6 @@ The visible signature of success: replica count climbs from 0,
 peaks at some value, then drops back to 0. The demo prints the
 replica count at each phase for transparency.
 
-![KEDA HTTP add-on data flow]({{ "/assets/diagrams/12-keda-http-addon.svg" | relative_url }})
-
 ## Pattern B: HTTP request scaling with the KEDA HTTP add-on
 
 The second pattern uses the HTTP add-on instead of a built-in
@@ -539,20 +512,7 @@ KEDA scaler. The shape:
 - The interceptor buffers requests during cold-start so the
   client doesn't see 5xx errors while the Pod is starting
 
-```
-+----------+      +-----------------+      +-----------------+
-|  client  |─────►| HTTP add-on     |─────►| nginx-custom    |
-|  (hey)   |      | interceptor     |      | Deployment      |
-+----------+      | (queues + count)|      | (0 ↔ N pods)    |
-                  +--------┬--------+      +-----------------+
-                           │
-                           ▼
-                  +-----------------+
-                  | KEDA scaler     |
-                  | (reads metrics, |
-                  |  drives HPA)    |
-                  +-----------------+
-```
+![KEDA HTTP add-on data flow]({{ "/assets/diagrams/12-keda-http-addon.svg" | relative_url }})
 
 ### Workload
 
@@ -731,4 +691,4 @@ Total elapsed time for both demos: ~6-10 minutes for the first
 run (Strimzi cluster bring-up dominates), ~3-5 minutes for
 subsequent runs.
 
-[On to §13: Wrap-up →]({{ "/docs/13-wrap-up/" | relative_url }})
+[On to §13: Alternatives to minikube →]({{ "/docs/13-alternatives/" | relative_url }})

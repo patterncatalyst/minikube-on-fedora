@@ -1508,6 +1508,77 @@ have to derive them.
 
   Verified row count unchanged at **107**.
 
+- **r16c** (2026-05-17, ASCII→SVG replacement, not splice) —
+  r16b's auto-splice put SVG embeds at heuristic locations
+  (before the first `## ` heading) but **did not remove the
+  existing ASCII art** in §11 and §12. Result: SVGs landed at
+  unrelated positions (after the bullet-list intro, before
+  unrelated headings) while the original ASCII diagrams stayed
+  in place inside their proper sections. User caught this.
+
+  Lesson recorded: auto-splice is unsafe when the destination
+  files already contain diagrams. A heuristic that inserts a
+  new embed cannot reason about whether existing ASCII art
+  represents the same concept. The correct operation is
+  *replace ASCII with SVG in place*, which requires the
+  ASCII source content to be known — and that requires
+  reading the file, not pattern-matching a heading.
+
+  Six targeted `str_replace` edits in r16c, using the user's
+  paste of current file content as the precise baseline:
+
+  §11 corrections:
+  1. Remove misplaced SVG embed between the bullet list ("6.
+     Optional: Kiali...") and `## What's a service mesh`
+  2. Replace the ASCII mesh diagram inside `## Istio
+     architecture` with the SVG embed in the same position.
+     The Bookinfo ASCII diagram (productpage → details/reviews
+     → ratings) is *not* affected — it's a different concept
+     from the istio-mesh.svg and stays as ASCII
+
+  §12 corrections:
+  3. Remove misplaced HPA-vs-KEDA SVG embed between the
+     bullet list and `## HPA vs KEDA`
+  4. Replace **both** ASCII diagrams in `## HPA vs KEDA`
+     (HPA flow + KEDA flow) with one combined SVG embed,
+     restructuring the surrounding prose to flow naturally:
+     "HPA reads from Pods → can't scale to zero. KEDA reads
+     from external events → can." Then the diagram. Then
+     "KEDA doesn't replace HPA — it provides the External
+     Metrics API HPA was designed to consume." The prose
+     reads better than before — the original "looks like
+     this:" + ASCII + prose pattern was clumsy
+  5. Remove misplaced HTTP add-on SVG embed (before
+     `## Pattern B` heading) and the ASCII version inside
+     Pattern B; place the SVG inside Pattern B, after the
+     bullet list explaining the components, before
+     `### Workload`
+  6. Fix stale footer cross-reference: `[On to §13:
+     Wrap-up →](/docs/13-wrap-up/)` → `[On to §13:
+     Alternatives to minikube →](/docs/13-alternatives/)`.
+     §13 was renamed Wrap-up → Alternatives in r14a but the
+     §12 cross-reference link wasn't updated then; this
+     fixes that gap
+
+  Verification:
+  - §11 SVG embed count: 1 (line 55, in "## Istio
+    architecture")
+  - §11 ASCII box-drawing chars: 7 (only the Bookinfo
+    productpage→details/reviews→ratings diagram remaining;
+    correct — that diagram has no SVG counterpart)
+  - §12 SVG embed count: 2 (line 51 in "## HPA vs KEDA",
+    line 515 in "## Pattern B")
+  - §12 ASCII box-drawing chars: 0 (all 3 ASCII diagrams
+    replaced)
+  - §12 footer link: now points to `13-alternatives`
+  - Both files Liquid-safe (no `{{ .Capital }}` collisions)
+
+  Files updated:
+  - `_docs/11-istio.md`
+  - `_docs/12-keda.md`
+
+  Verified row count unchanged at **107**.
+
 **Open, priority-ordered:**
 
 1. **r17** — Editorial pass + deployed-preview review.

@@ -27,8 +27,6 @@ avoid stepping on §6-§9 work. By the end you'll have:
 6. Optional: Kiali / Prometheus / Grafana / Jaeger for visualizing
    the mesh
 
-![Istio service mesh — control plane and data plane]({{ "/assets/diagrams/11-istio-mesh.svg" | relative_url }})
-
 ## What's a service mesh
 
 In §6-§9, when one Pod talked to another (e.g., a Deployment of
@@ -54,27 +52,7 @@ binary that configures every Envoy in the mesh.
 
 ## Istio architecture
 
-```
-   ┌─────────────────────────┐
-   │      istiod             │   ← control plane: serves config
-   │  (control plane)        │     to every sidecar via xDS
-   └────────────┬────────────┘
-                │ xDS
-   ┌────────────┴─────────────────────────────────────┐
-   │                                                   │
-   ▼                                                   ▼
-┌──────────────────┐                       ┌──────────────────┐
-│  Pod: nginx      │                       │  Pod: bookinfo   │
-│  ┌────────────┐  │   mTLS, traffic       │  ┌────────────┐  │
-│  │ nginx app  │  │   shaping happen      │  │ productpage│  │
-│  └─────┬──────┘  │   in the sidecars,    │  └─────┬──────┘  │
-│        │         │   not in the apps     │        │         │
-│  ┌─────▼──────┐  │                       │  ┌─────▼──────┐  │
-│  │ envoy      │◄─┼───────────────────────┼─►│ envoy      │  │
-│  │ (sidecar)  │  │                       │  │ (sidecar)  │  │
-│  └────────────┘  │                       │  └────────────┘  │
-└──────────────────┘                       └──────────────────┘
-```
+![Istio service mesh — control plane and data plane]({{ "/assets/diagrams/11-istio-mesh.svg" | relative_url }})
 
 The mechanism: at Pod creation, Istio's admission webhook injects
 a second container (`istio-proxy`, running Envoy) and an init
