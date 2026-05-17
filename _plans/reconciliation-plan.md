@@ -59,9 +59,14 @@ in the document implicitly assumes these.
 Claims made in prose that are not yet end-to-end verified. New
 rows added as sections get drafted.
 
-| Status | Claim | Section | Notes |
-|--------|-------|---------|-------|
-| (no rows yet — sections are not drafted) | | | |
+| Status     | Claim                                                                | Section | Notes                                                                                |
+|------------|----------------------------------------------------------------------|---------|--------------------------------------------------------------------------------------|
+| unverified | 4 CPU / 8 GB RAM / 20 GB free disk is sufficient for §1–§10           | §1      | Tutorial floor; promote after walking §1–§10 on hardware near this floor             |
+| unverified | 6 CPU / 16 GB RAM / 50 GB free disk is comfortable for §1–§12         | §1      | "Comfortable for all" recommendation; verify when §11 + §12 are complete             |
+| unverified | Podman runs rootless on Fedora 44 with the §1 UBI test command       | §1      | `podman run --rm ubi9/ubi-minimal id` returns successful exit                        |
+| unverified | The podman driver works without KVM/qemu/VirtualBox on Fedora 44      | §1, §3  | Resolve in r05 when §3 + driver-check example land                                   |
+| unverified | No SELinux `:Z` flag needed for minikube hostPath PVs                 | §1, §8  | Resolve in r09 when persistent-volume example lands                                  |
+| unverified | UBI images at `registry.access.redhat.com` are pullable without subscription | §1      | Implicitly tested by the §1 verification block; promote when that's run cleanly      |
 
 ## C. Testing matrix
 
@@ -72,6 +77,7 @@ are still aspirational.
 
 | Status     | Example                              | Section | Notes                                                 |
 |------------|--------------------------------------|---------|-------------------------------------------------------|
+| unverified | `examples/03-driver-check/`          | §3      | Sanity: podman driver starts a cluster, status green  |
 | unverified | `examples/06-deploy-nginx-kubectl`   | §6      | Deploy UBI nginx via `kubectl apply`, hit NodePort    |
 | unverified | `examples/07-nodeport-service`       | §7      | Expose Deployment via NodePort, retrieve URL          |
 | unverified | `examples/08-persistent-volume`      | §8      | `hostPath` PV + dynamic PVC                           |
@@ -80,37 +86,49 @@ are still aspirational.
 | unverified | `examples/12-keda-http-scale`        | §12     | KEDA HTTP add-on + `hey` load test                    |
 
 **Aggregator status:** `scripts/test-all-examples.sh` does not
-yet exist; will be added once the first example's `demo.sh`
-passes on its own.
+yet exist; will be added once the first two examples' `demo.sh`
+pass on their own.
 
-## D. Open priorities
+## D. Iteration log and open priorities
 
-Roughly priority-ordered list of what to do next. Updated each
-time the project moves forward.
+Iteration-by-iteration record of what landed, what was promoted,
+and what's next.
 
 **Done:**
 
-- ✅ PRD drafted and approved (r01)
-- ✅ Skeleton scaffolded with project branding (r02 — this iteration)
+- ✅ **r01** (2026-05-16) — PRD drafted and approved
+- ✅ **r02** (2026-05-16) — Skeleton scaffolded with project
+  branding; GitHub Pages site live at
+  `https://patterncatalyst.github.io/minikube-on-fedora/`
+
+**In flight:**
+
+- **r03** — `_docs/01-prerequisites.md` drafted; iteration plan
+  codified at `_plans/iteration-plan.md`; `CONTRIBUTING.md`
+  added at repo root; `scripts/audit-fedora-prereqs.sh` added
+  for capturing Fedora 44 environment state. Awaiting first-run
+  audit output to resolve Section A version pins for r04
 
 **Open, priority-ordered:**
 
-1. Verify `minikube`, `kubectl`, and `helm` install paths on
-   Fedora 44 — are they in standard repos or via upstream
-   installers? (Resolves three rows in Section A above)
-2. Draft §1 prerequisites against a fresh Fedora 44 install
-3. Draft §2 installation; pin tool versions in Section A
-4. Draft §3 starting minikube with the podman driver; resolve
-   any rootless-podman gotchas in the same pass
-5. Build `examples/06-deploy-nginx-kubectl/` end-to-end before
-   drafting §6 prose (test code first, then prose — per
-   `LESSONS-LEARNED.md`)
-6. Draft §4–§5 (profiles, multi-node, addons)
-7. Draft §6–§7 prose now that the example works
-8. Author the small helm chart for §9; verify against the same
-   UBI nginx workload
-9. Draft §9 helm; refresh §10 editor/shell/terminal integration
-10. Tackle §11 Istio: bump minikube resources, install
-    `istioctl`, get bookinfo demo running, draft prose
-11. Tackle §12 KEDA + HTTP add-on (optional section)
-12. Draft §13–§15, cross-section editorial pass, diagrams
+1. Run `scripts/audit-fedora-prereqs.sh` on Fedora 44 and paste
+   the output back to the iteration thread; that data resolves
+   Section A version rows
+2. **r04** — draft §2 installation with version pins set from
+   the audit output; promote Section A rows from `unverified` to
+   `verified (Fedora 44)` as each tool's install is confirmed
+3. **r05** — draft §3 starting minikube + `examples/03-driver-check/`;
+   resolves the "podman driver works without KVM" claim in §3
+4. **r06** — draft §4 profiles/multi-node + §5 addons
+5. **r07** — draft §6 kubectl + `examples/06-deploy-nginx-kubectl/`
+   — the first example that the Section C testing matrix can
+   meaningfully validate
+6. **r08–r09** — drafts §7–§8 with examples
+7. **r10** — §9 helm + authored small chart
+8. **r11** — §10 editor/shell/terminal; will request local-setup
+   specifics (warp.dev workflows, CLion settings)
+9. **r12** — §11 Istio (resource-bump pre-flight; expect Section B
+   claims around resource usage to surface here)
+10. **r13** — §12 KEDA (optional)
+11. **r14–r16** — tail sections, diagrams, editorial pass,
+    final reconciliation refresh

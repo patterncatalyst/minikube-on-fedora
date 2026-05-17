@@ -1,6 +1,6 @@
 # scripts/
 
-Developer-facing scripts. Two patterns live here:
+Developer-facing scripts. Three patterns live here.
 
 ## Per-example test scripts
 
@@ -59,6 +59,25 @@ done
 The aggregator should NOT fail-fast — let every test run, then
 report. This is more useful after a refactor when you want to see
 all problems at once.
+
+## Audit scripts
+
+`audit-fedora-prereqs.sh` captures the Fedora 44 environment
+state this tutorial assumes — hardware, container engine,
+currently-installed tools, what's available in `dnf` repos. It
+modifies nothing and is safe to re-run.
+
+Used before writing a new section to set version pins from real
+data rather than guesses, and useful long-term as a "is my
+environment still aligned with the tutorial?" check:
+
+```bash
+./scripts/audit-fedora-prereqs.sh > /tmp/audit.txt
+cat /tmp/audit.txt
+```
+
+The output is paste-friendly into iteration discussions where
+version pins in the reconciliation plan need resolving.
 
 ## Other developer scripts
 
