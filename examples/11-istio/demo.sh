@@ -199,35 +199,105 @@ fi
 kubectl get pods -n istio-system | sed 's/^/    /'
 pass "Istio control plane and gateway ready"
 
+# The MutatingWebhookConfiguration that performs sidecar injection
+# registers separately from istiod's Pod readiness. `kubectl wait
+# Available` returns as soon as istiod's Pod is ready (gRPC port
+# open) — but the caBundle on the webhook config gets populated
+# asynchronously a few seconds later. Deploying a workload during
+# that gap produces a Pod with no sidecar injected; the API server
+# silently skips the webhook because its caBundle is empty.
+step "waiting for MutatingWebhookConfiguration istio-sidecar-injector to be ready"
+WEBHOOK_READY=""
+for i in $(seq 1 60); do
+    CABUNDLE=$(kubectl get mutatingwebhookconfiguration istio-sidecar-injector \
+        -o jsonpath='{.webhooks[0].clientConfig.caBundle}' 2>/dev/null || true)
+    if [[ -n "${CABUNDLE}" ]]; then
+        info "webhook ready (caBundle populated) after ${i}s"
+        WEBHOOK_READY="yes"
+        break
+    fi
+    sleep 1
+done
+if [[ -z "${WEBHOOK_READY}" ]]; then
+    fail "istio-sidecar-injector webhook caBundle not populated within 60s"
+fi
+pass "sidecar-injector webhook live"
+
 # ── Phase 4: Label default namespace for sidecar injection ──────────────────
 step "labeling default namespace for istio sidecar injection"
 kubectl label namespace default istio-injection=enabled --overwrite >/dev/null
+# Brief buffer so the admission controller's namespace-label cache
+# refreshes before our nginx Pod creation hits the webhook
+sleep 3
 pass "default namespace labeled (istio-injection=enabled)"
 
 # ── Phase 5: Deploy nginx-with-sidecar ──────────────────────────────────────
-step "deploying nginx-with-sidecar"
-# Make sure no stale §11 nginx is around (idempotency)
-kubectl delete -f "${MANIFESTS_DIR}/" --ignore-not-found=true >/dev/null 2>&1 || true
-kubectl apply -f "${MANIFESTS_DIR}/"
-if ! kubectl wait --for=condition=Available \
-        "deployment/nginx-istio" --timeout="${WAIT_DEPLOY_SECONDS}s" >/dev/null; then
-    info "Deployment status:"
-    kubectl describe deployment/nginx-istio | sed 's/^/    /'
-    fail "nginx-istio Deployment did not become Available"
-fi
+deploy_nginx_with_sidecar() {
+    kubectl delete -f "${MANIFESTS_DIR}/" --ignore-not-found=true >/dev/null 2>&1 || true
+    sleep 2
+    kubectl apply -f "${MANIFESTS_DIR}/"
+    if ! kubectl wait --for=condition=Available \
+            "deployment/nginx-istio" --timeout="${WAIT_DEPLOY_SECONDS}s" >/dev/null; then
+        info "Deployment status:"
+        kubectl describe deployment/nginx-istio | sed 's/^/    /'
+        fail "nginx-istio Deployment did not become Available"
+    fi
+}
 
-# Verify 2/2 containers (nginx + istio-proxy)
-NGINX_POD=$(kubectl get pod -l app=nginx-istio -o jsonpath='{.items[0].metadata.name}')
-NGINX_CONTAINERS=$(kubectl get pod "${NGINX_POD}" -o jsonpath='{range .status.containerStatuses[*]}{.name},{end}')
-case "${NGINX_CONTAINERS}" in
-    *nginx*istio-proxy*|*istio-proxy*nginx*)
-        pass "nginx-istio Pod has nginx + istio-proxy (mesh injection working)"
-        ;;
-    *)
-        info "Pod containers: ${NGINX_CONTAINERS}"
-        fail "expected nginx + istio-proxy in the Pod; got something else"
-        ;;
-esac
+dump_injection_diagnostics() {
+    info ""
+    info "  Namespace labels:"
+    kubectl get namespace default --show-labels 2>/dev/null | sed 's/^/    /'
+    info ""
+    info "  Mutating webhook configurations matching istio:"
+    kubectl get mutatingwebhookconfigurations \
+        -o custom-columns='NAME:.metadata.name,CABUNDLE_BYTES:.webhooks[0].clientConfig.caBundle' \
+        2>/dev/null | grep -i istio | sed 's/^/    /' || echo "    (none found)"
+    info ""
+    info "  Pod annotations:"
+    kubectl get pod "${NGINX_POD}" -o jsonpath='{.metadata.annotations}' 2>/dev/null \
+        | sed 's/^/    /' || echo "    (pod gone)"
+    info ""
+    info "  istiod logs (last 30 lines):"
+    kubectl logs -n istio-system deployment/istiod --tail=30 2>/dev/null \
+        | sed 's/^/    /' || echo "    (no logs)"
+    info ""
+}
+
+check_sidecar_injected() {
+    NGINX_POD=$(kubectl get pod -l app=nginx-istio -o jsonpath='{.items[0].metadata.name}')
+    NGINX_CONTAINERS=$(kubectl get pod "${NGINX_POD}" \
+        -o jsonpath='{range .status.containerStatuses[*]}{.name},{end}')
+    case "${NGINX_CONTAINERS}" in
+        *nginx*istio-proxy*|*istio-proxy*nginx*)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+step "deploying nginx-with-sidecar"
+deploy_nginx_with_sidecar
+
+if check_sidecar_injected; then
+    pass "nginx-istio Pod has nginx + istio-proxy (mesh injection working)"
+else
+    info "first deploy did not inject sidecar — Pod containers: ${NGINX_CONTAINERS}"
+    info "dumping diagnostics, then retrying once after a brief pause"
+    dump_injection_diagnostics
+    info "retrying nginx deployment (10s pause)"
+    sleep 10
+    deploy_nginx_with_sidecar
+    if check_sidecar_injected; then
+        pass "nginx-istio Pod has nginx + istio-proxy on retry (mesh injection working)"
+    else
+        info "still no sidecar on retry — Pod containers: ${NGINX_CONTAINERS}"
+        dump_injection_diagnostics
+        fail "sidecar injection failed twice; webhook is broken"
+    fi
+fi
 
 # ── Phase 6: Deploy Bookinfo ────────────────────────────────────────────────
 step "deploying Bookinfo (4 microservices, 6 Pods) — first run ~2-3 minutes"
