@@ -142,9 +142,9 @@ Fedora 44.
 | **verified (Fedora 44)** | `bookinfo-gateway.yaml` (Gateway + VirtualService) exposes productpage at `istio-ingressgateway:80` reachable via `kubectl port-forward` | §11 | r12d user run: Gateway + VirtualService applied cleanly; `istioctl analyze` returned clean; port-forward established; productpage responded with HTML containing `<title>Simple Bookstore App</title>` |
 | **verified (Fedora 44)** | `istioctl analyze` returns clean output (no Errors) for a configured Bookinfo mesh | §11 | r12d user run: ✓ Gateway + VirtualService applied; istioctl analyze clean |
 | **verified (Fedora 44)** | Current Istio (1.29+) Bookinfo sample has been rebranded from "Bookinfo Sample" to "Simple Bookstore App" and migrated from Bootstrap CSS (which used `glyphicon-star` for reviews v2/v3 ratings) to Tailwind. HTML-marker-based routing assertions need updating — better: use response-hash distribution which doesn't depend on specific markup | §11 | r12d user run: productpage response started `<title>Simple Bookstore App</title>` and `<script src="static/tailwind/tailwind.css">`. r12e demo replaces `glyphicon-star` count with hash-based check: v1-pin expects ≤3 distinct hashes / 10 samples (deterministic backend), 50/50 split expects ≥2 distinct patterns / 20 samples (mixed deterministic v1 + random-rating v3) |
-| unverified              | `virtual-service-all-v1.yaml` pins 100% of reviews traffic to v1 (verified via response-hash distribution: ≤3 distinct hashes across 10 samples) | §11 | r12e demo's strongest routing assertion; promote when full demo passes |
-| unverified              | `virtual-service-reviews-50-v3.yaml` (or `-jason-v2-v3.yaml` fallback) produces multiple distinct response patterns (≥2 distinct hashes / 20 samples) when applied to bookinfo traffic | §11 | r12e demo claim; replaces the brittle `glyphicon-star` count with markup-agnostic hash diversity |
-| unverified              | kubectl context can be saved + restored across a demo run via `kubectl config use-context` (so `istio` profile work doesn't disturb `minikube` profile state) | §11 | r12 demo's context-management pattern; the trap restores on every exit |
+| **verified (Fedora 44)** | `virtual-service-all-v1.yaml` pins 100% of reviews traffic to v1 (verified via response-hash distribution: ≤3 distinct hashes across 10 samples) | §11 | r12e user run: **exactly 1 distinct hash** (`b6e5bbdddade...`) across 10 samples. productpage with only v1 reviews is fully deterministic — zero noise. Strongest mesh-routing assertion in the tutorial |
+| **verified (Fedora 44)** | `virtual-service-reviews-50-v3.yaml` (or `-jason-v2-v3.yaml` fallback) produces multiple distinct response patterns (≥2 distinct hashes / 20 samples) when applied to bookinfo traffic | §11 | r12e user run: 2 distinct hashes across 20 samples, 11/9 distribution (55/45%) between the v1 hash (`b6e5bbdddade...`) and the v3 hash (`0491712a6626...`). v3 also produced a single deterministic hash, suggesting current Bookinfo seeds randomness from request ID |
+| **verified (Fedora 44)** | kubectl context can be saved + restored across a demo run via `kubectl config use-context` (so `istio` profile work doesn't disturb `minikube` profile state) | §11 | r12e user run: demo started with `current kubectl context: minikube`, switched to `istio` for the work, and on exit ("cleanup: stopping port-forward..." → "restoring kubectl context to minikube") restored cleanly. §6-§9 demos remain runnable without manual switching |
 
 ## C. Testing matrix
 
@@ -160,7 +160,7 @@ are still aspirational.
 | **verified (Fedora 44)** | `examples/07-nodeport-service`     | §7      | r08a user run: tunnel established in 3s, NodePort exposure via auto-tunnel `http://127.0.0.1:45185`, curl matched sentinel, 35s total |
 | **verified (Fedora 44)** | `examples/08-persistent-volume`    | §8      | r09 user run: Deployment Available in 3s, PVC bound, timestamps matched before/after `kubectl delete pod` — PV persistence confirmed |
 | **verified (Fedora 44)** | `examples/09-deploy-nginx-helm`     | §9      | r10d user run: lint + template + install + curl-install-title + upgrade + rollout + curl-upgrade-title + history + uninstall + zero-leftovers (after 2s of polling) all green |
-| **in flight** | `examples/11-istio`                   | §11     | Shipped in r12; awaiting user run on a new `istio` minikube profile (4 CPU / 6 GB recommended). 8-12 min first-run duration expected |
+| **verified (Fedora 44)** | `examples/11-istio`                   | §11     | r12e user run: full §11 happy path passed — 13 phases from pre-flight through routing assertions. v1-pin proven by 1/10 distinct hashes, 50/50 split proven by 2/20 with 55/45 distribution. SUCCESS banner with verified counts; cleanup trap restored kubectl context |
 | unverified | `examples/12-keda-http-scale`        | §12     | KEDA HTTP add-on + `hey` load test                    |
 
 **Aggregator status:** `scripts/test-all-examples.sh` does not
@@ -615,23 +615,62 @@ and what's next.
      works, istioctl analyze clean, the UI rebrand finding gets
      its own row). The two routing assertions stay unverified
      pending the r12e re-run
+- ✅ **r12f** (2026-05-17, §11 verified end-to-end, **Phase 4
+  complete**) — r12e user run: **`✓ SUCCESS`**. Full §11 demo
+  passed all 13 phases in ~30s (cluster + Istio + image all
+  cached from prior runs). The two routing assertions came in
+  cleaner than expected:
+  - v1-pin: **exactly 1** distinct hash across 10 samples
+    (productpage with only v1 reviews is fully deterministic;
+    zero noise). Strongest mesh-routing assertion in the
+    tutorial
+  - 50/50 split: **2** distinct hashes across 20 samples,
+    11/9 distribution (55/45% — within statistical noise of
+    a true 50/50). v3 also produced a single deterministic
+    hash, suggesting current Bookinfo seeds randomness from
+    request ID
+  r12f promotes:
+  - The two §11 routing assertions to verified
+  - The kubectl-context save/restore row to verified
+  - Section C `examples/11-istio/` from in flight to verified
+  Total verified row count after r12f: **83** (started r02 at
+  ~5; gained 78 across 24 sub-iterations of real-on-Fedora
+  verification). This is the end of **Phase 4 (Service Mesh)**.
+  Phases 5+ are §12 KEDA (optional), the tail sections (§13-§15),
+  diagrams, and the editorial pass
+
+**Phase 4 retrospective — six sub-iterations of §11 (r12 through
+r12e), each catching a real-world issue:**
+
+| Sub-iter | Finding                                                            | Captured as                           |
+|----------|--------------------------------------------------------------------|---------------------------------------|
+| r12      | Initial §11 ship (Istio + Bookinfo + routing)                      | 12 unverified §11 rows                |
+| r12a     | inotify limits sized for one minikube cluster, not two             | Section B verified row + pre-flight   |
+| r12b     | Propagated the inotify finding to §1 prereqs + audit script        | Documentation in three places         |
+| r12c     | Istio install-then-deploy webhook race (Available ≠ caBundle live) | Section B verified row + caBundle poll|
+| r12d     | Istio 1.29+ native sidecars (KEP-753) — istio-proxy is initContainer| Section B verified row + spec-based check |
+| r12e     | Bookinfo UI rebrand: Bootstrap → Tailwind, no more glyphicon-star  | Section B verified row + hash-based check |
+
+None of these were in the obvious-search-result Istio quickstart
+docs in clearly-findable form. Now they're captured as verified
+knowledge in the reconciliation plan — future readers don't
+have to derive them.
 
 **Open, priority-ordered:**
 
-1. Re-run `examples/11-istio/demo.sh` after applying r12e. Expect
-   `✓ SUCCESS` — the cluster state is good, the only remaining
-   gates are the productpage title and the two routing
-   distributions. On success: 2 more §11 rows promote (the two
-   routing assertions) plus Section C `examples/11-istio/`
-2. Optional: install the observability addons (`kubectl apply -f
-   ~/.local/share/istio-current/samples/addons/`) and explore via
-   `istioctl dashboard kiali`. Not a verification gate
+1. **r13** — §12 KEDA (optional section per PRD; "reference
+   material for KEDA + HTTP add-on"). Lighter than §11 — uses
+   the existing `minikube` profile (no second cluster), installs
+   via helm, demo will exercise scale-from-zero with `hey`
+2. Optional: install the §11 observability addons (`kubectl
+   apply -f ~/.local/share/istio-current/samples/addons/`) and
+   explore via `istioctl dashboard kiali`. Not a verification
+   gate; valuable for hands-on understanding of the mesh
 3. Optional: §10 row promotions (`which k9s`, `kubectl
    completion zsh | head`, etc.) — low priority
-4. Optional: §8 PV auto-delete, §7 leftover claims — low priority,
-   can stay unverified
-5. **r13** — §12 KEDA (optional section per PRD; recall this is
-   "reference material for KEDA + HTTP add-on")
-6. **r14–r16** — tail sections (§13 wrap-up, §14 troubleshooting?,
-   §15 where-next-pointers), diagrams, editorial pass, final
-   reconciliation refresh
+4. Optional: §8 PV auto-delete, §7 leftover claims — low
+   priority, can stay unverified
+5. **r14–r16** — tail sections (§13 wrap-up, §14
+   troubleshooting?, §15 where-next-pointers), diagrams (paired
+   `.svg` + `.excalidraw`), editorial pass across all section
+   prose, final reconciliation refresh
