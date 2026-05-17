@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-istio
+  labels:
+    app: nginx-istio
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: nginx-istio
+  template:
+    metadata:
+      labels:
+        app: nginx-istio
+      annotations:
+        # Explicit per-Pod opt-in. The §11 prose also labels the
+        # `default` namespace with `istio-injection=enabled`; the
+        # annotation here is belt-and-suspenders. Setting it to
+        # "false" would opt this Pod out of injection even in a
+        # labeled namespace.
+        sidecar.istio.io/inject: "true"
+    spec:
+      containers:
+      - name: nginx
+        image: nginx-custom:v1
+        # Same image as §6/§7/§8/§9. NOT cross-profile cached —
+        # demo.sh rebuilds it on the istio profile if missing.
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 2
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "64Mi"
+          limits:
+            cpu: "500m"
+            memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx-istio
+  labels:
+    app: nginx-istio
+spec:
+  type: ClusterIP
+  selector:
+    app: nginx-istio
+  ports:
+  - port: 80
+    targetPort: 8080
+    protocol: TCP

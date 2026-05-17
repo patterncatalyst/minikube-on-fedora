@@ -121,7 +121,7 @@ Fedora 44.
 | **verified (Fedora 44)** | `helm install` with `--set` overrides default values from `values.yaml`    | §9 | r10 user run: served HTML contained `First install via helm` (the `--set content.title="..."` override) |
 | **verified (Fedora 44)** | `helm upgrade --set` updates the release to a new revision                  | §9 | r10 user run: `helm history` returned 2 revisions (1 superseded, 2 deployed) |
 | **verified (Fedora 44)** | `checksum/configmap` annotation in the Deployment template triggers a Pod rollout when ConfigMap content changes | §9 | r10 user run: upgrade-time title `Upgraded title via helm` appeared in served HTML, proving Pods recreated with new ConfigMap content (otherwise old Pods would still serve old content) |
-| unverified              | `helm uninstall` removes all chart-created resources within 30s (async deletion) | §9 | r10 user run: leftover Pod in `Terminating` state caught the demo's one-shot check (failed); r10d demo polls for 30s; promote on demo re-run pass |
+| **verified (Fedora 44)** | `helm uninstall` removes all chart-created resources within 30s (async deletion) | §9 | r10d user run with polling demo: "all resources gone after 2s" — well under the 30s budget; ✓ SUCCESS |
 | **verified (Fedora 44)** | Helm 4 reads charts authored against the Helm 3 chart format (`apiVersion: v2`) | §2, §9 | r10 user run with helm `v4.1.1+g5caf004` cleanly handled the v2-format chart through lint, template, install, upgrade, history, uninstall |
 | **verified (Fedora 44)** | `helm uninstall` is asynchronous — returns success once delete operations are submitted; actual Pod termination follows `terminationGracePeriodSeconds` (default 30s) | §9 | Learned in r10 user run: leftover check ran 0ms after uninstall returned, caught a Pod still `Terminating` (3s old). r10d's demo polls for 30s after uninstall to account for the async behavior |
 | unverified              | `kubectl completion zsh`, `helm completion zsh`, `minikube completion zsh` produce working tab completion when sourced in `~/.zshrc` | §10 | r11 prose claim; promote on demonstration (e.g., `kubectl get po<TAB>` showing pod kinds) |
@@ -129,6 +129,17 @@ Fedora 44.
 | unverified              | `k9s` installs cleanly via `sudo dnf install -y k9s` on Fedora 44 | §10 | r11 prose claim; verifiable in seconds with `which k9s && k9s version` |
 | unverified              | `tmux` installs cleanly via `sudo dnf install -y tmux` on Fedora 44 | §10 | r11 prose claim |
 | unverified              | Pulsar's `.rpm` from pulsar-edit.dev installs cleanly on Fedora 44 with YAML highlighting working out of the box | §10 | r11 prose claim; the author's working setup |
+| unverified              | A dedicated `istio` minikube profile with `--memory=6g --cpus=4 --rootless=true --container-runtime=containerd` starts cleanly on Fedora 44 | §11 | r12 prose claim; promote when `examples/11-istio/demo.sh` passes |
+| unverified              | `scripts/setup-istio.sh` downloads + extracts Istio 1.29.2 and installs istioctl to `~/.local/bin/` | §11 | r12 setup script claim |
+| unverified              | `istioctl install --set profile=demo -y` brings up istiod + ingressgateway + egressgateway within 60s | §11 | r12 demo claim |
+| unverified              | Labeling `default` namespace `istio-injection=enabled` causes new Pods to be sidecar-injected (`READY 2/2`) | §11 | r12 demo claim; the central mesh-injection mechanism |
+| unverified              | minikube image cache is per-profile — `nginx-custom:v1` from the `minikube` profile is NOT visible on the `istio` profile | §11 | r12 demo design assumption; demo rebuilds the image on the istio profile |
+| unverified              | Bookinfo sample app deploys cleanly with all 4 microservices + 6 Pods reaching Available | §11 | r12 demo claim; first cross-profile use of upstream Istio sample images |
+| unverified              | `bookinfo-gateway.yaml` (Gateway + VirtualService) exposes productpage at `istio-ingressgateway:80` reachable via `kubectl port-forward` | §11 | r12 demo claim |
+| unverified              | `virtual-service-all-v1.yaml` pins 100% of reviews traffic to v1 (no `glyphicon-star` indicators across 10 sampled responses) | §11 | r12 demo's strongest routing assertion |
+| unverified              | `virtual-service-reviews-50-v3.yaml` produces approximately 50/50 split between v1 and v3 (sampled across 20 responses) | §11 | r12 demo claim; soft-warning on out-of-range counts since 20 samples have variance |
+| unverified              | `istioctl analyze` returns clean output (no Errors) for a configured Bookinfo mesh | §11 | r12 demo claim |
+| unverified              | kubectl context can be saved + restored across a demo run via `kubectl config use-context` (so `istio` profile work doesn't disturb `minikube` profile state) | §11 | r12 demo's context-management pattern; the trap restores on every exit |
 
 ## C. Testing matrix
 
@@ -143,8 +154,8 @@ are still aspirational.
 | **verified (Fedora 44)** | `examples/06-deploy-nginx-kubectl` | §6      | r07c user run: image built, Deployment Available in 8s, port-forward + curl + scale to 3 all worked |
 | **verified (Fedora 44)** | `examples/07-nodeport-service`     | §7      | r08a user run: tunnel established in 3s, NodePort exposure via auto-tunnel `http://127.0.0.1:45185`, curl matched sentinel, 35s total |
 | **verified (Fedora 44)** | `examples/08-persistent-volume`    | §8      | r09 user run: Deployment Available in 3s, PVC bound, timestamps matched before/after `kubectl delete pod` — PV persistence confirmed |
-| **in flight** | `examples/09-deploy-nginx-helm`        | §9      | r10 user run passed every substantive check; failed only on a one-shot leftover query that raced a `Terminating` Pod. r10d demo polls for 30s; awaiting re-run |
-| unverified | `examples/11-istio-bookinfo`         | §11     | Istio sample app with sidecar + Gateway + VS          |
+| **verified (Fedora 44)** | `examples/09-deploy-nginx-helm`     | §9      | r10d user run: lint + template + install + curl-install-title + upgrade + rollout + curl-upgrade-title + history + uninstall + zero-leftovers (after 2s of polling) all green |
+| **in flight** | `examples/11-istio`                   | §11     | Shipped in r12; awaiting user run on a new `istio` minikube profile (4 CPU / 6 GB recommended). 8-12 min first-run duration expected |
 | unverified | `examples/12-keda-http-scale`        | §12     | KEDA HTTP add-on + `hey` load test                    |
 
 **Aggregator status:** `scripts/test-all-examples.sh` does not
@@ -393,45 +404,61 @@ and what's next.
   one new `verified` row recording the async-uninstall finding.
   `helm uninstall removes all resources within 30s` row stays
   in flight pending re-run
-- **r11** (2026-05-17, §10 Editor, shell, terminal) —
-  `_docs/10-editor-shell-terminal.md` drafted (20-min section
-  on practical tooling for k8s work). Specific to user's setup
-  per r10c convo: **Pulsar** as the editor recommendation (the
-  community-maintained Atom successor) with alternatives
-  (VS Code, Neovim, IntelliJ, nano) noted for the editor-
-  agnostic reader; **zsh** as the recommended shell with
-  bash-compatibility footnotes; tab completion incantations for
-  kubectl/helm/minikube; a curated alias set (`k=kubectl`, the
-  `kg*`/`kd*`/`kl*` family) with `compdef` lines so the aliases
-  inherit kubectl's tab completion; brief recaps of stern,
-  kubectx/kubens from §2; **k9s** as the single most-recommended
-  optional tool; tmux/zellij for terminal multiplexing.
-  Deliberately no `examples/10-*/` dir — §10 is reference
-  material, "verification" is "open a new zsh and tab-complete
-  works." Reconciliation plan: 5 new `unverified` §10 rows
-  added to Section B (completion, alias completion, k9s + tmux
-  install via dnf, Pulsar setup). User noted aliases aren't
-  their personal default; prose presents them as "worth knowing
-  the convention" rather than mandatory
+- ✅ **r11** (2026-05-17, §10 Editor, shell, terminal — reference
+  section; no demo) — `_docs/10-editor-shell-terminal.md` drafted
+  (20-min section on practical tooling for k8s work). Pulsar as
+  editor + alternatives (VS Code, Neovim, IntelliJ, nano); zsh as
+  shell with bash-compat footnotes; tab completion incantations
+  for kubectl/helm/minikube; curated alias set (`k=kubectl`,
+  `kg*`/`kd*`/`kl*`) with `compdef` lines so aliases inherit
+  completion; recaps of stern, kubectx/kubens; k9s as the
+  most-recommended optional tool; tmux/zellij. No
+  `examples/10-*/` directory — verification is "open a new zsh
+  and tab-complete works." 5 §10 rows added to Section B as
+  unverified low-priority — can be checked individually
+  (`which k9s`, etc.) but §10 isn't a verification gate
+
+**In flight:**
+
+- **r12** (2026-05-17, §11 Istio) — `_docs/11-istio.md` drafted
+  (40-min section, longest in the tutorial). Two halves: a
+  **minimal sidecar injection** of our existing `nginx-custom:v1`,
+  then the full **Bookinfo** sample with traffic routing and
+  fault injection. Per user direction "let's do Both."
+  Architecture: dedicated `istio` minikube profile (4 CPU /
+  6 GB) separate from the §6-§9 `minikube` profile; image cache
+  is per-profile so nginx-custom rebuilds. `scripts/setup-istio.sh`
+  is the one-time setup (downloads Istio 1.29.2 tarball, installs
+  istioctl to `~/.local/bin/`). `examples/11-istio/demo.sh` is
+  the comprehensive run: pre-flight, build image, install Istio
+  (idempotent), label namespace, deploy nginx-with-sidecar,
+  verify 2/2 containers, deploy Bookinfo, apply Gateway +
+  VirtualService, port-forward + curl productpage, apply
+  v1-pinning rule (assert 0/10 v3 hits), apply 50/50 split
+  (assert ~50% of 20 responses hit v3). kubectl context
+  saved+restored so §6-§9 profile is undisturbed. 12 §11 rows
+  added to Section B (control plane install, sidecar injection,
+  bookinfo, gateway, two routing assertions, analyze, per-profile
+  image cache, context save/restore). Bookinfo uses upstream
+  `docker.io/istio/*` images — vendor-neutral PRD constraint
+  was about *our* examples; upstream sample apps using their own
+  images is conventional. Demo expected 8-12 min first run
 
 **Open, priority-ordered:**
 
-1. Re-run `examples/09-deploy-nginx-helm/demo.sh` after applying
-   r10d. On `✓ SUCCESS`, the final §9 row (no-leftovers-within-30s)
-   promotes plus Section C `examples/09-deploy-nginx-helm/`. The
-   "8 §9 Section B rows promote" framing from r10's open list is
-   now: 7 already promoted in r10d's plan, 1 pending re-run
-2. Optional: verify §8 PV auto-delete by running the demo,
-   exiting before cleanup, manually `kubectl delete pvc/nginx-content`,
-   then `kubectl get pv` — should show the PV cleaned up. Low
-   priority
-3. Optional: §7 leftovers (range enforcement, coexist) — low
-   priority, can stay `unverified` indefinitely
-4. Optional: §10 row promotions are easy individually
-   (`which k9s`, `kubectl completion zsh | head`, etc.) but
-   low priority — §10 is reference, not a verification gate
-5. **r12** — §11 Istio (resource bump pre-flight; expect Section B
-   resource claims to surface here)
-6. **r13** — §12 KEDA (optional section)
-7. **r14–r16** — tail sections, diagrams, editorial pass, final
+1. Run `scripts/setup-istio.sh` (one-time; downloads Istio
+   1.29.2 to `~/.local/share/`)
+2. Run `examples/11-istio/demo.sh`. On `✓ SUCCESS`, 12 §11
+   Section B rows promote plus Section C `examples/11-istio/`
+3. Optional: install the observability addons (`kubectl apply -f
+   ~/.local/share/istio-current/samples/addons/`) and explore via
+   `istioctl dashboard kiali`. Not a verification gate
+4. Optional: §10 row promotions (`which k9s`, `kubectl
+   completion zsh | head`, etc.) — low priority
+5. Optional: §8 PV auto-delete, §7 leftover claims — low priority,
+   can stay unverified
+6. **r13** — §12 KEDA (optional section per PRD; recall this is
+   "reference material for KEDA + HTTP add-on")
+7. **r14–r16** — tail sections (§13 wrap-up, §14 troubleshooting?,
+   §15 where-next-pointers), diagrams, editorial pass, final
    reconciliation refresh
