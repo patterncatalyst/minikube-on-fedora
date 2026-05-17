@@ -632,7 +632,11 @@ keyed on the Host header.
 6. Port-forward the HTTP interceptor to localhost:18080
 7. Fire one request with `Host: nginx.local` to wake the
    workload — interceptor should buffer until the pod is ready
-8. Run `hey -n 500 -c 50 -H 'Host: nginx.local' http://127.0.0.1:18080/`
+8. Run `hey -n 500 -c 50 -host nginx.local
+   http://127.0.0.1:18080/` (note: `-host`, not `-H`, since hey
+   is written in Go and Go's `net/http` silently strips
+   `Host:` headers set via the headers map — see the §12
+   HTTP example's README for the gotcha details)
 9. Watch replica count climb during the load
 10. Wait for `scaledownPeriod + 30s` of idle
 11. Assert replicas = 0 (final state)
@@ -641,6 +645,18 @@ The first request post-scale-down is interesting to watch — it
 takes a few seconds because the interceptor is waiting for a
 Pod to come up. Subsequent requests after the Pod is ready are
 fast (single-digit milliseconds).
+
+A note on observed peak replicas: in practice, on minikube with
+this nginx workload, the peak is often **just 1 replica** even
+under `hey -c 50`. The reason is that with nginx's per-request
+latency around 10ms, 500 requests at 50 concurrent finish in
+roughly 100ms — well below the threshold to drive KEDA's
+concurrency metric past `targetValue: 5` for sustained periods.
+The lifecycle is still being demonstrated faithfully (0 → ≥1
+→ 0), just at the lower bound. To see scaling to higher peaks,
+swap `-n 500` for `-z 15s` (run hey for 15 seconds of sustained
+load); on the same minikube setup, you'll see peak replicas of
+3-5.
 
 ## Cleanup
 

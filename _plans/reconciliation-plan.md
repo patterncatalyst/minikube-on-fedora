@@ -71,7 +71,7 @@ Fedora 44.
 | Status                  | Claim                                                                       | Section | Notes                                                                       |
 |-------------------------|-----------------------------------------------------------------------------|---------|-----------------------------------------------------------------------------|
 | unverified              | 4 CPU / 8 GB RAM / 20 GB free disk is sufficient for §1–§10                  | §1      | Promote after running §1–§10 on hardware near the floor (not the dev box)    |
-| unverified              | 6 CPU / 16 GB RAM / 50 GB free disk is comfortable for §1–§12                | §1      | "Comfortable for all" recommendation; verify once §11 + §12 are complete    |
+| **verified (Fedora 44)** | 6 CPU / 16 GB RAM / 50 GB free disk is comfortable for §1–§12                | §1      | r13f close-out: user's 6 CPU / 16 GB minikube profile handled the full tutorial including §11 Istio (separate `istio` profile, 4 CPU / 6 GB) and §12 (Strimzi + Kafka 4.1.0 + KEDA + HTTP add-on + per-demo workloads). No OOM kills, no CPU starvation, no scheduling failures observed |
 | **verified (Fedora 44)** | Podman runs rootless on Fedora 44 with the §1 UBI test command              | §1      | r03 user output: `podman run --rm ubi9/ubi-minimal echo OK` → `OK` ✓        |
 | **verified (Fedora 44)** | UBI images at `registry.access.redhat.com` are pullable without subscription | §1      | r03 user output: pull + run + exec all succeeded against ubi9/ubi-minimal ✓ |
 | **verified (Fedora 44)** | The podman driver works without KVM/qemu/VirtualBox on Fedora 44             | §1, §3  | r05c user output: driver-check demo passed; no virtualization layer touched ✓ |
@@ -159,8 +159,8 @@ Fedora 44.
 | **verified (Fedora 44)** | KEDA HTTP add-on `HTTPScaledObject` (CRD: `http.keda.sh/v1alpha1`) with `replicas.min: 0` results in zero replicas at idle | §12 | r13c user run: applied manifests, initial assertion `current replicas: 0` passed |
 | **verified (Fedora 44)** | The HTTP add-on **interceptor buffers a cold-start request** until the workload Pod is Ready, returning a 200 response with backend (nginx) content. Measured 3 seconds on this minikube setup (image cached, Pod startup dominated by readinessProbe `initialDelaySeconds: 1` + `periodSeconds: 2`) | §12 | r13c user run: cold-start curl returned HTTP 200 with nginx content after exactly 3s. Tightened r13c assertions verify status code AND nginx content (not just any HTML) |
 | **verified (Fedora 44)** | `hey` (Go-based load tester) does NOT respect `-H 'Host: x'` for setting the HTTP Host header — Go's `net/http` package silently strips Host headers from the headers map (issue golang/go#7682, open since 2014). Use `hey -host x` instead, which sets Go's special `Request.Host` field directly. Symptom of misuse: all requests through a virtual-host-based proxy (KEDA HTTP add-on interceptor, Istio gateway, nginx vhost, traefik with Host rules, etc.) return 404. curl handles `-H 'Host:'` correctly because curl treats it as a special case | §12 | r13c → r13d: r13's demo used `-H "Host: nginx.local"`, causing all 500 hey requests to return 404 while the cold-start curl (3s, 200, nginx content) worked. r13d fixed the demo to use `-host` and updated the README's "When this fails" section so future readers don't lose time to this |
-| unverified              | `hey -n 500 -c 50` sustained HTTP load drives the HTTPScaledObject's concurrency metric, scaling nginx from 0 to N replicas within 120s | §12 | r13 demo claim |
-| unverified              | After `scaledownPeriod` (30s) of zero traffic, the HTTP add-on scales the workload back to 0 replicas | §12 | r13 demo claim; completes the HTTP scale-from-zero lifecycle |
+| **verified (Fedora 44)** | `hey -n 500 -c 50` sustained HTTP load drives the HTTPScaledObject's concurrency metric, scaling nginx from 0 to ≥1 replicas within 120s. Peak replicas of 1 is consistent with KEDA semantics here — with `targetValue: 5` concurrency and a per-request latency of ~10ms on this minikube setup, 500 requests at 50 concurrent finish in ~115ms (4500 req/s), well below the threshold to ask for additional replicas. To see scaling to higher N, drive sustained load instead (e.g., `hey -z 15s -c 50`) | §12 | r13f user run: replicas climbed from 0 to 1 within 1 second of hey starting; all 500 requests returned HTTP 200 |
+| **verified (Fedora 44)** | After `scaledownPeriod` (30s) of zero traffic, the HTTP add-on scales the workload back to 0 replicas | §12 | r13f user run: nginx dropped to 0 replicas at 37s after hey finished (cooldown 30s + ~7s reconciliation lag). Full 0→1→0 HTTP lifecycle verified |
 | **verified (Fedora 44)** | KEDA Pod count after `setup-keda.sh` completes: **10 Pods** in the `keda` namespace — 1 keda-operator, 1 keda-admission-webhooks, 1 keda-operator-metrics-apiserver (KEDA core, 3 Pods), 1 keda-add-ons-http-controller-manager, 3 keda-add-ons-http-external-scaler (replicated by default), 3 keda-add-ons-http-interceptor (replicated by default) (HTTP add-on, 7 Pods) | §12 | r13b user run: the r13 plan row said 7 Pods which assumed single replicas for all components. The HTTP add-on's helm chart actually deploys the external-scaler and interceptor with 3 replicas each by default for HA. Row corrected on promotion |
 | **verified (Fedora 44)** | KEDA does not conflict with HPA — KEDA `ScaledObject` creates its own HPA backed by KEDA's metrics-apiserver, and the AKS docs explicitly warn against mixing pre-existing HPAs on the same target. The §12 demos use ONLY KEDA, no manual HPAs | §12 | r13b user run: KEDA-managed HPA reconciliation worked cleanly. The full 0→N→0 lifecycle would have failed silently or noisily if there were an HPA conflict, so the demo passing constitutes evidence |
 | **verified (Fedora 44)** | The §12 prose embeds a screenshot at `assets/screenshots/strimzi-kafka-cluster-ready.png` showing the converged Kafka cluster state: `kafka/my-kafka READY=True KAFKA VERSION=4.1.0 METADATA VERSION=4.1-IV1`, `kafkanodepool/dual-role 1 ["controller","broker"] [0]`, and three Running Pods (broker, entity-operator, cluster-operator). Caption walks readers through each row | §12 | r13b user-provided screenshot from successful demo run |
@@ -181,7 +181,7 @@ are still aspirational.
 | **verified (Fedora 44)** | `examples/09-deploy-nginx-helm`     | §9      | r10d user run: lint + template + install + curl-install-title + upgrade + rollout + curl-upgrade-title + history + uninstall + zero-leftovers (after 2s of polling) all green |
 | **verified (Fedora 44)** | `examples/11-istio`                   | §11     | r12e user run: full §11 happy path passed — 13 phases from pre-flight through routing assertions. v1-pin proven by 1/10 distinct hashes, 50/50 split proven by 2/20 with 55/45 distribution. SUCCESS banner with verified counts; cleanup trap restored kubectl context |
 | **verified (Fedora 44)** | `examples/12-keda-kafka`              | §12     | r13b user run: full demo passed end-to-end. 0→3→0 replica lifecycle with 200 messages produced and drained. See `_plans/reconciliation-plan.md` Section B for individual claim promotions |
-| **in flight** | `examples/12-keda-http`               | §12     | Shipped in r13; HTTP add-on scaling demo. Awaiting first user run on minikube profile |
+| **verified (Fedora 44)** | `examples/12-keda-http`               | §12     | r13f user run: full demo passed end-to-end after r13c (tightened assertions) + r13d (`-host` fix) + r13e (parsing fix). Cold-start 3s/200/nginx content; hey 500/500 at 4500 req/s with all 200s; scale-up to 1 replica then back to 0 after 37s. See `_plans/reconciliation-plan.md` Section B for individual claim promotions |
 
 **Aggregator status:** `scripts/test-all-examples.sh` does not
 yet exist; will be added once the first two examples' `demo.sh`
@@ -1122,19 +1122,93 @@ have to derive them.
 
   Verified row count: **103** (unchanged)
 
+- **r13f** (2026-05-17, §12 HTTP demo verified — Phase 5
+  close-out) — sixth and final r13 sub-iteration. User
+  re-ran the §12 HTTP demo on the back of r13e's parsing
+  fix. **Full, honest `✓ SUCCESS`** — every assertion fired,
+  every phase ran:
+  - Cold-start: 3s, HTTP 200, nginx content
+  - hey load: 500/500 returned HTTP 200 at ~4500 req/s
+  - Scale-up: replicas climbed from 0 to 1 within 1s
+  - Scale-down: dropped to 0 at 37s (30s cooldown + ~7s
+    reconciliation lag)
+
+  Promotions (4 rows):
+  - HTTP load scale-up VERIFIED, with honest note about why
+    peak=1 is correct here (load was 500 fast requests
+    finishing in 115ms — well below the threshold for
+    additional replicas. To see N>1, drive sustained load
+    with `hey -z 15s -c 50`)
+  - HTTP scale-down after `scaledownPeriod` VERIFIED
+  - Section C `examples/12-keda-http/` VERIFIED
+  - §1 resource recommendation (6 CPU / 16 GB / 50 GB)
+    VERIFIED end-to-end (the full tutorial including §11
+    Istio in a separate profile and §12 KEDA+Strimzi
+    completed without OOM/CPU/scheduling issues)
+
+  Verified row count: **107** (up from 103). All §12 rows
+  verified except those that don't apply (no §12-specific
+  unverified rows remain)
+
+  **Phase 5 retrospective** — six sub-iterations for §12,
+  consistent with §11's six sub-iterations from Phase 4.
+  Sub-iteration breakdown:
+
+  | Sub-iter | Finding | Captured as |
+  |---|---|---|
+  | r13   | Initial §12 ship (prose + 2 setup scripts + 2 example dirs + plan) | 14 §12 unverified rows + 2 Section C in-flight rows |
+  | r13a  | Strimzi 0.51 dropped Kafka 3.x entirely; only 4.1.0/4.1.1/4.2.0 supported | Kafka version bumped to 4.1.0, metadataVersion field dropped, verified Section B row added |
+  | r13b  | Kafka demo verified + screenshot of healthy cluster state | 10 §12 Kafka rows + 2 chart-version rows + Section C `examples/12-keda-kafka/` promoted; new "what success looks like" prose subsection with embedded screenshot |
+  | r13c  | §12 HTTP demo false-positive (404s but lax assertions claimed success); cleanup scripts for §11+§12 | Tightened HTTP assertions (status code + body content + impossibly-fast warning + hey status distribution); 3 new `cleanup.sh` scripts (§11, §12 Kafka, §12 HTTP) with two-tier teardown |
+  | r13d  | hey `-H 'Host:'` silently dropped by Go's net/http (golang/go#7682) — use `-host` flag instead | One-line fix + "Lessons learned" Section B row + README updated; 2 cold-start rows promoted on data already collected by tightened r13c assertions |
+  | r13e  | Demo aborted silently after hey output due to two parsing bugs (awk pattern over-anchored + missing `\|\| true` on grep pipe → set-e exit) | Parsing block rewritten with directly-targeted regex + safety guards; local test harness for success/404/empty cases |
+  | r13f  | §12 HTTP demo full clean run | 3 §12 HTTP rows + Section C HTTP example + §1 resource row promoted; **Phase 5 complete** |
+
+**Phase coverage map (sections vs verification status):**
+
+| Section | Verified | Notes |
+|---|---|---|
+| §1  Prerequisites | ✓ | Including inotify limits (from r12a finding) |
+| §2  Tooling install | ✓ | minikube/kubectl/helm/yq/hey/krew |
+| §3  Starting minikube | ✓ | rootless containerd via podman driver |
+| §4  Profiles + multi-node | ✓ | |
+| §5  Addons + dashboard | ✓ | |
+| §6  Deploy via kubectl | ✓ | nginx-custom multi-stage UBI build |
+| §7  NodePort | ✓ | minikube service auto-tunnel via slirp4netns |
+| §8  Persistent Volumes | ✓ | initContainer-seeds-PV pattern |
+| §9  helm | ✓ | checksum-annotation rollout trigger |
+| §10 Editor/shell/terminal | (mostly verified, some `which`-tier rows still unverified — low-value) |
+| §11 Istio | ✓ | Bookinfo + native sidecars + Kiali addons |
+| §12 KEDA | ✓ | Strimzi Kafka 4.1.0 lag scaling + HTTP add-on |
+
 **Open, priority-ordered:**
 
-1. **Re-run `examples/12-keda-http/demo.sh`** after applying
-   r13e. With the parsing fix in place, the demo should
-   complete past the hey summary, through the scale-down
-   wait, to a real `✓ SUCCESS`. On confirmed clean run,
-   3 more Section B rows promote + Section C
-   `examples/12-keda-http/` → verified row count 106,
-   **§12 fully complete**
-2. Optional: §10 row promotions, §8 PV auto-delete, §7
-   leftovers — low priority
-3. **r14–r16** — tail sections (§13 wrap-up, §14
-   troubleshooting?, §15 where-next-pointers), diagrams
-   (paired `.svg` + `.excalidraw` in `assets/diagrams/`),
-   editorial pass across all section prose, final
-   reconciliation refresh
+1. **r14** — §13 "Wrap-up". A short closing section that
+   recaps what the reader has built (one cluster running
+   §3-§10 demos, optionally a second `istio` profile for
+   §11, KEDA + Strimzi on the main profile for §12) and
+   names the tutorial's themes (rootless containerd via
+   podman, operator-pattern for stateful workloads, UBI as
+   the runtime base, defensive scripting around external
+   dependencies). One-page section, no demo, prose only
+2. **r15** — Diagrams. Paired `.svg` + `.excalidraw` source
+   files in `assets/diagrams/`. Anticipated set: (a)
+   §3-§5 minikube topology overview, (b) §6-§9
+   Deployment/Service/Ingress relationships, (c) §11 Istio
+   mesh architecture (control plane + sidecars + gateways),
+   (d) §12 HPA-vs-KEDA scaling models, (e) §12 KEDA HTTP
+   add-on architecture (interceptor + scaler + operator).
+   The current prose ASCII diagrams are placeholders that
+   work but don't scale well; SVG versions render properly
+   on hi-DPI displays and can be edited
+3. **r16** — Editorial pass. Read every section's prose
+   front-to-back as if for the first time. Tighten word
+   choice, ensure consistent voice ("you" for reader,
+   passive otherwise), verify cross-references between
+   sections, sweep for stale TODO markers, ensure each
+   section's "Verification" subsection points to the right
+   example dir
+4. Optional: §10 row promotions (`which k9s` etc.) — low
+   priority, can stay unverified
+5. Optional: §8 PV auto-delete row, §7 leftovers — low
+   priority, can stay unverified
