@@ -1,0 +1,35 @@
+# examples/12-keda-http/manifests/http-scaled-object.yaml
+#
+# KEDA HTTP add-on's HTTPScaledObject CRD. Distinct from the regular
+# ScaledObject — uses the HTTP add-on's interceptor + scaler, not the
+# core KEDA controller.
+---
+apiVersion: http.keda.sh/v1alpha1
+kind: HTTPScaledObject
+metadata:
+  name: nginx-http-scaler
+  namespace: default
+spec:
+  # Host matching: the interceptor routes requests to scaled workloads
+  # based on the Host header. Any value works; this is just a string
+  # the test client must use in the `Host:` header.
+  hosts:
+    - nginx.local
+  scaleTargetRef:
+    name: nginx-http             # Deployment to scale
+    kind: Deployment
+    service: nginx-http          # Service the interceptor forwards to
+    port: 80                     # Service's port
+  replicas:
+    min: 0                       # scale-to-zero
+    max: 5                       # bounded for the demo
+  # How long the workload stays at 0 replicas with no traffic before
+  # KEDA scales it down again. Short for the demo so we can see the
+  # full lifecycle in one run.
+  scaledownPeriod: 30
+  scalingMetric:
+    concurrency:
+      # One replica per N in-flight requests. With `hey -c 50`
+      # (50 concurrent clients), HPA would ask for 10 replicas;
+      # capped at max: 5.
+      targetValue: 5

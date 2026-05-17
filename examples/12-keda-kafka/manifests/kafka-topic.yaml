@@ -1,0 +1,16 @@
+---
+apiVersion: kafka.strimzi.io/v1
+kind: KafkaTopic
+metadata:
+  name: orders
+  namespace: kafka
+  labels:
+    strimzi.io/cluster: my-kafka
+spec:
+  partitions: 3
+  replicas: 1
+  config:
+    # Retention: keep messages for 2 hours. Default is 7 days; we don't
+    # need to hold demo messages that long.
+    retention.ms: 7200000
+    # Segment: roll new log segment every 100 MB or 1 hour. Default fine.

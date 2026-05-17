@@ -1,0 +1,36 @@
+# examples/12-keda-kafka/manifests/scaled-object.yaml
+#
+# The KEDA ScaledObject is what makes this a "scaled" workload. Once
+# applied, KEDA polls Kafka every 5 seconds (pollingInterval) for the
+# consumer group's lag. When lag > lagThreshold * current_replicas,
+# more replicas come up (capped at maxReplicaCount). When lag drops
+# to zero and stays there for cooldownPeriod seconds, replicas drop
+# to zero.
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: order-processor-scaler
+  namespace: default
+spec:
+  scaleTargetRef:
+    name: order-processor       # references the Deployment in same namespace
+  pollingInterval: 5             # check Kafka lag every 5s
+  cooldownPeriod: 30             # 30s idle → scale to 0
+  minReplicaCount: 0             # scale-to-zero enabled
+  maxReplicaCount: 3             # bounded by topic partition count
+  triggers:
+    - type: kafka
+      metadata:
+        bootstrapServers: my-kafka-kafka-bootstrap.kafka:9092
+        consumerGroup: order-processor-group
+        topic: orders
+        # One replica per 5 messages of lag. Tunable per workload —
+        # higher values mean more lag tolerated before scaling up
+        # (cheaper); lower values mean faster scale-up (more responsive).
+        lagThreshold: "5"
+        # Where the consumer starts reading from when there's no
+        # committed offset (first time the group sees the topic).
+        # "earliest" — process all retained messages (demo uses this).
+        # "latest" — skip backlog, start with new messages only.
+        offsetResetPolicy: earliest

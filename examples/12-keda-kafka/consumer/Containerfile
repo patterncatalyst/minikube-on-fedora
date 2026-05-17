@@ -1,0 +1,50 @@
+# examples/12-keda-kafka/consumer/Containerfile
+#
+# Multi-stage UBI-based image for the Kafka consumer. Same pattern as
+# §6's nginx-custom — full UBI for the build, ubi-minimal at runtime.
+#
+# Builder: installs python3 + pip + the kafka-python wheel + its
+# transitive dependencies into a venv. ~500 MB layer, discarded.
+#
+# Runtime: ubi-minimal + python3 (no pip), with the venv copied in.
+# Final image is small (~150 MB) and contains no build tooling.
+
+# ── Stage 1: builder ────────────────────────────────────────────────────────
+FROM registry.access.redhat.com/ubi9/ubi:latest AS builder
+WORKDIR /build
+
+RUN dnf install -y python3 python3-pip && \
+    dnf clean all && \
+    rm -rf /var/cache/dnf
+
+# Create a venv to keep the runtime stage clean
+RUN python3 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Install kafka-python. Pinned to 2.0.6 — recent stable as of mid-2025;
+# 2.x line works against any Kafka >= 0.9, no protocol surprises.
+RUN pip install --no-cache-dir kafka-python==2.0.6
+
+# ── Stage 2: runtime ────────────────────────────────────────────────────────
+FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+
+RUN microdnf install -y python3 && \
+    microdnf clean all && \
+    rm -rf /var/cache/dnf /var/cache/yum
+
+# Copy the venv from the builder. PATH means /opt/venv/bin/python3 is
+# `python3` — and that python3 has kafka-python available.
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# App code
+WORKDIR /app
+COPY consumer.py /app/consumer.py
+
+# Run as non-root (UBI standard pattern, matches §6 nginx-custom)
+USER 1001:0
+
+# Unbuffered output so prints appear in kubectl logs in real time
+ENV PYTHONUNBUFFERED=1
+
+CMD ["python3", "/app/consumer.py"]

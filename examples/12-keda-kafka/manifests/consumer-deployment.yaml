@@ -1,0 +1,47 @@
+# examples/12-keda-kafka/manifests/consumer-deployment.yaml
+#
+# Python Kafka consumer Deployment. Starts at replicas: 0 — the
+# moment the ScaledObject is applied, KEDA owns the replica count.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-processor
+  labels:
+    app: order-processor
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      app: order-processor
+  template:
+    metadata:
+      labels:
+        app: order-processor
+    spec:
+      containers:
+        - name: order-processor
+          image: order-processor:v1
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: KAFKA_BROKER
+              value: "my-kafka-kafka-bootstrap.kafka:9092"
+            - name: KAFKA_TOPIC
+              value: "orders"
+            - name: KAFKA_GROUP
+              value: "order-processor-group"
+            - name: WORK_SLEEP_S
+              value: "0.5"
+            - name: PYTHONUNBUFFERED
+              value: "1"
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "200m"
+              memory: "128Mi"
+          # SIGTERM grace period — KEDA scales down by sending SIGTERM,
+          # then waiting this many seconds, then SIGKILL. Our consumer
+          # handles SIGTERM and exits immediately, so 10s is plenty.
+      terminationGracePeriodSeconds: 10

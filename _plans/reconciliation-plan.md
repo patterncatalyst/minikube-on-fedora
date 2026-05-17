@@ -147,6 +147,20 @@ Fedora 44.
 | **verified (Fedora 44)** | kubectl context can be saved + restored across a demo run via `kubectl config use-context` (so `istio` profile work doesn't disturb `minikube` profile state) | §11 | r12e user run: demo started with `current kubectl context: minikube`, switched to `istio` for the work, and on exit ("cleanup: stopping port-forward..." → "restoring kubectl context to minikube") restored cleanly. §6-§9 demos remain runnable without manual switching |
 | **verified (Fedora 44)** | `kubectl apply -f $ISTIO_DIR/samples/addons/` installs Kiali, Prometheus, Grafana, Jaeger, and Loki cleanly on the `istio` profile in ~3-5 minutes | §11 | r12g user run: `deployment.apps/kiali condition met`, `prometheus condition met`, `grafana condition met`, `jaeger condition met` returned within timeout; `loki-0` StatefulSet `2/2 Running`. Current `samples/addons/` includes Loki alongside the canonical four; Kiali integrates with Prometheus + Loki + Jaeger for the unified observability view |
 | **verified (Fedora 44)** | Kiali Traffic Graph renders a live mesh visualization with traffic animation, success/error rates per edge, and namespace-scoped filtering. Switching the namespace dropdown from `istio-system` to `default` reveals the application call graph (productpage → details / reviews → ratings) with live request rates | §11 | r12g user run: 200-curl traffic loop against `/productpage` produced a Kiali Overview with 4 applications, climbing inbound-traffic sparkline, and a Traffic Graph showing istio-ingressgateway → productpage with 1.89 req/s sustained at 100% success. Screenshots captured in `assets/screenshots/kiali-{overview,traffic-graph}.png` |
+| unverified              | `scripts/setup-keda.sh` installs KEDA core 2.19.0 + KEDA HTTP add-on 0.12.2 into the `keda` namespace via helm | §12 | r13 setup script claim; promote when first §12 demo passes |
+| unverified              | `scripts/setup-strimzi.sh` installs Strimzi Cluster Operator 0.51.0 into the `kafka` namespace via helm | §12 | r13 setup script claim |
+| unverified              | A single-node Strimzi Kafka cluster (combined controller+broker role) with Kafka **3.9.0** (NOT 3.9.2 — known Strimzi 0.51 reconciliation bug) reaches `condition=Ready` within 5 minutes on minikube | §12 | r13 manifest claim; the most likely flaky step in the tutorial per Strimzi's historic reconciliation quirks |
+| unverified              | A `KafkaTopic` CR with 3 partitions reaches `condition=Ready` via Strimzi's Topic Operator | §12 | r13 manifest claim |
+| unverified              | The Python `order-processor` consumer image builds cleanly from a multi-stage UBI Containerfile (ubi9 builder + ubi9-minimal runtime, kafka-python==2.0.6 in venv) | §12 | r13 image claim; follows same pattern as §6 nginx-custom |
+| unverified              | A KEDA `ScaledObject` with `minReplicaCount: 0` and a Kafka trigger results in **zero replicas at idle** (no consumer Pods running until messages arrive) | §12 | r13 demo claim; the core scale-to-zero assertion for Pattern A |
+| unverified              | Producing 200 messages to a Kafka topic causes KEDA to scale the consumer Deployment from 0 to ≥1 replicas within 120 seconds | §12 | r13 demo claim; the core scale-up assertion |
+| unverified              | After the topic drains and `cooldownPeriod` (30s) elapses, KEDA scales the consumer back to 0 replicas | §12 | r13 demo claim; the core scale-down assertion completing the 0→N→0 lifecycle |
+| unverified              | KEDA HTTP add-on `HTTPScaledObject` (CRD: `http.keda.sh/v1alpha1`) with `replicas.min: 0` results in zero replicas at idle | §12 | r13 HTTPScaledObject claim |
+| unverified              | The HTTP add-on **interceptor buffers a cold-start request** until the workload Pod is Ready, returning a 200 response instead of a 5xx (typically 3-8s on minikube) | §12 | r13 demo claim; the interceptor's killer feature vs naive scale-to-zero |
+| unverified              | `hey -n 500 -c 50` sustained HTTP load drives the HTTPScaledObject's concurrency metric, scaling nginx from 0 to N replicas within 120s | §12 | r13 demo claim |
+| unverified              | After `scaledownPeriod` (30s) of zero traffic, the HTTP add-on scales the workload back to 0 replicas | §12 | r13 demo claim; completes the HTTP scale-from-zero lifecycle |
+| unverified              | KEDA Pod count after both demos run cleanly: 7 in the `keda` namespace (1 operator, 1 metrics-apiserver, 1 admission-webhook, 4 HTTP add-on Pods: controller-manager, external-scaler, interceptor, operator-webhook) | §12 | r13 setup-keda.sh claim; promote on observation |
+| unverified              | KEDA does not conflict with HPA — KEDA `ScaledObject` creates its own HPA backed by KEDA's metrics-apiserver, and the AKS docs explicitly warn against mixing pre-existing HPAs on the same target. The §12 demos use ONLY KEDA, no manual HPAs | §12 | r13 prose claim |
 
 ## C. Testing matrix
 
@@ -163,7 +177,8 @@ are still aspirational.
 | **verified (Fedora 44)** | `examples/08-persistent-volume`    | §8      | r09 user run: Deployment Available in 3s, PVC bound, timestamps matched before/after `kubectl delete pod` — PV persistence confirmed |
 | **verified (Fedora 44)** | `examples/09-deploy-nginx-helm`     | §9      | r10d user run: lint + template + install + curl-install-title + upgrade + rollout + curl-upgrade-title + history + uninstall + zero-leftovers (after 2s of polling) all green |
 | **verified (Fedora 44)** | `examples/11-istio`                   | §11     | r12e user run: full §11 happy path passed — 13 phases from pre-flight through routing assertions. v1-pin proven by 1/10 distinct hashes, 50/50 split proven by 2/20 with 55/45 distribution. SUCCESS banner with verified counts; cleanup trap restored kubectl context |
-| unverified | `examples/12-keda-http-scale`        | §12     | KEDA HTTP add-on + `hey` load test                    |
+| **in flight** | `examples/12-keda-kafka`              | §12     | Shipped in r13; Kafka consumer-lag scaling demo. Awaiting first user run on minikube profile |
+| **in flight** | `examples/12-keda-http`               | §12     | Shipped in r13; HTTP add-on scaling demo. Awaiting first user run on minikube profile |
 
 **Aggregator status:** `scripts/test-all-examples.sh` does not
 yet exist; will be added once the first two examples' `demo.sh`
@@ -712,23 +727,120 @@ have to derive them.
   Section D priorities updated to remove the now-completed
   observability item
 
+- **r13** (2026-05-17, §12 KEDA — initial ship) — first ship
+  of the optional KEDA section. Pre-flight confirmed user's
+  minikube profile has 6 CPU / 16 GB / rootless / containerd
+  / podman with ~510Mi memory in use (plenty of headroom for
+  Strimzi + KEDA + workloads). Per PRD: "reference material
+  for KEDA + HTTP add-on." Per user direction: Kafka via
+  **Strimzi** (acknowledged historical "mixed results" — r13
+  plan includes defensive scripting + honest Bitnami fallback
+  note in prose) for Pattern A, **KEDA HTTP add-on** for
+  Pattern B. Both demos use the existing `minikube` profile,
+  no second cluster.
+
+  Files shipped:
+  - `_docs/12-keda.md` — 45-min section. HPA-vs-KEDA
+    conceptual intro; ScaledObject CRD walkthrough; profile
+    setup (reuses §3 minikube); KEDA install via helm;
+    **Pattern A** (Strimzi + Kafka consumer-lag scaling); the
+    full Strimzi cluster manifest with annotations explaining
+    each design choice (single-node KRaft, dual-role,
+    `version: 3.9.0` pin with "NOT 3.9.2 — known operator
+    bug" comment, internal listener only, RF=1, EntityOperator
+    for topic + user reconciliation); Python consumer source
+    inline with the SIGTERM graceful-exit explanation;
+    Deployment with `replicas: 0` + ScaledObject with
+    `lagThreshold: "5"`; **Pattern B** (HTTP add-on); the
+    architecture diagram showing interceptor + scaler +
+    operator; HTTPScaledObject CRD walkthrough;
+    `concurrency.targetValue: 5` explained; cleanup section;
+    Bitnami fallback note for Strimzi-misbehaves scenarios.
+    Beta status of the HTTP add-on surfaced clearly with the
+    official upstream quote
+  - `scripts/setup-keda.sh` — idempotent helm install of KEDA
+    core 2.19.0 + HTTP add-on 0.12.2 into the `keda`
+    namespace. Detects existing installs and upgrades.
+    Pre-flight checks helm/kubectl availability.
+    Diagnostic dump of Pod readiness on completion
+  - `scripts/setup-strimzi.sh` — idempotent helm install of
+    Strimzi Cluster Operator 0.51.0 into the `kafka`
+    namespace. `watchAnyNamespace=false` (operator only
+    watches the `kafka` namespace). 5-min timeout on wait.
+    Diagnostic dump (Pod list + last 30 lines of operator
+    logs) if `kubectl wait Available` times out
+  - `examples/12-keda-kafka/` — full Pattern A demo:
+    - `manifests/kafka-cluster.yaml` (KafkaNodePool +
+      Kafka CR with KRaft, dual-role, version pin)
+    - `manifests/kafka-topic.yaml` (KafkaTopic 'orders',
+      3 partitions, 2h retention)
+    - `manifests/consumer-deployment.yaml` (replicas: 0,
+      env-configurable broker/topic/group/sleep, SIGTERM
+      grace period 10s)
+    - `manifests/scaled-object.yaml` (KEDA ScaledObject:
+      lagThreshold=5, maxReplicas=3, pollingInterval=5,
+      cooldownPeriod=30, offsetResetPolicy=earliest)
+    - `consumer/consumer.py` (Python Kafka consumer with
+      graceful SIGTERM, configurable WORK_SLEEP_S)
+    - `consumer/Containerfile` (multi-stage UBI build,
+      kafka-python==2.0.6 in venv, USER 1001:0)
+    - `demo.sh` (10 phases, idempotent, comprehensive
+      diagnostic dumps on Strimzi-readiness failure — dumps
+      Cluster Operator logs + Kafka CR status + Pods +
+      events)
+    - `README.md` (pre-reqs, 8 tested claims, expected
+      timing, what-to-look-for, 4 common failure modes,
+      cleanup, going-further pointers)
+  - `examples/12-keda-http/` — full Pattern B demo:
+    - `manifests/nginx-deployment.yaml` (replicas: 0,
+      reuses nginx-custom:v1 from §6, readinessProbe with
+      short init delay so cold-start is fast)
+    - `manifests/http-scaled-object.yaml` (HTTPScaledObject:
+      hosts: nginx.local, concurrency target 5, max 5,
+      scaledownPeriod 30s)
+    - `demo.sh` (cold-start timing measured, hey load with
+      sustained metrics, scale-up + scale-down assertions,
+      diagnostic dumps for HTTPScaledObject + interceptor
+      logs on failure)
+    - `README.md` (pre-reqs, 6 tested claims, expected
+      timing, 5 common failure modes, cleanup, going-further
+      pointers including production-readiness note on
+      add-on beta status)
+
+  14 §12 unverified Section B rows added (setup scripts,
+  Strimzi Kafka readiness, topic readiness, consumer image
+  build, scale-to-zero assertion x2, scale-up assertions x2,
+  scale-down assertions x2, cold-start buffering, KEDA Pod
+  count, no-HPA-conflict claim). Two Section C rows added
+  (`examples/12-keda-kafka`, `examples/12-keda-http`), both
+  in flight.
+
+  Anticipated sub-iterations (per Phase 4's pattern):
+  - **r13a** likely: Strimzi or Kafka readiness flake. The
+    Kafka cluster bring-up is the riskiest step
+  - **r13b** likely: KEDA scale-up timing in low-resource
+    minikube. Need to tune polling/cooldown periods
+  - **r13c-?**: assertion thresholds, image-pull timeouts,
+    interceptor edge cases
+
+  This is consistent with §11's six-iteration cadence;
+  budgeting 3-5 sub-iterations for §12 is reasonable
+
 **Open, priority-ordered:**
 
-1. **r13** — §12 KEDA (optional section per PRD; "reference
-   material for KEDA + HTTP add-on"). Confirmed setup: existing
-   `minikube` profile (6 CPU / 16 GB / rootless / containerd /
-   podman). Allocated resources on idle profile: ~1050m CPU
-   requests, ~510Mi memory — plenty of headroom for Strimzi +
-   KEDA + scaled workloads. Per user direction: **Strimzi** for
-   Kafka (acknowledged "mixed results" historically — r13 plan
-   includes defensive scripting + an honest Bitnami fallback
-   note in prose); HTTP add-on demo uses `nginx-custom:v1` (the
-   same image as §6-§9, scale-from-zero with `hey`)
-2. Optional: §10 row promotions (`which k9s`, `kubectl
-   completion zsh | head`, etc.) — low priority
-3. Optional: §8 PV auto-delete, §7 leftover claims — low
-   priority, can stay unverified
-4. **r14–r16** — tail sections (§13 wrap-up, §14
-   troubleshooting?, §15 where-next-pointers), diagrams (paired
-   `.svg` + `.excalidraw`), editorial pass across all section
-   prose, final reconciliation refresh
+1. Run `./scripts/setup-keda.sh` (one-time KEDA install)
+2. Run `./scripts/setup-strimzi.sh` (one-time Strimzi install
+   — only needed for the Kafka demo)
+3. Run `examples/12-keda-kafka/demo.sh`. Expect first run to
+   be slow (Kafka cluster bring-up). On `✓ SUCCESS`, 8 §12
+   Kafka rows promote plus Section C
+   `examples/12-keda-kafka/`
+4. Run `examples/12-keda-http/demo.sh`. Faster than the Kafka
+   demo. On `✓ SUCCESS`, 6 §12 HTTP rows promote plus Section
+   C `examples/12-keda-http/`
+5. Optional: §10 row promotions, §8 PV auto-delete, §7
+   leftovers — low priority
+6. **r14–r16** — tail sections (§13 wrap-up, §14
+   troubleshooting?, §15 where-next-pointers), diagrams
+   (paired `.svg` + `.excalidraw`), editorial pass across
+   all section prose, final reconciliation refresh
