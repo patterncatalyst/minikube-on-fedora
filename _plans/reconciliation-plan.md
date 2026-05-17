@@ -1180,84 +1180,94 @@ have to derive them.
 | §10 Editor/shell/terminal | (mostly verified, some `which`-tier rows still unverified — low-value) |
 | §11 Istio | ✓ | Bookinfo + native sidecars + Kiali addons |
 | §12 KEDA | ✓ | Strimzi Kafka 4.1.0 lag scaling + HTTP add-on |
-| §13 Wrap-up | ✓ (prose) | Closing recap shipped in r14 |
+| §13 Alternatives | ✓ (prose) | Tour of kind/k3s/microk8s/MicroShift with honest Fedora-compatibility notes; shipped r14a |
 
-- **r14** (2026-05-17, §13 wrap-up — Phase 6 begins) —
-  first ship of the tail-section work. §13 is a closing
-  prose chapter, not a demo:
-  - **What you've built**: recap of cluster state, cached
-    UBI images, installed tooling, the bigger mental models
-    the reader should now have (Deployment/Service/Pod
-    relationships, PV+initContainer pattern, helm as both
-    package manager + templating engine, operator pattern,
-    scale-to-zero as a generalized primitive)
-  - **Patterns that kept coming up**: rootless containerd
-    via podman, UBI as runtime base, multi-stage builds,
-    operator pattern for stateful workloads, defensive
-    scripting around external dependencies, honest
-    assertions (with the §12 false-positive episode named
-    explicitly), inotify limits at multi-cluster scale.
-    These are the recurring themes worth naming because the
-    reader will keep making them in any future K8s project
-  - **Where to go next**: two buckets. "Going deeper on what
-    you've built" — run §12 Kafka demo with real workload,
-    use `hey -z` to drive sustained §12 HTTP load, modify
-    Istio VirtualService for header-based routing.
-    "Production-like next steps" — replace NodePort with
-    ingress-nginx + cert-manager, adopt GitOps (ArgoCD or
-    Flux), set up real observability (kube-prometheus-stack),
-    multi-node on real hardware (k3s or kubeadm), build CI
-    to push to the cluster
-  - **Useful resources**: bookmark-worthy external links
-    (kubernetes.io, CNCF landscape, Istio docs, KEDA scalers
-    catalog, Strimzi docs)
-  - **Closing thought**: brief reflection on the hands-on
-    learning approach the tutorial encourages, without
-    being preachy about it
+- **r14** (2026-05-17, §13 wrap-up — RETRACTED) —
+  shipped a "Wrap-up" section that wasn't on the outline.
+  The actual §13 per PRD is "Alternatives to minikube", with
+  reflective/closing content properly belonging in §14 (FAQ)
+  and §15 (Where to go next). Retracted in r14a.
 
-  1900 words, ~10 minute read. Voice intentionally looser
-  than the technical sections — it's a closing chapter, not
-  a how-to, so reflective prose works where step-by-step
-  instructions would feel out of place. Liquid-safe (no
-  `{{ }}` collisions). Links use the standard relative_url
-  helper. No `{% raw %}` blocks needed (no code samples).
+- **r14a** (2026-05-17, §13 corrected — Alternatives to
+  minikube) — replaces r14's misallocated wrap-up content
+  with the real §13. The apply step deletes `_docs/13-wrap-up.md`
+  from the working tree and adds `_docs/13-alternatives.md`
+  in its place.
 
-  Footer link goes back to the outline rather than forward
-  to a next section, since this is the end of the tutorial
-  body. The cross-reference at the end of §12 ("On to §13:
-  Wrap-up →") now resolves correctly.
+  Content of `_docs/13-alternatives.md` (~1300 words, 5 min):
+  - **Quick decision framework** up front — five rows of
+    "if you're doing X, pick Y" so a reader scanning the
+    section gets the answer without reading the body
+  - **kind v0.31.0** — Kubernetes-IN-Docker, defaults to K8s
+    1.35.0, Podman auto-detect via
+    `KIND_EXPERIMENTAL_PROVIDER=podman`. Strengths: CI/CD,
+    ephemeral clusters, fast start/stop. Weaknesses: image
+    loading is awkward (`kind load docker-image`), persistent
+    state isn't the design center. Fedora-compat: good
+  - **k3s v1.36.1+k3s1** — Rancher/SUSE, tracks upstream
+    K8s 1.36.1, single-binary install via
+    `curl -sfL https://get.k3s.io | sh -`. Strengths: edge
+    devices, IoT, Raspberry Pi, single-host production.
+    Weaknesses: bundled Traefik/Klipper differ from typical
+    production K8s defaults. Fedora-compat: good with caveat
+    (needs `container-selinux` + k3s-selinux RPM + firewalld
+    ports)
+  - **microk8s 1.33/stable** — Canonical, snap-based.
+    Genuinely well-engineered on Ubuntu. **Fedora-compat:
+    rough — honestly stated.** Cites the December 2024
+    hardill.me.uk install attempt that concluded "not viable
+    on Fedora at this time" due to snapd squashfs issues +
+    AppArmor missing from stock Fedora. This honest framing
+    is more useful than vendor-neutral mush
+  - **MicroShift** — Red Hat's edge OpenShift. Only RHEL 9/10
+    RPM binaries exist. Red Hat's own Developer site
+    [explicitly recommends against](https://developers.redhat.com/articles/2025/02/20/why-developers-should-use-microshift)
+    `dnf install microshift` on Fedora. Supported Fedora path
+    is CRC (CodeReady Containers, which manages a RHEL VM).
+    Niche: OpenShift API parity for development
+  - **Comparison table** — 5 rows × 4 columns (architecture,
+    Fedora story, best fit)
+  - **Recommendation** — for a Fedora reader who's just
+    completed this tutorial, minikube is still the right
+    pick for daily dev unless one of the specific
+    alternative needs (CI, edge, OpenShift parity) applies.
+    The underlying Kubernetes is the same; the manifests
+    you learned port unchanged
 
-  Reconciliation plan: §13 added to the phase coverage map.
-  No Section B rows because there's nothing to verify — the
-  section is reflective prose pointing at external resources.
-  Verified row count unchanged at **107**.
+  Cross-reference at bottom links to §14 FAQ (next section).
 
-  Anticipated r15 (diagrams) and r16 (editorial pass) ship
-  next, completing Phase 6 and the tutorial as a whole
+  Phase coverage map row for §13 corrected (was "Wrap-up",
+  is now "Alternatives"). Verified row count unchanged at
+  **107** (no demo content — comparison prose with external
+  links).
 
 **Open, priority-ordered:**
 
-1. **r15** — Diagrams. Paired `.svg` + `.excalidraw` source
-   files in `assets/diagrams/`. Anticipated set: (a)
-   §3-§5 minikube topology overview, (b) §6-§9
-   Deployment/Service/Ingress relationships, (c) §11 Istio
-   mesh architecture (control plane + sidecars + gateways),
-   (d) §12 HPA-vs-KEDA scaling models, (e) §12 KEDA HTTP
-   add-on architecture (interceptor + scaler + operator).
-   The current prose ASCII diagrams are placeholders that
-   work but don't scale well; SVG versions render properly
-   on hi-DPI displays and can be edited via `.excalidraw`
-2. **r16** — Editorial pass. Read every section's prose
-   front-to-back as if for the first time. Tighten word
-   choice, ensure consistent voice ("you" for reader,
-   passive otherwise), verify cross-references between
-   sections, sweep for stale TODO markers, ensure each
-   section's "Verification" subsection points to the right
-   example dir
-3. Optional: §10 row promotions (`which k9s` etc.) — low
-   priority, can stay unverified
-4. Optional: §8 PV auto-delete row, §7 leftovers — low
-   priority, can stay unverified
+1. **r15 — §14 FAQ + cleanup recipes.** Common pain points
+   readers might hit, organized as Q&A. Should cover:
+   "minikube won't start", "Pods stuck in ImagePullBackOff",
+   "the demo I just ran left behind state — how do I clean
+   it up", "kubectl context confusion between minikube and
+   istio profiles", "inotify limits hit", "I changed a
+   ConfigMap but the Pod still has the old value", and the
+   cleanup recipes consolidated in one place (point to the
+   per-example-dir `cleanup.sh` scripts from r13c)
+2. **r16 — §15 Where to go next.** The content I'd
+   incorrectly written into the wrap-up — moved here
+   properly. Pointers to deeper resources (kubernetes.io,
+   CNCF landscape, Istio docs, KEDA scalers catalog,
+   Strimzi docs), and concrete next-step suggestions
+   (ingress-nginx + cert-manager replaces NodePort, GitOps
+   via ArgoCD/Flux, real observability with
+   kube-prometheus-stack, real multi-node with k3s/kubeadm,
+   CI pipelines)
+3. **r17** — Diagrams. Paired `.svg` + `.excalidraw` source
+   files in `assets/diagrams/`
+4. **r18** — Editorial pass across all section prose
+5. Optional: §10 row promotions, §8 PV auto-delete, §7
+   leftovers — low priority
+
+
 4. Optional: §10 row promotions (`which k9s` etc.) — low
    priority, can stay unverified
 5. Optional: §8 PV auto-delete row, §7 leftovers — low
