@@ -77,7 +77,7 @@ Fedora 44.
 | **verified (Fedora 44)** | The podman driver works without KVM/qemu/VirtualBox on Fedora 44             | §1, §3  | r05c user output: driver-check demo passed; no virtualization layer touched ✓ |
 | **verified (Fedora 44)** | No SELinux `:Z` flag needed for minikube-managed PVs via the standard StorageClass | §1, §8 | r09 user run: PVC from `standard` SC bound and mounted cleanly with no SELinux relabeling required. The `:Z` flag matters for direct host bind mounts (which we don't use); the storage-provisioner addon handles SELinux labeling internally |
 | **verified (Fedora 44)** | `minikube` RPM from `storage.googleapis.com` installs cleanly via `dnf`     | §2      | r05 user output: dnf install completed, /usr/bin/minikube present ✓         |
-| unverified              | `helm 4.1.x` from Fedora repos works against Helm 3-format charts            | §2, §9  | Install verified; chart-compat promotes in r10 when first `helm install` lands |
+| **verified (Fedora 44)** | `helm 4.1.x` from Fedora repos works against Helm 3-format charts            | §2, §9  | r10 user run: helm `v4.1.1+g5caf004` cleanly handled an `apiVersion: v2` chart through install/upgrade/uninstall |
 | **verified (Fedora 44)** | `helm` from Fedora repos installs cleanly via `dnf`                          | §2      | r05 user output: `dnf install helm` succeeded, /usr/bin/helm present ✓      |
 | **verified (Fedora 44)** | `kubectl 1.35.x` client works against minikube-default 1.35.x cluster        | §2, §3  | r05c user output: `kubectl get nodes` and `kubectl wait` all succeeded against the 1.35.1 cluster ✓ |
 | **verified (Fedora 44)** | krew installer + `kubectl krew install stern ctx ns` works as documented    | §2      | r05 user output: krew bootstrap + three plugin installs all succeeded ✓     |
@@ -116,13 +116,14 @@ Fedora 44.
 | **verified (Fedora 44)** | Deleting a Pod and waiting for the Deployment replacement preserves PV content (PV is independent of Pod lifecycle) | §8 | r09 user run: timestamps `2026-05-17T12:28:19Z` matched exactly before and after `kubectl delete pod nginx-pv-864c5dfd8b-zvpwn` |
 | unverified              | `standard` StorageClass's `Delete` reclaim policy auto-deletes the PV when the PVC is deleted | §8 | r09 cleanup behavior; promote when post-`kubectl delete` `kubectl get pv` shows no orphaned PV |
 | **verified (Fedora 44)** | Jekyll's Liquid templating collides with Go template syntax (`{{ }}`) in code blocks — `{% raw %}` / `{% endraw %}` wrappers are required around any code block showing Go/helm/jinja templates | site-build | r10 Jekyll CI build failure: `liquid-4.0.4 standardfilters.rb:253:in 'replace': wrong number of arguments` from helm's `{{ ... \| replace "+" "_" }}` being parsed as a Liquid pipeline. r10a wraps all four §9 helm template code blocks plus the §1 `podman info --format` line with raw tags. Applies prospectively to §11 Istio, §12 KEDA, anywhere Go templates appear in prose |
-| unverified              | helm 4.x lints an `apiVersion: v2` chart with no warnings                   | §9 | r10 prose claim; promote when `examples/09-deploy-nginx-helm/demo.sh` passes |
-| unverified              | `helm template` renders all chart templates without applying to the cluster | §9 | r10 prose claim; demo verifies output contains ConfigMap + Deployment + Service kinds |
-| unverified              | `helm install` with `--set` overrides default values from `values.yaml`    | §9 | r10 demo claim; promote when installed HTML contains the install-time title |
-| unverified              | `helm upgrade --set` updates the release to a new revision                  | §9 | r10 demo claim; promote when `helm history` shows two revisions |
-| unverified              | `checksum/configmap` annotation in the Deployment template triggers a Pod rollout when ConfigMap content changes | §9 | r10 design claim; promote when upgrade's new content appears in served HTML (otherwise old Pods would keep serving old content) |
-| unverified              | `helm uninstall` removes all chart-created resources with no leftovers     | §9 | r10 demo claim; promote when post-uninstall label-selector query returns zero rows |
-| unverified              | Helm 4 reads charts authored against the Helm 3 chart format (`apiVersion: v2`) | §2, §9 | Promoted from Section A: r10 demo proves the §2 claim that Helm 4 reads Helm 3 charts |
+| **verified (Fedora 44)** | helm 4.x lints an `apiVersion: v2` chart with no warnings                   | §9 | r10 user run: `1 chart(s) linted, 0 chart(s) failed` (one INFO note about chart icon being recommended; no errors) |
+| **verified (Fedora 44)** | `helm template` renders all chart templates without applying to the cluster | §9 | r10 user run: dry-run output contained ConfigMap, Deployment, Service kinds with values interpolated |
+| **verified (Fedora 44)** | `helm install` with `--set` overrides default values from `values.yaml`    | §9 | r10 user run: served HTML contained `First install via helm` (the `--set content.title="..."` override) |
+| **verified (Fedora 44)** | `helm upgrade --set` updates the release to a new revision                  | §9 | r10 user run: `helm history` returned 2 revisions (1 superseded, 2 deployed) |
+| **verified (Fedora 44)** | `checksum/configmap` annotation in the Deployment template triggers a Pod rollout when ConfigMap content changes | §9 | r10 user run: upgrade-time title `Upgraded title via helm` appeared in served HTML, proving Pods recreated with new ConfigMap content (otherwise old Pods would still serve old content) |
+| unverified              | `helm uninstall` removes all chart-created resources within 30s (async deletion) | §9 | r10 user run: leftover Pod in `Terminating` state caught the demo's one-shot check (failed); r10d demo polls for 30s; promote on demo re-run pass |
+| **verified (Fedora 44)** | Helm 4 reads charts authored against the Helm 3 chart format (`apiVersion: v2`) | §2, §9 | r10 user run with helm `v4.1.1+g5caf004` cleanly handled the v2-format chart through lint, template, install, upgrade, history, uninstall |
+| **verified (Fedora 44)** | `helm uninstall` is asynchronous — returns success once delete operations are submitted; actual Pod termination follows `terminationGracePeriodSeconds` (default 30s) | §9 | Learned in r10 user run: leftover check ran 0ms after uninstall returned, caught a Pod still `Terminating` (3s old). r10d's demo polls for 30s after uninstall to account for the async behavior |
 
 ## C. Testing matrix
 
@@ -137,7 +138,7 @@ are still aspirational.
 | **verified (Fedora 44)** | `examples/06-deploy-nginx-kubectl` | §6      | r07c user run: image built, Deployment Available in 8s, port-forward + curl + scale to 3 all worked |
 | **verified (Fedora 44)** | `examples/07-nodeport-service`     | §7      | r08a user run: tunnel established in 3s, NodePort exposure via auto-tunnel `http://127.0.0.1:45185`, curl matched sentinel, 35s total |
 | **verified (Fedora 44)** | `examples/08-persistent-volume`    | §8      | r09 user run: Deployment Available in 3s, PVC bound, timestamps matched before/after `kubectl delete pod` — PV persistence confirmed |
-| **in flight** | `examples/09-deploy-nginx-helm`        | §9      | Shipped in r10; awaiting user demo run (lint, template, install, upgrade, history, uninstall) |
+| **in flight** | `examples/09-deploy-nginx-helm`        | §9      | r10 user run passed every substantive check; failed only on a one-shot leftover query that raced a `Terminating` Pod. r10d demo polls for 30s; awaiting re-run |
 | unverified | `examples/11-istio-bookinfo`         | §11     | Istio sample app with sidecar + Gateway + VS          |
 | unverified | `examples/12-keda-http-scale`        | §12     | KEDA HTTP add-on + `hey` load test                    |
 
@@ -350,13 +351,51 @@ and what's next.
   _helpers.tpl). New `verified` Section B row records the
   lesson; applies prospectively to §11 Istio, §12 KEDA, or
   anywhere Go templates appear in prose
+- **r10b** (2026-05-17, jekyll build fix part 2) — r10a wrapped
+  the offending code blocks in `_docs/`, but the reconciliation
+  plan's narrative about the bug *itself contained* `{{ ... |
+  replace "+" "_" }}` in prose, and Liquid hit it on the next
+  build. Fix: `render_with_liquid: false` in front matter of
+  `_plans/reconciliation-plan.md` and (defensively)
+  `_plans/iteration-plan.md`. Plan files are pure reference
+  markdown; they don't use Liquid features; disabling it
+  wholesale is cleaner than wrapping every mention with raw
+  tags (which can break markdown tables anyway). Build green
+  after r10b applied
+- **r10c** (2026-05-17, tooling) — `scripts/check-liquid-collisions.sh`
+  shipped. Bash + awk static scan for the two conventions:
+  Go-template patterns outside `{% raw %}` wrappers in
+  `_docs/*.md`, any `{{ }}` content in `_plans/*.md` missing
+  `render_with_liquid: false`. Tested against both corrected
+  and uncorrected r10/r10a versions; correctly flags the exact
+  lines that broke the CI build, passes when content is fixed.
+  Runs in well under a second; no Ruby/Bundler/Jekyll needed.
+  CONTRIBUTING.md updated with a "Site authoring conventions"
+  section documenting both rules and pointing at the script
+- **r10d** (2026-05-17, §9 demo race fix) — §9 demo run passed
+  every substantive check (lint, template, install + curl,
+  upgrade + rollout + curl with new content, history, uninstall)
+  but failed the one-shot leftover query. The query ran 0ms
+  after `helm uninstall` returned and caught a Pod in
+  `Terminating` state (3 seconds old). Root cause: helm
+  uninstall is asynchronous — it returns once the release
+  record is gone and delete operations are submitted, but the
+  kubelet then runs through `terminationGracePeriodSeconds`
+  (default 30s) before force-killing Pods. r10d replaces the
+  one-shot check with a 30-second polling loop. Reconciliation
+  plan: 6 §9 Section B rows promoted to verified with actual
+  run details + the §2/§9 helm-3-chart-compat row promoted +
+  one new `verified` row recording the async-uninstall finding.
+  `helm uninstall removes all resources within 30s` row stays
+  in flight pending re-run
 
 **Open, priority-ordered:**
 
-1. Run `examples/09-deploy-nginx-helm/demo.sh`. On `✓ SUCCESS`,
-   8 §9 Section B rows promote plus Section C
-   (`examples/09-deploy-nginx-helm/`). Includes the long-pending
-   helm-4-reads-helm-3-chart claim from §2
+1. Re-run `examples/09-deploy-nginx-helm/demo.sh` after applying
+   r10d. On `✓ SUCCESS`, the final §9 row (no-leftovers-within-30s)
+   promotes plus Section C `examples/09-deploy-nginx-helm/`. The
+   "8 §9 Section B rows promote" framing from r10's open list is
+   now: 7 already promoted in r10d's plan, 1 pending re-run
 2. Optional: verify §8 PV auto-delete by running the demo,
    exiting before cleanup, manually `kubectl delete pvc/nginx-content`,
    then `kubectl get pv` — should show the PV cleaned up. Low

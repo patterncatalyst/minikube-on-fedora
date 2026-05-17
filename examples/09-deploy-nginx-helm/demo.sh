@@ -225,12 +225,26 @@ PF_PID=""
 helm uninstall "${RELEASE_NAME}" | sed 's/^/    /'
 pass "release uninstalled"
 
-# ── Verify no leftover resources ────────────────────────────────────────────
+# ── Verify no leftover resources (poll — helm uninstall is async) ───────────
 step "verifying no chart resources remain (label app.kubernetes.io/instance=${RELEASE_NAME})"
-LEFTOVERS=$(kubectl get all,configmap -l "app.kubernetes.io/instance=${RELEASE_NAME}" \
-    --no-headers 2>/dev/null | wc -l)
+# helm uninstall returns once the release record is deleted and delete
+# operations are submitted to the API server. Actual Pod termination is
+# async — kubelet runs the preStop hook (none in our case) and waits up to
+# terminationGracePeriodSeconds (default 30s) before force-killing. A
+# check immediately after uninstall can see Pods still in Terminating
+# state. Poll for up to 30s.
+LEFTOVERS=0
+for i in $(seq 1 30); do
+    LEFTOVERS=$(kubectl get all,configmap -l "app.kubernetes.io/instance=${RELEASE_NAME}" \
+        --no-headers 2>/dev/null | wc -l)
+    if [[ "${LEFTOVERS}" -eq 0 ]]; then
+        info "all resources gone after ${i}s"
+        break
+    fi
+    sleep 1
+done
 if [[ "${LEFTOVERS}" -ne 0 ]]; then
-    info "unexpected leftover resources:"
+    info "unexpected leftover resources after 30s wait:"
     kubectl get all,configmap -l "app.kubernetes.io/instance=${RELEASE_NAME}" | sed 's/^/    /'
     fail "found ${LEFTOVERS} leftover resources after uninstall"
 fi
