@@ -3,10 +3,10 @@ title: "§11 istio"
 order: 11
 example_dir: examples/11-istio
 permalink: /examples/11-istio/
-layout: docs
+layout: tutorial
 ---
 
-> Source: [`examples/11-istio/`](https://github.com/patterncatalyst/minikube-on-fedora/tree/main/examples/11-istio) &nbsp;|&nbsp; [← Back to examples index]({{ "/docs/16-examples/" | relative_url }})
+**Source:** [`examples/11-istio/`](https://github.com/patterncatalyst/minikube-on-fedora/tree/main/examples/11-istio) &middot; [← Back to examples index]({{ "/docs/16-examples/" | relative_url }})
 
 The longest single demo in the tutorial. Installs Istio on a
 dedicated minikube profile, sidecar-injects our existing

@@ -3,10 +3,10 @@ title: "§9 deploy nginx helm"
 order: 9
 example_dir: examples/09-deploy-nginx-helm
 permalink: /examples/09-deploy-nginx-helm/
-layout: docs
+layout: tutorial
 ---
 
-> Source: [`examples/09-deploy-nginx-helm/`](https://github.com/patterncatalyst/minikube-on-fedora/tree/main/examples/09-deploy-nginx-helm) &nbsp;|&nbsp; [← Back to examples index]({{ "/docs/16-examples/" | relative_url }})
+**Source:** [`examples/09-deploy-nginx-helm/`](https://github.com/patterncatalyst/minikube-on-fedora/tree/main/examples/09-deploy-nginx-helm) &middot; [← Back to examples index]({{ "/docs/16-examples/" | relative_url }})
 
 Authors a small helm chart that deploys the same `nginx-custom:v1`
 image as §6/§7/§8, but with content templated through helm's

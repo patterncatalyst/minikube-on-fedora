@@ -113,9 +113,11 @@ for example_dir in examples/*/; do
         printf 'order: %d\n' "$order"
         printf 'example_dir: examples/%s\n' "$name"
         printf 'permalink: /examples/%s/\n' "$name"
-        printf 'layout: docs\n'
+        printf 'layout: tutorial\n'
         printf -- '---\n\n'
-        printf '> Source: [`examples/%s/`](https://github.com/patterncatalyst/minikube-on-fedora/tree/main/examples/%s) &nbsp;|&nbsp; [← Back to examples index]({{ "/docs/16-examples/" | relative_url }})\n\n' "$name" "$name"
+        # Meta line: NO pipes (kramdown's GFM mode parses them as table separators
+        # inside blockquotes). Use a middot · separator instead.
+        printf '**Source:** [`examples/%s/`](https://github.com/patterncatalyst/minikube-on-fedora/tree/main/examples/%s) &middot; [← Back to examples index]({{ "/docs/16-examples/" | relative_url }})\n\n' "$name" "$name"
         printf '%s\n' "$body"
     } > "$output"
 

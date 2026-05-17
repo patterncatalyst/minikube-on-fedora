@@ -3,10 +3,10 @@ title: "§3 driver check"
 order: 3
 example_dir: examples/03-driver-check
 permalink: /examples/03-driver-check/
-layout: docs
+layout: tutorial
 ---
 
-> Source: [`examples/03-driver-check/`](https://github.com/patterncatalyst/minikube-on-fedora/tree/main/examples/03-driver-check) &nbsp;|&nbsp; [← Back to examples index]({{ "/docs/16-examples/" | relative_url }})
+**Source:** [`examples/03-driver-check/`](https://github.com/patterncatalyst/minikube-on-fedora/tree/main/examples/03-driver-check) &middot; [← Back to examples index]({{ "/docs/16-examples/" | relative_url }})
 
 The first runnable example in this tutorial. A smoke test that
 exercises the §3 happy path end-to-end: start a minikube cluster
