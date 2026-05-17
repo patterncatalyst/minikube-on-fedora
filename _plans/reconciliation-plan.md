@@ -49,9 +49,9 @@ in the document implicitly assumes these.
 | **verified (Fedora 44)** | Podman           | 5.8.2         | §1 prereq check       | `podman --version` returns 5.8.2 ✓ r03 audit               |
 | unverified              | minikube         | v1.38.x       | §2 install (RPM)      | `minikube version` matches after running §2 install        |
 | unverified              | kubectl          | v1.34.x+ (1.35.3 observed) | §2 install (upstream binary; skipped if recent already present) | `kubectl version --client=true` reports 1.34+ |
-| unverified              | helm             | 4.1.x         | §2 install (`dnf install helm`) | `helm version --short` reports v4.1.x+                  |
-| unverified              | httpie           | TBD           | §2 install (`dnf install httpie`) | `http --version` reports installed                       |
-| unverified              | yq (mikefarah)   | latest        | §2 install (upstream binary) | `yq --version` reports `yq (https://github.com/mikefarah/yq/)` |
+| unverified              | helm             | 4.1.1         | §2 install (`dnf install helm`) | `helm version --short` reports v4.1.1                   |
+| unverified              | httpie           | 3.2.4         | §2 install (`dnf install httpie`) | `http --version` reports 3.2.4                         |
+| unverified              | yq (mikefarah)   | 4.47.1        | §2 install (`dnf install yq`) | `yq --version` reports v4.x                                |
 | unverified              | krew             | latest        | §2 install (upstream installer) | `kubectl krew version` reports installed                |
 | unverified              | stern            | latest (krew) | §2 install (`kubectl krew install stern`) | `kubectl plugin list` shows stern                     |
 | unverified              | kubectx / kubens (krew names: ctx, ns) | latest (krew) | §2 install (`kubectl krew install ctx ns`) | `kubectl plugin list` shows ctx and ns |
@@ -73,12 +73,15 @@ Fedora 44.
 | unverified              | 6 CPU / 16 GB RAM / 50 GB free disk is comfortable for §1–§12                | §1      | "Comfortable for all" recommendation; verify once §11 + §12 are complete    |
 | **verified (Fedora 44)** | Podman runs rootless on Fedora 44 with the §1 UBI test command              | §1      | r03 user output: `podman run --rm ubi9/ubi-minimal echo OK` → `OK` ✓        |
 | **verified (Fedora 44)** | UBI images at `registry.access.redhat.com` are pullable without subscription | §1      | r03 user output: pull + run + exec all succeeded against ubi9/ubi-minimal ✓ |
-| unverified              | The podman driver works without KVM/qemu/VirtualBox on Fedora 44             | §1, §3  | Resolve in r05 when §3 + driver-check example land                          |
+| unverified              | The podman driver works without KVM/qemu/VirtualBox on Fedora 44             | §1, §3  | Promotes when `examples/03-driver-check/demo.sh` passes (r05)               |
 | unverified              | No SELinux `:Z` flag needed for minikube hostPath PVs                        | §1, §8  | Resolve in r09 when persistent-volume example lands                         |
 | unverified              | `minikube` RPM from `storage.googleapis.com` installs cleanly via `dnf`      | §2      | r04 prose claim; promote once user runs §2 install                          |
 | unverified              | `helm 4.1.x` from Fedora repos works against Helm 3-format charts            | §2, §9  | r04 prose claim; promote in r10 when first helm install lands               |
-| unverified              | `kubectl 1.35.x` client works against minikube-default 1.35.x cluster        | §2      | Implied by version skew policy; promote when first kubectl-against-cluster command runs (r05+) |
+| unverified              | `kubectl 1.35.x` client works against minikube-default 1.35.x cluster        | §2, §3  | Implied by version skew policy; promotes when driver-check demo passes      |
 | unverified              | krew installer + `kubectl krew install stern ctx ns` works as documented     | §2      | r04 prose claim; promote once user runs §2 install                          |
+| unverified              | mikefarah yq is `dnf install yq` on Fedora 44 (not python-yq)                | §2      | r05 prose correction; promote once user runs §2 install                     |
+| unverified              | `minikube start --driver=podman` brings up a healthy cluster                 | §3      | Promotes when driver-check demo passes                                      |
+| unverified              | `minikube pause/unpause/stop/delete` cluster-lifecycle commands work         | §3      | Pause/stop not exercised in driver-check; defer or add lifecycle demo later |
 
 ## C. Testing matrix
 
@@ -89,7 +92,7 @@ are still aspirational.
 
 | Status     | Example                              | Section | Notes                                                 |
 |------------|--------------------------------------|---------|-------------------------------------------------------|
-| unverified | `examples/03-driver-check/`          | §3      | Sanity: podman driver starts a cluster, status green  |
+| **in flight** | `examples/03-driver-check/`       | §3      | Shipped in r05; awaiting user run on Fedora 44        |
 | unverified | `examples/06-deploy-nginx-kubectl`   | §6      | Deploy UBI nginx via `kubectl apply`, hit NodePort    |
 | unverified | `examples/07-nodeport-service`       | §7      | Expose Deployment via NodePort, retrieve URL          |
 | unverified | `examples/08-persistent-volume`      | §8      | `hostPath` PV + dynamic PVC                           |
@@ -114,41 +117,51 @@ and what's next.
   `https://patterncatalyst.github.io/minikube-on-fedora/`
 - ✅ **r03** (2026-05-17) — `_docs/01-prerequisites.md` drafted;
   iteration plan codified; `CONTRIBUTING.md` added;
-  `scripts/audit-fedora-prereqs.sh` shipped and run. User
-  audit + UBI test confirmed Fedora 44, Podman 5.8.2 rootless,
-  UBI image pullable without subscription. Four reconciliation
-  rows promoted to `verified (Fedora 44)`
+  `scripts/audit-fedora-prereqs.sh` shipped. User audit + UBI
+  test confirmed Fedora 44, Podman 5.8.2 rootless, UBI pullable
+  without subscription. Four reconciliation rows promoted
+- ✅ **r04** (2026-05-17) — `_docs/02-installation.md` drafted
+  with pinned install paths: minikube via dnf-from-upstream-RPM,
+  kubectl skipped or upstream binary, helm 4.1.x via
+  `dnf install helm`, httpie via dnf, mikefarah yq via upstream
+  binary (corrected in r05 — see below), krew installer +
+  `stern`/`ctx`/`ns` via krew, hey via `go install`.
+  Audit script bugs fixed (podman 5.x `CgroupVersion` template,
+  `maybe()` stderr leak). User re-ran audit post-r04;
+  surfaced one finding rolled into r05
 
 **In flight:**
 
-- **r04** — `_docs/02-installation.md` drafted with pinned
-  install paths: minikube RPM via dnf (v1.38.x), kubectl upstream
-  binary or existing 1.34+, helm via `dnf install helm` (4.1.x),
-  httpie via dnf, mikefarah yq via upstream, krew + stern + ctx +
-  ns via the kubectl plugin manager, hey via `go install`. Audit
-  script bugs fixed (podman 5.x `CgroupVersion` removed from
-  template; `maybe()` now checks PATH before invoke to avoid
-  stderr leak). Awaiting user run of §2 commands to promote
-  Section A rows for minikube/kubectl/helm/etc
+- **r05** — `_docs/03-starting-minikube.md` drafted (cluster
+  start, layers, status, lifecycle, drivers, in-cluster
+  runtime). `examples/03-driver-check/` added — the project's
+  first runnable demo. **r04 follow-up fix in §2**: yq is
+  packaged in Fedora 44 as mikefarah's yq (4.47.1, confirmed
+  via r04-post audit), so §2's install instruction is now
+  `sudo dnf install -y yq` rather than the upstream binary
+  download; the historical "python-yq" concern doesn't apply
+  on Fedora 44
 
 **Open, priority-ordered:**
 
-1. Run §2 install commands on Fedora 44; report any divergence.
-   On success, ten Section A rows and four Section B rows
-   promote to `verified (Fedora 44)`
-2. **r05** — draft §3 starting minikube + `examples/03-driver-check/`;
-   resolves the "podman driver works without KVM" claim in §1/§3
-   and adds the first row to Section C testing matrix
-3. **r06** — draft §4 profiles/multi-node + §5 addons
-4. **r07** — draft §6 kubectl + `examples/06-deploy-nginx-kubectl/`
-   — first Section C row to flip when its `demo.sh` passes
-5. **r08–r09** — §7 + §8 with examples
-6. **r10** — §9 helm + authored small chart; helm 4.x compat
+1. Run §2 install commands (if not already) and §3 happy path
+   on Fedora 44; then run `examples/03-driver-check/demo.sh`.
+   On `✓ SUCCESS`, the demo's Section C row promotes to
+   `verified (Fedora 44)`, along with §1/§3 claims about the
+   podman driver, kubectl-against-cluster, and the §2 install
+   paths
+2. **r06** — draft §4 profiles/multi-node + §5 addons (small
+   sections combined)
+3. **r07** — draft §6 kubectl + `examples/06-deploy-nginx-kubectl/`
+   — first example to deploy a workload, not just verify
+   cluster health
+4. **r08–r09** — §7 + §8 with examples
+5. **r10** — §9 helm + authored small chart; helm 4.x compat
    claim from Section B promotes when first `helm install` lands
-7. **r11** — §10 editor/shell/terminal; will request local-setup
+6. **r11** — §10 editor/shell/terminal; will request local-setup
    specifics (warp.dev workflows, CLion settings)
-8. **r12** — §11 Istio (resource bump pre-flight; expect Section B
+7. **r12** — §11 Istio (resource bump pre-flight; expect Section B
    resource claims to surface here)
-9. **r13** — §12 KEDA (optional section)
-10. **r14–r16** — tail sections, diagrams, editorial pass,
+8. **r13** — §12 KEDA (optional section)
+9. **r14–r16** — tail sections, diagrams, editorial pass,
     final reconciliation refresh

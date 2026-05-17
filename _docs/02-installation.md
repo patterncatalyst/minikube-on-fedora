@@ -125,17 +125,22 @@ http --version
 
 ### yq — YAML query and transform
 
-The mikefarah `yq` (Go binary, jq-like syntax) — not to be
-confused with the Python `python3-yq` that Fedora packages, which
-is a different tool with different syntax. This tutorial uses
-mikefarah's:
+mikefarah's `yq` (Go binary, jq-like syntax) is packaged in
+Fedora 44 repos at v4.x:
 
 ```bash
-sudo curl -L https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64 \
-  -o /usr/local/bin/yq
-sudo chmod +x /usr/local/bin/yq
+sudo dnf install -y yq
 yq --version
 ```
+
+You should see `yq (https://github.com/mikefarah/yq/) version v4.x`.
+
+A historical note worth knowing: in earlier Fedora versions the
+`yq` package was the unrelated Python tool `python-yq`, which has
+different syntax. Older guides will tell you to grab mikefarah's
+binary from upstream to avoid that confusion. On Fedora 44 the
+`dnf install` is now the right path — Fedora packages mikefarah's
+`yq` directly.
 
 ### hey — HTTP load generator
 
