@@ -4,16 +4,22 @@
 #
 # End-to-end smoke test for §6:
 #   1. ensure cluster is up; clear any prior nginx Deployment/Service
-#   2. apply manifests
-#   3. wait for the Deployment to be Available
-#   4. port-forward the Service to a host port in the 1808x range
-#   5. curl the host port; check for the nginx welcome page
-#   6. scale the Deployment to 3 replicas; verify all Ready
-#   7. clean up port-forward + manifests on exit (success or failure)
+#   2. build the nginx image with `minikube image build` (multi-stage
+#      Containerfile, UBI 9 builder → UBI 9 Minimal runtime)
+#   3. apply Deployment + Service manifests
+#   4. wait for the Deployment to be Available; on timeout, dump pod
+#      logs from current and previous containers for diagnosis
+#   5. port-forward the Service to a host port in the 1808x range
+#   6. curl the host port; check for the sentinel content baked
+#      into the image
+#   7. scale the Deployment to 3 replicas; verify all Ready
+#   8. clean up port-forward + manifests on exit (success or failure)
 #
 # Uses the default minikube cluster (NOT a separate profile, unlike
 # examples/03-driver-check/) — leaves the cluster running for the
-# next demo. Cleans up its own resources only.
+# next demo. The built image stays in the cluster's local image cache
+# across runs (cached for fast re-runs); to force a rebuild from
+# scratch, run `minikube image rm nginx-custom:v1` before re-running.
 #
 # Exit codes: 0 on full pass, non-zero on any step failure.
 
@@ -27,6 +33,7 @@ source "${REPO_ROOT}/scripts/lib/_helpers.sh"
 
 # ── Config ──────────────────────────────────────────────────────────────────
 APP_NAME="nginx"
+IMAGE_TAG="nginx-custom:v1"
 MANIFESTS_DIR="${SCRIPT_DIR}/manifests"
 HOST_PORT=18080
 WAIT_DEPLOY_SECONDS=180
@@ -68,6 +75,16 @@ for _ in {1..15}; do
 done
 pass "no stale ${APP_NAME} resources"
 
+# ── Build the image inside minikube ─────────────────────────────────────────
+step "building ${IMAGE_TAG} via minikube image build (multi-stage UBI 9)"
+# `minikube image build` runs the build inside the cluster's runtime so the
+# resulting image is immediately available to kubelet without needing a
+# registry push. -f specifies the Containerfile (default lookup is Dockerfile).
+if ! minikube image build -t "${IMAGE_TAG}" -f Containerfile "${SCRIPT_DIR}"; then
+    fail "minikube image build failed (see output above)"
+fi
+pass "${IMAGE_TAG} built and available in cluster"
+
 # ── Apply manifests ─────────────────────────────────────────────────────────
 step "applying nginx Deployment and Service"
 kubectl apply -f "${MANIFESTS_DIR}/"
@@ -81,6 +98,14 @@ if ! kubectl wait --for=condition=Available "deployment/${APP_NAME}" \
     kubectl describe "deployment/${APP_NAME}" | sed 's/^/    /'
     info "Pod status:"
     kubectl get pods -l "app=${APP_NAME}" | sed 's/^/    /'
+    info "Pod logs (current and previous container if restarted):"
+    for pod in $(kubectl get pods -l "app=${APP_NAME}" \
+                   -o jsonpath='{.items[*].metadata.name}' 2>/dev/null); do
+        echo "    ----- ${pod} (current container) -----"
+        kubectl logs "${pod}" --tail=30 2>&1 | sed 's/^/    /' || true
+        echo "    ----- ${pod} (previous container, if restarted) -----"
+        kubectl logs "${pod}" --tail=30 --previous 2>&1 | sed 's/^/    /' || true
+    done
     fail "Deployment did not become Available within ${WAIT_DEPLOY_SECONDS}s"
 fi
 kubectl get deployment,pods -l "app=${APP_NAME}" | sed 's/^/    /'
@@ -101,28 +126,26 @@ for ((i = 0; i < PORT_FORWARD_TIMEOUT; i++)); do
     sleep 1
 done
 if [[ "${listening}" -ne 1 ]]; then
-    info "port-forward output:"
-    # The PID may have died; check it
     if ! kill -0 "${PORT_FORWARD_PID}" 2>/dev/null; then
-        info "  (port-forward process is no longer running)"
+        info "(port-forward process is no longer running)"
     fi
     fail "port-forward never started listening within ${PORT_FORWARD_TIMEOUT}s"
 fi
 pass "port-forward listening on :${HOST_PORT}"
 
 # ── Validate response ───────────────────────────────────────────────────────
-step "validating nginx HTTP response"
+step "validating nginx HTTP response (looking for sentinel string)"
 RESP=$(curl -fsS "http://127.0.0.1:${HOST_PORT}/")
-# UBI nginx serves a "Test Page" by default; check for any of the
-# expected markers.
+# Sentinel content from index.html that confirms we're serving our
+# baked-in page (not some default upstream nginx welcome).
 case "${RESP}" in
-    *"Test Page"*|*"nginx"*|*"Welcome"*)
-        pass "nginx responded with expected content"
+    *"Test Page for nginx on UBI 9 Minimal"*)
+        pass "nginx served the baked-in index.html"
         ;;
     *)
         info "unexpected response (first 200 chars):"
         echo "${RESP:0:200}" | sed 's/^/    /'
-        fail "response did not match expected nginx welcome content"
+        fail "response did not match the sentinel string"
         ;;
 esac
 
@@ -146,11 +169,14 @@ kubectl get pods -l "app=${APP_NAME}" | sed 's/^/    /'
 pass "scaled to 3 replicas, all Running"
 
 # ── Done ────────────────────────────────────────────────────────────────────
-step "SUCCESS — nginx Deployment + Service + port-forward + scaling all working"
+step "SUCCESS — image built + Deployment + Service + port-forward + scaling all working"
 echo
 echo "  Cleanup will run automatically on script exit:"
 echo "    - kubectl port-forward backgrounded process killed"
 echo "    - nginx Deployment and Service deleted"
-echo "  The minikube cluster itself stays up for the next demo."
+echo "  Persists across runs:"
+echo "    - ${IMAGE_TAG} image stays in the cluster's image cache"
+echo "      (force rebuild: minikube image rm ${IMAGE_TAG})"
+echo "    - the minikube cluster itself stays up for the next demo"
 echo
 exit 0

@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Test Page for nginx on UBI 9 Minimal</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 40rem;
+           margin: 2rem auto; padding: 0 1rem; color: #222;
+           line-height: 1.5; }
+    code { background: #f4f4f4; padding: 0.1em 0.3em; border-radius: 3px; }
+    .ok { color: #2d6e2d; }
+  </style>
+</head>
+<body>
+  <h1>Test Page for nginx on UBI 9 Minimal <span class="ok">✓</span></h1>
+  <p>If you're reading this in a browser, the §6 example from the
+     <em>minikube-on-fedora</em> tutorial has deployed successfully.</p>
+  <p>Served by <code>nginx</code> running on
+     <code>registry.access.redhat.com/ubi9/ubi-minimal</code>,
+     built with a two-stage <code>Containerfile</code> and loaded into
+     minikube via <code>minikube image build</code>.</p>
+  <p>This page was baked into the image at build time — no ConfigMap,
+     no hostPath volume, no SELinux context to worry about.</p>
+</body>
+</html>

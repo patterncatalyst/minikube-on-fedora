@@ -16,7 +16,10 @@ spec:
     spec:
       containers:
       - name: nginx
-        image: registry.access.redhat.com/ubi9/nginx-124
+        image: nginx-custom:v1
+        # The image was built locally by `minikube image build` in
+        # demo.sh — it's not in any registry, so don't try to pull.
+        imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8080
         readinessProbe:

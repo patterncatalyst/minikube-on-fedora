@@ -1,0 +1,73 @@
+# examples/06-deploy-nginx-kubectl/Containerfile
+#
+# Multi-stage build: UBI 9 builder → UBI 9 Minimal runtime.
+#
+# Both base images are freely redistributable per Red Hat's UBI EULA;
+# neither requires subscription-manager registration to install packages
+# from the public UBI repos (this is what distinguishes UBI from full
+# RHEL container images).
+#
+# Why multi-stage for a static-content nginx?
+#   The pattern scales naturally to real workloads where the builder
+#   needs heavy tooling (a static-site generator, a compiler toolchain,
+#   asset bundlers) that you don't want in the runtime image. For our
+#   single-page example, the builder is minimal — but the structure is
+#   familiar from production.
+#
+# Why not just use registry.access.redhat.com/ubi9/nginx-124?
+#   That image is an s2i (source-to-image) builder. Its default CMD is
+#   /usr/libexec/s2i/run, which expects content baked in at build time
+#   via `s2i assemble`. In plain Kubernetes (rather than OpenShift)
+#   it crashloops with no content. Building our own image from
+#   ubi-minimal sidesteps the issue and shows the multi-stage pattern.
+
+# ── Stage 1: Builder ────────────────────────────────────────────────────────
+FROM registry.access.redhat.com/ubi9/ubi AS builder
+
+WORKDIR /build
+
+# In a real project, you'd RUN a static-site generator here (Hugo,
+# Jekyll, mkdocs, etc.) — its tools live in the builder stage and
+# never reach the runtime image. For this tutorial we just stage the
+# hand-written index.html so the COPY --from=builder in stage 2 has
+# something to take.
+COPY index.html .
+
+# ── Stage 2: Runtime ────────────────────────────────────────────────────────
+FROM registry.access.redhat.com/ubi9/ubi-minimal
+
+# microdnf is ubi-minimal's slim package manager. Install nginx and
+# clean caches in the same RUN to keep the layer small.
+RUN microdnf install -y nginx && \
+    microdnf clean all && \
+    rm -rf /var/cache/dnf /var/cache/yum
+
+# Reconfigure nginx for non-root operation:
+#   1. Listen on 8080 instead of 80 (no CAP_NET_BIND_SERVICE needed)
+#   2. PID file in /tmp (writable by any user)
+#   3. Group-writable permissions on the working directories so a
+#      non-root USER can write logs and temp files
+RUN sed -i \
+        -e 's/listen[[:space:]]\+80[[:space:]]*default_server;/listen 8080 default_server;/' \
+        -e 's|listen[[:space:]]\+\[::\]:80[[:space:]]*default_server;|listen [::]:8080 default_server;|' \
+        -e 's|^pid[[:space:]]\+.*$|pid /tmp/nginx.pid;|' \
+        /etc/nginx/nginx.conf && \
+    chgrp -R 0 /var/lib/nginx /var/log/nginx /usr/share/nginx/html && \
+    chmod -R g+rwX /var/lib/nginx /var/log/nginx /usr/share/nginx/html
+
+# Copy the staged content from the builder stage. This is the
+# "COPY --from=builder" pattern that keeps the runtime image clean of
+# any build-time scaffolding.
+COPY --from=builder /build/index.html /usr/share/nginx/html/index.html
+
+# Run as a non-root UID. OpenShift assigns arbitrary UIDs at runtime, so
+# UID 1001 is conventional rather than required — what matters is that
+# the directory permissions (chgrp 0 + g+rwX above) let any non-root
+# user write the files nginx needs.
+USER 1001
+
+EXPOSE 8080
+
+# Run nginx in the foreground. "daemon off;" is critical: a
+# daemonizing nginx returns immediately and the container exits.
+CMD ["nginx", "-g", "daemon off;"]

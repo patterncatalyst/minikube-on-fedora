@@ -92,11 +92,14 @@ Fedora 44.
 | **verified (Fedora 44)** | `minikube addons enable metrics-server` makes `kubectl top` work            | §5      | r06 verification recipe: enabled metrics-server, `kubectl top nodes` returned `minikube 102m 0% 534Mi 0%` ✓ |
 | **verified (Fedora 44)** | `minikube addons enable ingress` brings up NGINX ingress-nginx pods         | §5      | r06 verification recipe: enabled ingress, three pods observed (1 controller Running, 2 admission jobs Completed) ✓ |
 | **verified (Fedora 44)** | `minikube addons enable dashboard` + `minikube dashboard --url` returns a URL | §5     | r06 verification recipe: enabled dashboard, `minikube dashboard --url` returned `http://127.0.0.1:40735/...` ✓ |
-| unverified              | UBI `registry.access.redhat.com/ubi9/nginx-124` is pullable from minikube's kicbase | §6 | r07 prose/manifest claim; promote when `examples/06-deploy-nginx-kubectl/demo.sh` passes |
-| unverified              | A two-replica Deployment with the manifest in §6 becomes `Available` within 3 minutes | §6 | r07 manifest claim; promote on demo pass |
+| **verified (Fedora 44)** | UBI application images (e.g. `ubi9/nginx-124`) are s2i builders — not directly runnable in plain Kubernetes | §6 | r07 user run: default CMD `/usr/libexec/s2i/run` crashloops; correct approach is to build our own image from a standard UBI base (r07a) |
+| unverified              | `minikube image build` builds and caches an image visible to the cluster's kubelet | §6 | r07a demo step; promote when `examples/06-deploy-nginx-kubectl/demo.sh` passes |
+| unverified              | A two-stage Containerfile (ubi9 → ubi9-minimal) produces a working nginx image | §6 | r07a Containerfile; promote on demo pass |
+| unverified              | `ubi9/ubi-minimal` installs nginx via `microdnf` without subscription-manager | §6 | r07a build step; promote on demo pass |
+| unverified              | A two-replica Deployment with the manifest in §6 becomes `Available` within 3 minutes | §6 | r07a manifest claim; promote on demo pass |
 | unverified              | `kubectl port-forward service/nginx 18080:80` opens a working tunnel        | §6      | r07 demo claim; promote on demo pass                                        |
 | unverified              | `kubectl scale deployment/nginx --replicas=3` brings count to 3 Running pods | §6     | r07 demo claim; promote on demo pass                                        |
-| unverified              | UBI nginx default page contains "Test Page" or "nginx" markers              | §6      | r07 demo response check; promote on demo pass                               |
+| unverified              | Baked-in index.html serves the sentinel string `Test Page for nginx on UBI 9 Minimal` | §6 | r07a demo response check; promote on demo pass                              |
 
 ## C. Testing matrix
 
@@ -177,28 +180,65 @@ and what's next.
 
 **Phase 2 done** (2026-05-17).
 
-**In flight:**
-
-- **r07** — §6 first real workload-deployment iteration.
+- ✅ **r07** (2026-05-17, shipped; demo failed; superseded by r07a)
+  — §6 first real workload-deployment iteration.
   `_docs/06-deploying-with-kubectl.md` drafted (25-min section
   on Pods/ReplicaSets/Deployments mental model, manifest
   walkthrough, apply/inspect/expose/port-forward/scale/rolling-
   update sequence). `examples/06-deploy-nginx-kubectl/` shipped
-  with two manifests (Deployment + Service, separated for
-  clarity), demo.sh covering deploy → port-forward → curl-
-  validate → scale (rolling-update is prose-only), and a README
-  documenting failure modes. UBI image pinned to
-  `registry.access.redhat.com/ubi9/nginx-124` (UBI 9, nginx 1.24,
-  runs as user 1001, listens on 8080 — rootless-friendly).
-  §3 polish: new callout warns about the auto-detect trap that
-  bit the r06 follow-up verification (docker-cli installed
-  alongside podman can confuse minikube's driver auto-detect
-  when only `rootless=true` is set). Reconciliation: six
-  Section B rows promoted from r06 user run (§4 profile
-  lifecycle, per-cluster resource override, §5 metrics-server /
-  ingress / dashboard), five new §6 unverified rows added,
-  Section C row for `examples/06-deploy-nginx-kubectl/` set to
-  `in flight`
+  with two manifests (Deployment + Service), demo.sh, README.
+  Initial Deployment pinned to
+  `registry.access.redhat.com/ubi9/nginx-124`. **Demo failed**
+  with `CrashLoopBackOff` — root cause: UBI nginx is an s2i
+  builder, doesn't run directly in plain Kubernetes. r07a is
+  the architectural pivot. §3 polish (auto-detect trap callout)
+  and r06-promotion reconciliation work from this iteration
+  carry forward into r07a unchanged
+
+**In flight:**
+
+- **r07a** (2026-05-17, architectural-pivot) — Demo from r07
+  failed: nginx Pods in `CrashLoopBackOff`. Initial diagnosis was
+  correct (UBI nginx-124 is an s2i builder, expects content at
+  `/opt/app-root/src`), but the first proposed fix (ConfigMap-
+  mounted content + `command: ["nginx", "-g", "daemon off;"]`) was
+  the wrong architecture. The user redirected to the right
+  approach: **build our own image** from a standard UBI base via a
+  multi-stage Containerfile (confirmed by LESSONS-LEARNED.md:
+  "Mixing UBI builder + minimal runtime in a multi-stage build is
+  common — the breadth of UBI helps build, the minimalism of
+  Hummingbird helps deploy"). r07a delivers the pivoted approach:
+  1. New `examples/06-deploy-nginx-kubectl/Containerfile` — two-
+     stage build: `ubi9/ubi` builder stages the index.html, then
+     `ubi9/ubi-minimal` runtime installs nginx via `microdnf`,
+     reconfigures it for non-root + port 8080 (group-0-writable
+     dirs, /tmp pid file, USER 1001 — OpenShift-compatible
+     pattern), and copies the staged content. Both base images
+     freely redistributable, no subscription-manager required
+  2. New `examples/06-deploy-nginx-kubectl/index.html` — the
+     baked-in sentinel content
+  3. `manifests/deployment.yaml` rewritten — references
+     `nginx-custom:v1` with `imagePullPolicy: IfNotPresent`; no
+     command override, no volume mount, no ConfigMap dependency
+  4. `demo.sh` adds a `minikube image build -t nginx-custom:v1
+     -f Containerfile .` step before applying manifests. Also
+     enhanced (carried over from the abandoned first r07a draft):
+     `kubectl wait` timeout path now dumps logs from current and
+     previous containers — so future similar failures
+     self-diagnose without a separate log-capture round-trip
+  5. §6 prose rewritten — "A small detour: building our own
+     image" replaces the s2i-workaround discussion. Walks through
+     the multi-stage Containerfile rationale, the three UBI
+     variants (ubi / ubi-minimal / ubi-micro) and when to pick
+     each, the OpenShift-compatible non-root pattern, and
+     `minikube image build`. New "A note on SELinux" subsection
+     introduces the `:Z` flag for the §8 PersistentVolume work to
+     come — §6 itself doesn't need `:Z` (no host bind mounts) but
+     this is where the convention enters the tutorial.
+     Reconciliation plan: stale s2i-workaround claim removed;
+     new `verified` claim recorded that UBI app images aren't
+     directly runnable in plain Kubernetes (learned from the r07
+     failure)
 
 **Open, priority-ordered:**
 
