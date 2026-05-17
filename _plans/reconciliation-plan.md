@@ -103,10 +103,17 @@ Fedora 44.
 | **verified (Fedora 44)** | Baked-in index.html serves the sentinel string `Test Page for nginx on UBI 9 Minimal` | §6 | r07c user run: HTTP response matched expected substring                     |
 | **verified (Fedora 44)** | Under rootless podman, the cluster node IP (e.g. `192.168.49.2`) is NOT host-routable; lives in a slirp4netns/pasta user network namespace | §7 | Learned in r08 user run: `minikube service --url` auto-tunnels and prints `127.0.0.1:<random-port>` instead of returning the node IP directly. r08a corrects §7 prose to acknowledge this |
 | **verified (Fedora 44)** | `minikube service <name> --url` blocks for ~20-30s during tunnel setup on rootless podman, then prints the URL and stays running until Ctrl-C | §7 | Learned in r08 user run: the demo's polling loop with `head -1` deadlocked because each iteration re-established the tunnel. r08a uses a single background invocation with output-file polling |
-| unverified              | NodePort Service exposes a workload at `<nodeIP>:<nodePort>` on minikube     | §7      | r08 manifest claim; promote when `examples/07-nodeport-service/demo.sh` passes |
-| unverified              | `minikube service <name> --url` returns a host-reachable URL (tunneled under rootless podman) | §7 | r08a demo claim; promote on demo pass after r08a applied                   |
-| unverified              | NodePort values must be in 30000-32767 range (enforced by kube-apiserver)    | §7      | r08 prose claim; promote on attempt to apply a manifest with an out-of-range nodePort |
-| unverified              | A Deployment with a different name + label can coexist with §6's nginx       | §7      | r08 design choice; promote when demos for §6 and §7 can be run back-to-back without interference |
+| **verified (Fedora 44)** | NodePort Service exposes a workload at `<nodeIP>:<nodePort>` on minikube     | §7      | r08a user run: NodePort `30808` works; reachable via tunnel URL `http://127.0.0.1:45185` |
+| **verified (Fedora 44)** | `minikube service <name> --url` returns a host-reachable URL (tunneled under rootless podman) | §7 | r08a user run: tunnel established in 3s, returned `http://127.0.0.1:45185`, curl succeeded |
+| unverified              | NodePort values must be in 30000-32767 range (enforced by kube-apiserver)    | §7      | r08 prose claim; never tested directly (would require submitting an out-of-range manifest); low priority |
+| unverified              | A Deployment with a different name + label can coexist with §6's nginx       | §7      | r08 design choice; not tested (user didn't run the optional coexist sanity check); low priority |
+| unverified              | minikube's `default-storageclass` + `storage-provisioner` addons provide a working `standard` StorageClass | §8 | r09 prose claim; promote when `examples/08-persistent-volume/demo.sh` passes |
+| unverified              | A PVC without `storageClassName` binds to a dynamically provisioned PV from the default StorageClass | §8 | r09 manifest claim; promote on demo pass |
+| unverified              | `k8s.io/minikube-hostpath` provisioner backs PVs with directories under `/tmp/hostpath-provisioner/` on the node | §8 | r09 prose claim; verifiable via `minikube ssh ls /tmp/hostpath-provisioner` while demo running |
+| unverified              | `initContainer` can seed a PV with content before the main container starts  | §8 | r09 design claim; promote on demo pass |
+| unverified              | A PVC mount at `/usr/share/nginx/html` overlays `nginx-custom:v1`'s baked-in content | §8 | r09 example claim; the demo's timestamp from PV serving instead of §6's "(from PV)" string change confirms |
+| unverified              | Deleting a Pod and waiting for the Deployment replacement preserves PV content (PV is independent of Pod lifecycle) | §8 | r09 demo's core persistence assertion; promote when timestamps before/after match |
+| unverified              | `standard` StorageClass's `Delete` reclaim policy auto-deletes the PV when the PVC is deleted | §8 | r09 cleanup behavior; promote when post-`kubectl delete` `kubectl get pv` shows no orphaned PV |
 
 ## C. Testing matrix
 
@@ -119,8 +126,8 @@ are still aspirational.
 |------------|--------------------------------------|---------|-------------------------------------------------------|
 | **verified (Fedora 44)** | `examples/03-driver-check/`        | §3      | r05c user run: cluster up, all 8 kube-system pods Running, ✓ SUCCESS |
 | **verified (Fedora 44)** | `examples/06-deploy-nginx-kubectl` | §6      | r07c user run: image built, Deployment Available in 8s, port-forward + curl + scale to 3 all worked |
-| **in flight** | `examples/07-nodeport-service`        | §7      | Shipped in r08; r08 demo hung on tunnel; r08a fixes the demo design; awaiting re-run |
-| unverified | `examples/08-persistent-volume`      | §8      | `hostPath` PV + dynamic PVC                           |
+| **verified (Fedora 44)** | `examples/07-nodeport-service`     | §7      | r08a user run: tunnel established in 3s, NodePort exposure via auto-tunnel `http://127.0.0.1:45185`, curl matched sentinel, 35s total |
+| **in flight** | `examples/08-persistent-volume`      | §8      | Shipped in r09; awaiting user demo run with persistence test (timestamp before/after Pod delete) |
 | unverified | `examples/09-deploy-nginx-helm`      | §9      | Same UBI nginx via an authored small helm chart       |
 | unverified | `examples/11-istio-bookinfo`         | §11     | Istio sample app with sidecar + Gateway + VS          |
 | unverified | `examples/12-keda-http-scale`        | §12     | KEDA HTTP add-on + `hey` load test                    |
@@ -250,72 +257,67 @@ and what's next.
   in 8 seconds, port-forward + curl + scale to 3 all green. Seven
   §6 Section B rows promoted, Section C `examples/06-deploy-nginx-kubectl/`
   promoted
+- ✅ **r08** (2026-05-17, §7 NodePort — confirmed in r08a user run)
+  — `_docs/07-services-nodeport.md` drafted (20-min section
+  covering Service types comparison, NodePort mechanics, three
+  patterns for reaching the NodePort, the 30000-32767 range
+  constraint, when NodePort isn't the right answer).
+  `examples/07-nodeport-service/` shipped with its own Deployment
+  + NodePort Service manifests, demo.sh, README. Reuses §6's
+  `nginx-custom:v1` image (auto-builds from §6's Containerfile if
+  not cached). Distinct resource names (`nginx-np`) and label
+  (`app: nginx-np`) so it coexists with §6. Two correctness bugs
+  surfaced in user run (prose framing of rootless = direct-route,
+  demo's URL-fetch deadlock under tunnel) — fixed in r08a
+- ✅ **r08a** (2026-05-17, prose-correction + demo-fix for r08) —
+  §7 prose "Reaching the NodePort" section rewritten with
+  correct two-case framing (host-routable vs not-routable, with
+  rootless podman in the not-routable bucket).
+  `examples/07-nodeport-service/demo.sh` rewritten to run
+  `minikube service --url` once in the background, watch its
+  output for the URL, kill on cleanup. README updated.
+  **r08a demo PASSED on user's Fedora 44** — tunnel established
+  in 3 seconds, NodePort exposure via `http://127.0.0.1:45185`,
+  curl matched sentinel, 35s total. Two §7 Section B rows
+  promoted; Section C `examples/07-nodeport-service/` promoted.
+  Two new `verified` Section B rows added from what we learned:
+  rootless-podman networking + tunnel timing
 
 **In flight:**
 
-- **r08** (2026-05-17, shipped; §7 prose has rootless-podman bug
-  corrected in r08a; demo design bug corrected in r08a) —
-  `_docs/07-services-nodeport.md` drafted (20-min section covering
-  Service types comparison, NodePort mechanics, three patterns for
-  reaching the NodePort, the 30000-32767 range constraint, when
-  NodePort isn't the right answer). `examples/07-nodeport-service/`
-  shipped with its own Deployment + NodePort Service manifests,
-  demo.sh, README. Reuses §6's `nginx-custom:v1` image (builds from
-  §6's Containerfile if not cached). Distinct resource names
-  (`nginx-np`) and label (`app: nginx-np`) so it coexists with §6.
-  **Two correctness bugs surfaced in user run**:
-  1. §7 prose framed "Linux with podman driver" as the
-     direct-route case, with "macOS/qemu" as the tunnel case.
-     Wrong — **rootless podman** (our default throughout) is
-     also a tunnel case because the cluster IP lives in a
-     slirp4netns/pasta user network namespace. The unifying frame
-     is "any time the cluster IP isn't host-routable, minikube
-     tunnels," which includes rootless Linux
-  2. Demo.sh's URL-fetch polling loop ran `minikube service --url
-     | head -1` in a loop, expecting near-instant return. On
-     rootless podman each invocation re-established a tunnel
-     (~20-30s), and `head -1` blocked until output appeared, so
-     10 iterations spent ~5 minutes "hanging"
-- **r08a** (2026-05-17, prose-correction + demo-fix for r08) —
-  1. `_docs/07-services-nodeport.md` "Reaching the NodePort"
-     section rewritten with the corrected two-case framing
-     (host-routable vs not-routable, and which drivers fall in
-     which bucket). Includes the actual `minikube service --url`
-     output for the rootless case showing the auto-tunnel banner
-  2. `examples/07-nodeport-service/demo.sh` rewritten — runs
-     `minikube service --url` **once** in the background,
-     captures stdout to a temp file, polls the file for an
-     `^http://` line for up to 90 seconds, checks the background
-     process is still alive. Cleanup trap kills the tunnel
-     process and any lingering `minikube service nginx-np`
-     children, removes the temp file
-  3. `examples/07-nodeport-service/README.md` updated — removes
-     the "no port-forwarding, no tunnel" claim that was wrong
-     for rootless. Adds a "tunnel, briefly" section explaining
-     the two cases
-  4. Reconciliation plan: two new `verified` Section B claims
-     recording what we learned about rootless podman networking
-     and `minikube service --url` timing. The four §7
-     `unverified` rows stay pending re-run of the (now fixed)
-     demo
+- **r09** (2026-05-17, §8 Persistent Volumes) —
+  `_docs/08-persistent-volumes.md` drafted (25-min section on
+  Volume/PV/PVC concepts, StorageClasses + dynamic provisioning,
+  minikube's `default-storageclass` + `storage-provisioner`
+  addons, access modes, reclaim policies, the
+  initContainer-seeds-PV pattern with timestamp-based
+  persistence verification). `examples/08-persistent-volume/`
+  shipped with PVC + Deployment (with initContainer) + Service
+  manifests, demo.sh, README. Demo includes a real persistence
+  test: deploys, captures timestamp from served HTML, deletes
+  the Pod, waits for replacement, re-establishes port-forward
+  to the new Pod, captures timestamp again, **asserts the two
+  match** — proving the PV survived the Pod lifecycle. Same
+  `nginx-custom:v1` image as §6/§7 but with content from a PV
+  rather than baked in. Reconciliation: seven new `unverified`
+  §8 rows added to Section B; Section C
+  `examples/08-persistent-volume/` set to `in flight`
 
 **Open, priority-ordered:**
 
-1. Apply r08a; re-run `examples/07-nodeport-service/demo.sh`. On
-   `✓ SUCCESS`, four §7 Section B rows promote plus Section C
-   (`examples/07-nodeport-service/`)
-2. Optional: run the manual coexist test (apply both §6 and §7
-   manifests simultaneously). On success, the "coexist" §7
-   Section B row promotes
-3. **r09** — §8 PVs + `examples/08-persistent-volume/`. First
-   section to need `:Z` for SELinux on Fedora hostPath mounts;
-   the §6 SELinux explainer becomes load-bearing here
-4. **r10** — §9 helm + authored small chart; helm-4-against-
+1. Run `examples/08-persistent-volume/demo.sh`. On `✓ SUCCESS`,
+   seven §8 Section B rows promote plus Section C
+   (`examples/08-persistent-volume/`). The demo asserts
+   timestamps match before/after Pod restart — that's the core
+   PV persistence claim
+2. Optional: the never-verified §7 claims (range enforcement,
+   coexist) — low priority, can stay `unverified` indefinitely
+3. **r10** — §9 helm + authored small chart; helm-4-against-
    helm-3-chart compat claim from Section B promotes here
-5. **r11** — §10 editor/shell/terminal; will request local-setup
+4. **r11** — §10 editor/shell/terminal; will request local-setup
    specifics
-6. **r12** — §11 Istio (resource bump pre-flight; expect Section B
+5. **r12** — §11 Istio (resource bump pre-flight; expect Section B
    resource claims to surface here)
-7. **r13** — §12 KEDA (optional section)
-8. **r14–r16** — tail sections, diagrams, editorial pass, final
+6. **r13** — §12 KEDA (optional section)
+7. **r14–r16** — tail sections, diagrams, editorial pass, final
    reconciliation refresh

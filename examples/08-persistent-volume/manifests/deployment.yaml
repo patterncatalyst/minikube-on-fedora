@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx-pv
+  labels:
+    app: nginx-pv
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx-pv
+  template:
+    metadata:
+      labels:
+        app: nginx-pv
+    spec:
+      initContainers:
+      # Runs BEFORE the nginx container. Idempotent: if the file
+      # already exists in the PV (e.g. on Pod restart), leave it
+      # alone. If empty (first run), seed with timestamped content.
+      # The timestamp lets the demo prove persistence by matching
+      # it across Pod restarts.
+      - name: seed-content
+        image: registry.access.redhat.com/ubi9/ubi-minimal
+        command:
+          - "/bin/sh"
+          - "-c"
+          - |
+            set -e
+            if [ -f /content/index.html ]; then
+              echo "[seed-content] content already exists; persistence is working"
+              cat /content/index.html
+            else
+              echo "[seed-content] seeding fresh content into PV"
+              cat > /content/index.html <<EOF
+            <h1>Test Page for nginx on UBI 9 Minimal (from PV)</h1>
+            <p>This file was written into the PersistentVolume at:</p>
+            <p>$(date -u +%Y-%m-%dT%H:%M:%SZ)</p>
+            <p>If this timestamp is unchanged after a Pod restart, the PV is doing its job.</p>
+            EOF
+            fi
+        volumeMounts:
+        - name: content
+          mountPath: /content
+      containers:
+      - name: nginx
+        image: nginx-custom:v1
+        # Same image as §6/§7 — generic nginx; content comes from
+        # the volume mount below, not the image
+        imagePullPolicy: IfNotPresent
+        ports:
+        - containerPort: 8080
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 2
+          periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "64Mi"
+          limits:
+            cpu: "500m"
+            memory: "256Mi"
+        volumeMounts:
+        # Mount the PV at /usr/share/nginx/html. This OVERLAYS the
+        # image's baked-in content with the PV's contents (which
+        # the initContainer seeded above).
+        - name: content
+          mountPath: /usr/share/nginx/html
+      volumes:
+      - name: content
+        persistentVolumeClaim:
+          claimName: nginx-content
