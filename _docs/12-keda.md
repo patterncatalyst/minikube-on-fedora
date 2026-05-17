@@ -644,28 +644,40 @@ fast (single-digit milliseconds).
 
 ## Cleanup
 
-Both demos' cleanup traps remove the workloads they create
-(consumer, nginx, ScaledObjects). They leave **KEDA, Strimzi,
-and the Kafka cluster running** by default, since reinstalling
-them takes 5+ minutes and you'll likely want to iterate.
+Each demo has two layers of cleanup:
 
-To fully clean up §12:
+1. **`demo.sh` cleanup trap** — runs automatically on demo exit
+   (whether the demo passed, failed, or you Ctrl-C'd it). Removes
+   only the per-run workload (consumer / nginx) plus the
+   ScaledObject. Leaves Kafka, Strimzi, KEDA, and any port-forwards
+   intact so re-runs are fast
+2. **`cleanup.sh` script** — explicit, deeper teardown. Run when
+   you're done with §12 (or with one of the two patterns) and want
+   to free the resources
+
+Tier 2 has its own options for how deep to go:
 
 ```bash
-# Remove Kafka cluster and topics
-kubectl delete kafka my-kafka -n kafka
-kubectl delete kafkatopic --all -n kafka
+# §12 Pattern A — remove the Kafka cluster + topics + PVCs,
+# keep Strimzi + KEDA installed
+cd examples/12-keda-kafka && ./cleanup.sh
 
-# Remove Strimzi
-helm uninstall strimzi -n kafka
-kubectl delete namespace kafka
+# §12 Pattern A — also remove Strimzi + KEDA + all their CRDs
+cd examples/12-keda-kafka && ./cleanup.sh --remove-operators
 
-# Remove KEDA HTTP add-on
+# §12 Pattern B — remove nginx workload, keep KEDA
+cd examples/12-keda-http && ./cleanup.sh
+
+# §12 Pattern B — also remove KEDA + HTTP add-on
+cd examples/12-keda-http && ./cleanup.sh --remove-operators
+```
+
+The `--remove-operators` flag affects both demos because they
+share KEDA. If you want to remove only the HTTP add-on (e.g. to
+re-run the Kafka demo without the add-on's Pods running), use:
+
+```bash
 helm uninstall keda-add-ons-http -n keda
-
-# Remove KEDA core
-helm uninstall keda -n keda
-kubectl delete namespace keda
 ```
 
 The minikube profile itself remains running for §6-§9 demos or

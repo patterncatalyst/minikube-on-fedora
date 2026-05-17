@@ -922,18 +922,101 @@ have to derive them.
   complete, §12 Pattern B (HTTP add-on) still unverified
   pending user run
 
+- **r13c** (2026-05-17, §12 HTTP false-positive + cleanup
+  scripts) — third Phase 5 sub-iteration. User ran the §12
+  HTTP demo on the back of r13b's verified KEDA + HTTP add-on
+  install. The demo reported `✓ SUCCESS` — but inspection of
+  the output revealed this was a **false positive**:
+  - `cold-start request took 0s` — physically implausible
+    for a real scale-from-zero through the interceptor
+    (should be 3-8s)
+  - hey's status code distribution showed **all 500
+    requests returned HTTP 404** — none of the load test
+    actually hit nginx
+  - The transient `replicas climbed to 1` did happen, but
+    the 1 replica never served traffic (because every
+    request 404'd in the interceptor before reaching it).
+    Likely root cause: the HTTP add-on's interceptor saw
+    requests but couldn't match them to the HTTPScaledObject's
+    route, so returned an HTML 404 page that satisfied the
+    demo's `*<html>*` pattern match
+
+  The demo's assertions were too lax in three places:
+  - The "interceptor reachable" check used `curl -fsS` (fail
+    silently) and didn't verify exit code, so a 404 looked
+    indistinguishable from a connection error
+  - The cold-start check used `case "${RESP}" in *<html>*`
+    which matches any HTML — including 404 pages
+  - The scale-up assertion checked `replicas >= 1` without
+    verifying that the replicas actually served traffic
+
+  Fixes in r13c (§12 HTTP `demo.sh`):
+  - Cold-start now captures HTTP status code explicitly via
+    `curl -w '%{http_code}'`, fails on non-200, and dumps
+    HTTPScaledObject status + interceptor logs + service
+    info on failure
+  - Cold-start body assertion tightened: must contain
+    `"Test Page for the HTTP Server"` or `"nginx"` or
+    `"Welcome to nginx"` (not just any HTML)
+  - Cold-start warns (but doesn't fail) if completion is
+    <1s, since real scale-from-zero takes longer
+  - hey output now parsed for status code distribution;
+    demo fails if any non-2xx response appears, and warns
+    if fewer than half of requests succeeded
+  - Interceptor port-forward check renamed to make clear
+    it only verifies TCP reachability, not routing
+    correctness
+
+  The actual routing fix (whatever's causing the 404) is
+  deferred to r13d. The tightened assertions in r13c will
+  make r13d's failure mode more diagnostic.
+
+  Cleanup scripts (per user request "should we make sure we
+  have a cleanup for each of these demos/examples?"):
+  - `examples/12-keda-kafka/cleanup.sh` — removes consumer
+    + ScaledObject + Kafka cluster + topics + PVCs.
+    `--remove-operators` also removes Strimzi + KEDA + all
+    CRDs
+  - `examples/12-keda-http/cleanup.sh` — removes nginx +
+    Service + HTTPScaledObject. `--remove-operators` also
+    removes KEDA + HTTP add-on + CRDs
+  - `examples/11-istio/cleanup.sh` — removes nginx-with-
+    sidecar + Bookinfo + addons. `--remove-istio` purges
+    istiod + gateways + CRDs + webhook configs.
+    `--remove-istio --remove-profile` drops the whole
+    minikube profile
+  - All three are idempotent (safe to re-run when state is
+    partially or fully gone)
+  - §12 prose Cleanup section rewritten to reference the
+    scripts instead of inline kubectl/helm commands
+  - §11 + §12 READMEs Cleanup subsections updated similarly
+
+  Note: §3-§9 demos already have cleanup traps that handle
+  their relatively-small state; no dedicated `cleanup.sh`
+  added for them. Their READMEs could be updated to mention
+  this in the future editorial pass
+
+  Verified row count: **100** (unchanged from r13b — no new
+  promotions; the §12 HTTP rows that looked promotable from
+  r13b's run actually aren't, since the demo didn't validate
+  what it claimed to). Plan now correctly reflects that the
+  §12 HTTP demo has never had a real verified run
+
 **Open, priority-ordered:**
 
-1. **Run `examples/12-keda-http/demo.sh`** — the HTTP
-   add-on demo. KEDA + HTTP add-on already installed (no
-   setup script needed). nginx-custom:v1 should already be
-   cached from §6. Expected: ~90-150s, 0→N→0 lifecycle with
-   `hey -n 500 -c 50` driving the load. On `✓ SUCCESS`,
-   6 §12 HTTP rows promote + Section C
-   `examples/12-keda-http/` promotes
-2. Optional: §10 row promotions, §8 PV auto-delete, §7
+1. **r13d — HTTP routing investigation** — the actual fix
+   for whatever is causing the interceptor to return 404 for
+   matched-host requests. Likely candidates: HTTPScaledObject
+   CRD schema changed in 0.12.x, namespace/scope of the
+   matched host, missing pathPrefixes, or interceptor-side
+   admin-port vs proxy-port confusion. The tightened r13c
+   assertions will surface the exact symptom on next run
+2. Re-run `examples/12-keda-http/demo.sh` after r13d. On
+   real `✓ SUCCESS`, 6 §12 HTTP Section B rows promote +
+   Section C `examples/12-keda-http/`
+3. Optional: §10 row promotions, §8 PV auto-delete, §7
    leftovers — low priority
-3. **r14–r16** — tail sections (§13 wrap-up, §14
+4. **r14–r16** — tail sections (§13 wrap-up, §14
    troubleshooting?, §15 where-next-pointers), diagrams
    (paired `.svg` + `.excalidraw` in `assets/diagrams/`),
    editorial pass across all section prose, final

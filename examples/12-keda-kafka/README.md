@@ -113,19 +113,23 @@ recent events.
 
 The demo's cleanup trap removes the consumer Deployment + the
 ScaledObject. The Kafka cluster + topic stay running for re-runs
-(both are slow to recreate). To fully clean up:
+(both are slow to recreate).
+
+For deeper cleanup, use `cleanup.sh`:
 
 ```bash
-kubectl delete kafka my-kafka -n kafka
-kubectl delete kafkatopic --all -n kafka
-helm uninstall strimzi -n kafka
-kubectl delete namespace kafka
+# Remove the Kafka cluster + topics + PVCs (keeps Strimzi + KEDA
+# operators installed for next time)
+./cleanup.sh
 
-# If you also want to remove KEDA:
-helm uninstall keda-add-ons-http -n keda
-helm uninstall keda -n keda
-kubectl delete namespace keda
+# Also remove Strimzi + KEDA operators and their CRDs
+./cleanup.sh --remove-operators
 ```
+
+`cleanup.sh --help` lists every option. The default tier is what
+most readers want between debugging sessions; `--remove-operators`
+is for when you're done with §12 entirely or wiping for a fresh
+start.
 
 ## Going further on your own
 

@@ -86,12 +86,25 @@ Pod startup dominated by readinessProbe `initialDelaySeconds`).
 
 Cleanup trap removes the Deployment, Service, and
 HTTPScaledObject. KEDA stays installed (re-install is slow).
-To fully clean up:
+
+For deeper cleanup, use `cleanup.sh`:
+
+```bash
+# Remove the nginx workload + HTTPScaledObject (keeps KEDA
+# installed for next time)
+./cleanup.sh
+
+# Also remove KEDA + HTTP add-on
+./cleanup.sh --remove-operators
+```
+
+Note: `--remove-operators` removes BOTH KEDA core and the HTTP
+add-on, which also affects the §12 Kafka demo (since it depends
+on KEDA too). To remove only the HTTP add-on while keeping KEDA
+core for the Kafka demo:
 
 ```bash
 helm uninstall keda-add-ons-http -n keda
-helm uninstall keda -n keda
-kubectl delete namespace keda
 ```
 
 ## Going further on your own

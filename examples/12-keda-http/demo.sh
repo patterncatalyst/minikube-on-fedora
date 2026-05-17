@@ -108,35 +108,89 @@ step "port-forwarding HTTP add-on interceptor to 127.0.0.1:${INTERCEPTOR_PORT}"
 kubectl port-forward -n keda service/keda-add-ons-http-interceptor-proxy \
     "${INTERCEPTOR_PORT}:8080" >/dev/null 2>&1 &
 PF_PID=$!
+# Wait for the port-forward TCP socket to accept connections. This is NOT
+# a check that routing works — just that the port-forward is up. The
+# cold-start phase below validates actual routing.
+PF_READY=""
 for _ in {1..30}; do
-    if curl -fsS --max-time 2 "http://127.0.0.1:${INTERCEPTOR_PORT}/" \
-            -H "Host: ${HOST_HEADER}" >/dev/null 2>&1; then
+    if curl -s -o /dev/null --max-time 2 "http://127.0.0.1:${INTERCEPTOR_PORT}/"; then
+        PF_READY="yes"
         break
     fi
     sleep 1
 done
+if [[ -z "${PF_READY}" ]]; then
+    fail "port-forward to interceptor did not accept TCP connections within 30s"
+fi
 if ! kill -0 "${PF_PID}" 2>/dev/null; then
     fail "port-forward died before becoming reachable"
 fi
-pass "interceptor reachable"
+pass "interceptor port-forward is up (note: this does NOT validate routing — see cold-start phase)"
 
 # ── Phase 6: Cold-start request ─────────────────────────────────────────────
 step "firing single cold-start request — interceptor will buffer until Pod is ready"
 COLD_START_BEGIN=$(date +%s)
-RESP=$(curl -fsS --max-time 60 "http://127.0.0.1:${INTERCEPTOR_PORT}/" \
-    -H "Host: ${HOST_HEADER}" 2>/dev/null || echo "")
+# Capture both the response body AND the HTTP status code separately.
+# -w '%{http_code}' on its own line appended after the body lets us
+# split them. A real cold-start should:
+#   (a) take measurable time (the interceptor blocks until Pod Ready)
+#   (b) return HTTP 200 with nginx content (not a 404 page from the
+#       interceptor saying "no route matched")
+RAW=$(curl -s --max-time 60 "http://127.0.0.1:${INTERCEPTOR_PORT}/" \
+    -H "Host: ${HOST_HEADER}" \
+    -w '\n---STATUS---\n%{http_code}\n' 2>&1 || echo "---STATUS---\n000")
 COLD_START_S=$(( $(date +%s) - COLD_START_BEGIN ))
-info "cold-start request took ${COLD_START_S}s"
-case "${RESP}" in
-    *"Test Page"*|*"<html"*|*"<!doctype"*)
-        pass "cold-start succeeded (HTML response received after ${COLD_START_S}s)"
+HTTP_CODE=$(echo "${RAW}" | sed -n '/---STATUS---/,/$/p' | tail -1 | tr -d '[:space:]')
+BODY=$(echo "${RAW}" | sed '/---STATUS---/,$d')
+info "cold-start request took ${COLD_START_S}s, status code: ${HTTP_CODE}"
+
+# Assertion 1: HTTP status must be 200. A 404 here means the interceptor
+# didn't recognize the route — which would mean the HTTPScaledObject's
+# Host matching isn't wired up to this request.
+if [[ "${HTTP_CODE}" != "200" ]]; then
+    info "non-200 response from interceptor. Body (first 500 chars):"
+    echo "${BODY:0:500}" | sed 's/^/    /'
+    info ""
+    info "HTTPScaledObject status:"
+    kubectl describe httpscaledobject nginx-http-scaler 2>/dev/null \
+        | sed 's/^/    /' || true
+    info ""
+    info "Interceptor logs (last 30 lines):"
+    kubectl logs -n keda -l app.kubernetes.io/component=interceptor \
+        --tail=30 2>/dev/null | sed 's/^/    /' || true
+    info ""
+    info "Interceptor service:"
+    kubectl get service -n keda keda-add-ons-http-interceptor-proxy \
+        -o wide 2>/dev/null | sed 's/^/    /' || true
+    fail "cold-start returned HTTP ${HTTP_CODE} — routing through interceptor is not working"
+fi
+
+# Assertion 2: Response body must contain nginx-specific content. A
+# generic <html> response could be the interceptor's own 404 page.
+case "${BODY}" in
+    *"Test Page for the HTTP Server"*|*"nginx"*|*"Welcome to nginx"*)
+        : # nginx content found — good
         ;;
     *)
-        info "response (first 200 chars):"
-        echo "${RESP:0:200}" | sed 's/^/    /'
-        fail "cold-start did not return expected response"
+        info "200 OK but body doesn't look like nginx content (first 500 chars):"
+        echo "${BODY:0:500}" | sed 's/^/    /'
+        fail "cold-start got 200 but body is not nginx-served content"
         ;;
 esac
+
+# Assertion 3: An honest cold-start through the interceptor takes
+# measurable time. If it returned in 0 seconds, the workload was
+# probably already running OR the response wasn't a real backend
+# response. (Sub-second responses CAN happen if the Pod was somehow
+# already up; we warn but don't fail.)
+if [[ "${COLD_START_S}" -eq 0 ]]; then
+    info "WARNING: cold-start completed in <1s. This is unusual for"
+    info "         a scale-from-zero cold-start — the interceptor"
+    info "         normally needs several seconds to bring a Pod up."
+    info "         Verify the deployment was actually at 0 replicas"
+    info "         before this phase, not pre-warmed."
+fi
+pass "cold-start succeeded — HTTP 200 with nginx content after ${COLD_START_S}s"
 
 # ── Phase 7: Drive load with hey ────────────────────────────────────────────
 step "driving load: hey -n ${LOAD_REQUESTS} -c ${LOAD_CONCURRENCY}"
@@ -167,9 +221,36 @@ for i in $(seq 1 "${SCALEUP_TIMEOUT}"); do
 done
 
 wait "${HEY_PID}" 2>/dev/null || true
-HEY_SUMMARY=$(tail -20 /tmp/hey-output.txt | grep -E "Summary|Total:|Requests/sec:|Status code distribution" -A 5 || tail -10 /tmp/hey-output.txt)
+HEY_OUTPUT=$(cat /tmp/hey-output.txt)
+HEY_SUMMARY=$(echo "${HEY_OUTPUT}" | grep -E "Summary|Total:|Requests/sec:|Status code distribution" -A 5 || tail -10 /tmp/hey-output.txt)
 info "hey summary:"
 echo "${HEY_SUMMARY}" | sed 's/^/    /'
+
+# Parse hey's status code distribution. The hey output has a
+# "Status code distribution:" section listing each status code with
+# its count. We want ALL responses to be 200.
+STATUS_LINES=$(echo "${HEY_OUTPUT}" | awk '/^  Status code distribution:/,/^$/' | grep -E '^\s+\[[0-9]+\]' || true)
+BAD_STATUSES=$(echo "${STATUS_LINES}" | grep -vE '^\s+\[2[0-9][0-9]\]' || true)
+TOTAL_OK=$(echo "${STATUS_LINES}" | grep -E '^\s+\[200\]' | awk '{print $2}' | head -1)
+TOTAL_OK="${TOTAL_OK:-0}"
+
+if [[ -n "${BAD_STATUSES}" ]]; then
+    info "hey returned non-2xx responses:"
+    echo "${BAD_STATUSES}" | sed 's/^/    /'
+    info ""
+    info "Interceptor logs (last 30 lines):"
+    kubectl logs -n keda -l app.kubernetes.io/component=interceptor \
+        --tail=30 2>/dev/null | sed 's/^/    /' || true
+    info ""
+    info "HTTPScaledObject status:"
+    kubectl describe httpscaledobject nginx-http-scaler 2>/dev/null \
+        | sed 's/^/    /' || true
+    fail "hey load returned non-2xx responses — routing through interceptor failed"
+fi
+if [[ "${TOTAL_OK}" -lt $((LOAD_REQUESTS / 2)) ]]; then
+    fail "fewer than half of hey requests succeeded (${TOTAL_OK}/${LOAD_REQUESTS}) — routing is unreliable"
+fi
+info "hey 2xx successes: ${TOTAL_OK}/${LOAD_REQUESTS}"
 
 if [[ -z "${SCALED_UP}" ]]; then
     info "nginx never scaled up. HTTPScaledObject status:"
