@@ -100,6 +100,10 @@ Fedora 44.
 | unverified              | `kubectl port-forward service/nginx 18080:80` opens a working tunnel        | §6      | r07 demo claim; promote on demo pass                                        |
 | unverified              | `kubectl scale deployment/nginx --replicas=3` brings count to 3 Running pods | §6     | r07 demo claim; promote on demo pass                                        |
 | unverified              | Baked-in index.html serves the sentinel string `Test Page for nginx on UBI 9 Minimal` | §6 | r07a demo response check; promote on demo pass                              |
+| unverified              | NodePort Service exposes a workload at `<nodeIP>:<nodePort>` on minikube     | §7      | r08 manifest claim; promote when `examples/07-nodeport-service/demo.sh` passes |
+| unverified              | `minikube service <name> --url` returns a host-reachable URL                 | §7      | r08 demo claim; promote on demo pass                                        |
+| unverified              | NodePort values must be in 30000-32767 range (enforced by kube-apiserver)    | §7      | r08 prose claim; promote on attempt to apply a manifest with an out-of-range nodePort |
+| unverified              | A Deployment with a different name + label can coexist with §6's nginx       | §7      | r08 design choice; promote when demos for §6 and §7 can be run back-to-back without interference |
 
 ## C. Testing matrix
 
@@ -111,7 +115,8 @@ are still aspirational.
 | Status     | Example                              | Section | Notes                                                 |
 |------------|--------------------------------------|---------|-------------------------------------------------------|
 | **verified (Fedora 44)** | `examples/03-driver-check/`        | §3      | r05c user run: cluster up, all 8 kube-system pods Running, ✓ SUCCESS |
-| **in flight** | `examples/06-deploy-nginx-kubectl`   | §6      | Shipped in r07; awaiting user run on Fedora 44                          |
+| **in flight** | `examples/06-deploy-nginx-kubectl`   | §6      | r07a pivot (multi-stage build); awaiting user demo run on Fedora 44     |
+| **in flight** | `examples/07-nodeport-service`        | §7      | Shipped in r08; awaiting user demo run on Fedora 44                     |
 | unverified | `examples/07-nodeport-service`       | §7      | Expose Deployment via NodePort, retrieve URL          |
 | unverified | `examples/08-persistent-volume`      | §8      | `hostPath` PV + dynamic PVC                           |
 | unverified | `examples/09-deploy-nginx-helm`      | §9      | Same UBI nginx via an authored small helm chart       |
@@ -194,6 +199,19 @@ and what's next.
   the architectural pivot. §3 polish (auto-detect trap callout)
   and r06-promotion reconciliation work from this iteration
   carry forward into r07a unchanged
+- ✅ **r07b** (2026-05-17, site-polish) — Homepage `index.html`
+  rewritten to **auto-generate section cards** from the `site.docs`
+  Jekyll collection sorted by front-matter `order`. Previously
+  3 hardcoded cards from r02 (Outline, Prerequisites,
+  Reconciliation plan) — and a stale comment promising to update
+  them "as sections get drafted," which never happened, so §2-§6
+  were shipping without homepage representation. The new Liquid
+  loop adds a section card for every `_docs/0N-*.md` file, with
+  eyebrow ("Overview" for §0, "Section N" for the rest), title,
+  description, and duration pulled from front matter. A separate
+  "Project plans" mini-section hosts cards for the reconciliation
+  plan and (newly visible) the iteration plan. Future sections
+  require zero `index.html` edits
 
 **In flight:**
 
@@ -239,15 +257,33 @@ and what's next.
      new `verified` claim recorded that UBI app images aren't
      directly runnable in plain Kubernetes (learned from the r07
      failure)
+- **r08** (2026-05-17) — `_docs/07-services-nodeport.md` drafted
+  (20-min section covering Service types comparison, NodePort
+  mechanics, three patterns for reaching the NodePort, the
+  30000-32767 range constraint, when NodePort isn't the right
+  answer). `examples/07-nodeport-service/` shipped with its own
+  Deployment + NodePort Service manifests, demo.sh, README.
+  Reuses §6's `nginx-custom:v1` image (builds from §6's
+  Containerfile automatically if not cached, so the demo is
+  runnable without having run §6's first). Distinct resource
+  names (`nginx-np`) and label (`app: nginx-np`) so it coexists
+  with §6's `nginx` resources without selector confusion. Demo
+  gets URL via `minikube service nginx-np --url` and curls it
+  directly — no port-forward needed. Reconciliation: four new
+  `unverified` §7 rows added; Section C
+  `examples/07-nodeport-service/` set to `in flight`
 
 **Open, priority-ordered:**
 
 1. Run `examples/06-deploy-nginx-kubectl/demo.sh` against the
    default minikube cluster. On `✓ SUCCESS`, five §6 Section B
    rows promote plus Section C
-2. **r08** — §7 NodePort + `examples/07-nodeport-service/`.
-   First example to expose a workload externally
-3. **r09** — §8 PVs + `examples/08-persistent-volume/`
+2. Run `examples/07-nodeport-service/demo.sh`. On `✓ SUCCESS`,
+   four §7 Section B rows promote plus Section C. (Can be run
+   independently of §6's demo; will auto-build the image if §6's
+   demo hasn't been run yet)
+3. **r09** — §8 PVs + `examples/08-persistent-volume/`. First
+   section to need `:Z` for SELinux on Fedora hostPath mounts
 4. **r10** — §9 helm + authored small chart; helm-4-against-
    helm-3-chart compat claim from Section B promotes here
 5. **r11** — §10 editor/shell/terminal; will request local-setup
