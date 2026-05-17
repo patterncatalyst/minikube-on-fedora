@@ -14,7 +14,8 @@
 section() { printf '\n=== %s ===\n' "$*"; }
 
 # Run a command if its first argument is on PATH; otherwise report
-# cleanly. Avoids bash's "command not found" stderr noise.
+# cleanly. Avoids bash's "command not found" stderr noise that the
+# r03 version of this script let through.
 maybe() {
     if command -v "$1" >/dev/null 2>&1; then
         "$@" 2>&1 || echo "  (command failed)"
@@ -42,36 +43,17 @@ maybe podman info --format \
 section "container engine: docker CLI (optional)"
 maybe docker --version
 
-section "currently installed tutorial tools"
-
-# Top-level binaries on PATH (installed via dnf, RPM, or upstream)
-for tool in minikube kubectl helm istioctl yq httpie hey gh; do
+section "currently installed tutorial tools (PATH)"
+for tool in minikube kubectl helm istioctl stern kubectx kubens yq krew httpie hey gh; do
     if command -v "$tool" >/dev/null 2>&1; then
-        printf '  %-16s %s\n' "$tool" "$(command -v "$tool")"
+        printf '  %-12s %s\n' "$tool" "$(command -v "$tool")"
     else
-        printf '  %-16s (not installed)\n' "$tool"
+        printf '  %-12s (not installed)\n' "$tool"
     fi
 done
 
-# krew + its plugins are kubectl subcommands, not standalone binaries.
-# They install as ~/.krew/bin/kubectl-<name> and are invoked as
-# `kubectl <name>`. command -v won't find them by their plain name.
-krew_dir="${KREW_ROOT:-$HOME/.krew}/bin"
-if [[ -x "${krew_dir}/kubectl-krew" ]]; then
-    printf '  %-16s %s\n' "kubectl krew" "${krew_dir}/kubectl-krew"
-    for plugin in stern ctx ns; do
-        if [[ -x "${krew_dir}/kubectl-${plugin}" ]]; then
-            printf '  %-16s %s\n' "kubectl ${plugin}" "${krew_dir}/kubectl-${plugin}"
-        else
-            printf '  %-16s (krew plugin not installed)\n' "kubectl ${plugin}"
-        fi
-    done
-else
-    printf '  %-16s (not installed; install via §2 krew bootstrap)\n' "kubectl krew"
-fi
-
 section "current versions (where installed)"
-maybe minikube version --short
+maybe minikube version
 maybe kubectl version --client=true
 maybe helm version --short
 maybe istioctl version --remote=false
@@ -87,6 +69,25 @@ for pkg in minikube kubectl kubernetes-client helm stern kubectx httpie yq; do
         echo "(no package named $pkg in current repos)"
     fi
 done
+
+section "kernel limits (matters for §11 multi-cluster)"
+INSTANCES=$(sysctl -n fs.inotify.max_user_instances 2>/dev/null || echo 0)
+WATCHES=$(sysctl -n fs.inotify.max_user_watches 2>/dev/null || echo 0)
+echo "  fs.inotify.max_user_instances = ${INSTANCES}"
+echo "  fs.inotify.max_user_watches   = ${WATCHES}"
+if [[ "${INSTANCES}" -ge 256 ]] && [[ "${WATCHES}" -ge 131072 ]]; then
+    echo "  STATUS: ✓ OK for running a second minikube profile (§11)"
+else
+    echo "  STATUS: ⚠ defaults — fine for §3-§10 (one cluster) but"
+    echo "          NOT for §11 (two clusters: minikube + istio)."
+    echo "          Fix from §1 prereqs 'Kernel limits' subsection:"
+    echo ""
+    echo "          sudo tee /etc/sysctl.d/99-kubernetes.conf <<EOF"
+    echo "          fs.inotify.max_user_instances = 512"
+    echo "          fs.inotify.max_user_watches = 524288"
+    echo "          EOF"
+    echo "          sudo sysctl -p /etc/sysctl.d/99-kubernetes.conf"
+fi
 
 section "done"
 echo "Paste the entire output above (from === platform === down) into"

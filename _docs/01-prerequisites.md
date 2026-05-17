@@ -174,6 +174,55 @@ following along.
   the cluster. §10 covers its Kubernetes view pointed at the
   minikube context
 
+## Kernel limits for multi-cluster (needed for §11)
+
+The §3 minikube profile is a containerized Linux that runs systemd
+as PID 1. Systemd uses **inotify** watches to manage cgroups — and
+Fedora 44's defaults for `fs.inotify.max_user_instances` and
+`fs.inotify.max_user_watches` are sized for **one** such container.
+
+§3 through §10 all run on a single minikube profile, so the defaults
+are fine. §11 (Istio) spins up a **second** profile alongside the
+first, and the second profile's systemd cannot allocate enough
+inotify resources. The container dies during start with:
+
+```
+Failed to create control group inotify object: Too many open files
+Failed to allocate manager object: Too many open files
+[!!!!!!] Failed to allocate manager object.
+```
+
+This is **not** the per-process file-descriptor limit (`RLIMIT_NOFILE`,
+ulimit -n). It's a separate kernel-wide sysctl. Bumping ulimits or
+adding `LimitNOFILE=infinity` to a unit file will not fix it. The
+fix is `sysctl`-based and persists across reboots:
+
+```bash
+sudo tee /etc/sysctl.d/99-kubernetes.conf <<EOF
+fs.inotify.max_user_instances = 512
+fs.inotify.max_user_watches = 524288
+EOF
+sudo sysctl -p /etc/sysctl.d/99-kubernetes.conf
+```
+
+Verify the change took:
+
+```bash
+sysctl fs.inotify.max_user_instances fs.inotify.max_user_watches
+```
+
+Should print `= 512` and `= 524288`.
+
+**Skip this step if you don't plan to do §11.** Default Fedora 44
+settings handle §3-§10's single cluster fine. The `examples/11-istio/demo.sh`
+pre-flight catches insufficient limits with the same recipe printed
+inline, so even if you skip ahead, the demo tells you what to do.
+
+The same numbers come up again in `scripts/audit-fedora-prereqs.sh`,
+which now reports current inotify values and a `✓ OK for §11` or
+`⚠ defaults — fine for §3-§10 but not §11` verdict alongside its
+other Fedora 44 environment checks.
+
 ## Verification
 
 If the following block produces clean output (no errors, an `OK`

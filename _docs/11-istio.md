@@ -88,6 +88,11 @@ there will get the sidecar automatically.
 
 ## Before you start: kernel inotify limits
 
+> See §1's **"Kernel limits for multi-cluster (needed for §11)"**
+> subsection for the canonical recipe. The summary here is for
+> readers jumping directly to §11; `scripts/audit-fedora-prereqs.sh`
+> reports whether your current limits are sufficient.
+
 minikube containers run systemd as PID 1, which uses inotify watches
 for cgroup management. **Fedora's default settings are sized for one
 such container** — and you already have one running (the `minikube`

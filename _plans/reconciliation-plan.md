@@ -472,6 +472,37 @@ and what's next.
   4. Two new `verified` Section B rows record both findings —
      the inotify limit floor for multi-cluster minikube on
      Fedora, and the stale-volume cascade failure mode
+- **r12b** (2026-05-17, kernel-limits finding propagated to §1
+  + audit script) — user request: "document the finding for
+  this <sysctl recipe>". r12a put the recipe inside §11 (both
+  in prose and as a pre-flight check in the demo); r12b makes
+  it discoverable from multiple reader paths:
+  1. **`_docs/01-prerequisites.md`** — new
+     "## Kernel limits for multi-cluster (needed for §11)"
+     subsection inserted right before "## Verification".
+     Explains why §3-§10 don't need it (one cluster, defaults
+     fine), why §11 does (two clusters), the symptom log line,
+     the `sysctl`-not-ulimit distinction (since LimitNOFILE
+     wouldn't have fixed it), the full
+     `/etc/sysctl.d/99-kubernetes.conf` recipe, the
+     verification command, and cross-references to the audit
+     script + §11 demo pre-flight
+  2. **`scripts/audit-fedora-prereqs.sh`** — new "kernel
+     limits" section reads the current inotify values via
+     `sysctl -n` and prints either `✓ OK for running a second
+     minikube profile (§11)` (if ≥256 instances and ≥131072
+     watches) or `⚠ defaults — fine for §3-§10 but NOT for §11`
+     with the full remediation recipe inline. So users running
+     `./scripts/audit-fedora-prereqs.sh` for any reason now
+     also get a §11-readiness check
+  3. **`_docs/11-istio.md`** — existing
+     "Before you start: kernel inotify limits" subsection now
+     leads with a callout block pointing back to §1 as the
+     canonical recipe. §11-jumpers still get all the
+     information; §1-readers see the topic once with §11
+     cross-references. No new Section B rows needed (r12a's
+     two verified rows cover both findings); r12b is
+     pure-documentation propagation
 
 **Open, priority-ordered:**
 
