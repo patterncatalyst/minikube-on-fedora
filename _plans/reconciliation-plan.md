@@ -93,6 +93,7 @@ Fedora 44.
 | **verified (Fedora 44)** | `minikube addons enable ingress` brings up NGINX ingress-nginx pods         | §5      | r06 verification recipe: enabled ingress, three pods observed (1 controller Running, 2 admission jobs Completed) ✓ |
 | **verified (Fedora 44)** | `minikube addons enable dashboard` + `minikube dashboard --url` returns a URL | §5     | r06 verification recipe: enabled dashboard, `minikube dashboard --url` returned `http://127.0.0.1:40735/...` ✓ |
 | **verified (Fedora 44)** | UBI application images (e.g. `ubi9/nginx-124`) are s2i builders — not directly runnable in plain Kubernetes | §6 | r07 user run: default CMD `/usr/libexec/s2i/run` crashloops; correct approach is to build our own image from a standard UBI base (r07a) |
+| **verified (Fedora 44)** | RHEL/UBI nginx 1.20 (`microdnf install nginx`) defaults to logging to `/var/log/nginx/*.log` files, not stdout/stderr | §6 | r07a user run: container crashloop only surfaced a startup warning via `kubectl logs`; runtime errors went to files invisible to kubectl. Custom `nginx.conf` in r07c logs to `/dev/stdout` and `/dev/stderr` |
 | unverified              | `minikube image build` builds and caches an image visible to the cluster's kubelet | §6 | r07a demo step; promote when `examples/06-deploy-nginx-kubectl/demo.sh` passes |
 | unverified              | A two-stage Containerfile (ubi9 → ubi9-minimal) produces a working nginx image | §6 | r07a Containerfile; promote on demo pass |
 | unverified              | `ubi9/ubi-minimal` installs nginx via `microdnf` without subscription-manager | §6 | r07a build step; promote on demo pass |
@@ -257,6 +258,41 @@ and what's next.
      new `verified` claim recorded that UBI app images aren't
      directly runnable in plain Kubernetes (learned from the r07
      failure)
+- **r07c** (2026-05-17, demo-fix + diagnostic-improvement) — r07a
+  demo failed with `CrashLoopBackOff`; `kubectl logs` showed only
+  a startup warning (`the "user" directive makes sense only if
+  the master process runs with super-user privileges`) followed
+  by silence. The build itself succeeded and the multi-stage
+  Containerfile worked as designed. Root cause identified from
+  the silence: **RHEL/UBI nginx writes access.log and error.log
+  to `/var/log/nginx/*.log` files by default, not stdout/stderr**
+  — so any runtime failure (the most likely being a port-bind
+  permission denial because my sed substitutions in r07a didn't
+  reliably patch the nginx.conf format) lands in a file kubectl
+  logs can't see. The fix abandons the sed approach entirely:
+  1. New `examples/06-deploy-nginx-kubectl/nginx.conf` — a
+     custom minimal config: logs to `/dev/stdout` and
+     `/dev/stderr`, pid file in `/tmp`, all `*_temp_path`
+     directives in `/tmp`, single server block on `:8080`, no
+     `user` directive at all. Generally useful as a starting
+     point for any containerized nginx
+  2. `Containerfile` simplified — drops the brittle sed pipeline
+     in favor of `COPY nginx.conf /etc/nginx/nginx.conf`. No
+     more dependence on the package's nginx.conf formatting
+  3. `USER 1001:0` (with explicit GID 0) replaces `USER 1001`
+     — the bare form may resolve to GID 1001 on container
+     runtimes that treat unknown UIDs that way, defeating any
+     group-0 permission scheme. With the new nginx.conf the
+     issue is mostly moot (logs and pid go to world-writable
+     paths) but the explicit `:0` is the right OpenShift-
+     compatible pattern
+  4. §6 prose updated with a new "Why we ship our own nginx.conf"
+     subsection that explains the three problems with the
+     package default (file-logging hides runtime errors, /run
+     pid path, user directive warning) and shows the full
+     custom config. The diagnostic story is itself a useful
+     teaching point for anyone deploying a packaged daemon to
+     Kubernetes
 - **r08** (2026-05-17) — `_docs/07-services-nodeport.md` drafted
   (20-min section covering Service types comparison, NodePort
   mechanics, three patterns for reaching the NodePort, the

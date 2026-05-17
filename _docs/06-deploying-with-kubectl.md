@@ -128,21 +128,18 @@ RUN microdnf install -y nginx && \
     microdnf clean all && \
     rm -rf /var/cache/dnf /var/cache/yum
 
-# Reconfigure for non-root operation: listen on 8080 (no
-# CAP_NET_BIND_SERVICE needed), PID file in /tmp, working
-# directories group-writable.
-RUN sed -i \
-        -e 's/listen[[:space:]]\+80[[:space:]]*default_server;/listen 8080 default_server;/' \
-        -e 's|listen[[:space:]]\+\[::\]:80[[:space:]]*default_server;|listen [::]:8080 default_server;|' \
-        -e 's|^pid[[:space:]]\+.*$|pid /tmp/nginx.pid;|' \
-        /etc/nginx/nginx.conf && \
-    chgrp -R 0 /var/lib/nginx /var/log/nginx /usr/share/nginx/html && \
-    chmod -R g+rwX /var/lib/nginx /var/log/nginx /usr/share/nginx/html
+# Replace the package's default nginx.conf with our minimal one (see
+# next subsection)
+COPY nginx.conf /etc/nginx/nginx.conf
 
 # Copy the staged content from the builder stage
 COPY --from=builder /build/index.html /usr/share/nginx/html/index.html
 
-USER 1001
+# Document root readable by any UID (already world-readable at 755;
+# belt-and-suspenders)
+RUN chmod -R a+rX /usr/share/nginx/html
+
+USER 1001:0
 EXPOSE 8080
 CMD ["nginx", "-g", "daemon off;"]
 ```
@@ -153,16 +150,86 @@ A few notes on the rationale:
   runtime image is more minimal than the builder (or fully distroless
   like UBI Micro), there may be no `/bin/sh` for `RUN` to invoke.
   Always-`COPY` is a robust habit
-- **`USER 1001`** — running as non-root inside the container is
-  defense in depth. The image is also running on a rootless podman
-  host (so root-in-container maps to an unprivileged user on the
-  host anyway), but in-container non-root is still a good habit
-- **PID file in `/tmp`** — nginx's default `pid /run/nginx.pid;` is
-  only writable as root. `/tmp` is world-writable on UBI Minimal
-- **Group-writable working directories** — `chgrp 0` + `g+rwX` is
-  the OpenShift-compatible pattern: a USER on any UID in group 0
-  can write the files nginx needs. Conventional in Red Hat container
-  images even when you're not running on OpenShift
+- **`COPY nginx.conf` overrides the package's default** — see the
+  next subsection for why we ship our own. Briefly: the default
+  RHEL nginx config logs to files under `/var/log/nginx` that
+  `kubectl logs` can't see, uses `/run/nginx.pid` (root-only), and
+  has a `user nginx;` directive that warns when running as non-root
+- **`USER 1001:0`** — UID 1001 with explicit GID 0. The `:0` part
+  matters: a bare `USER 1001` may result in GID 1001 (depending on
+  the runtime's handling of UIDs absent from `/etc/passwd`), which
+  breaks any group-0 permission scheme. OpenShift's pattern is "any
+  UID, always GID 0", and `1001:0` is the plain-Kubernetes
+  equivalent
+
+### Why we ship our own nginx.conf
+
+The default `/etc/nginx/nginx.conf` from the RHEL/UBI nginx package
+needs three changes for a container running as non-root with Pods
+that `kubectl logs` can introspect:
+
+1. **Logs to stdout/stderr, not files.** Default RHEL nginx writes
+   `access.log` and `error.log` under `/var/log/nginx/`. Those
+   files exist inside the container's filesystem; `kubectl logs`
+   only reads container stdout/stderr. When something goes wrong
+   at runtime — a port-bind permission denied, a worker crash —
+   the error message lands in a file you can't see, and the Pod
+   crash-loops with no obvious cause
+2. **PID file in `/tmp`, not `/run`.** Default is `/run/nginx.pid`
+   which is only writable as root
+3. **Drop the `user` directive.** The default has `user nginx;` to
+   drop privileges from root to the `nginx` user after binding
+   port 80. When we're already running as USER 1001, the directive
+   does nothing useful and nginx warns about it on startup
+
+`examples/06-deploy-nginx-kubectl/nginx.conf` makes those three
+fixes and a fourth: it points all `*_temp_path` directives at
+`/tmp/nginx-*`. nginx allocates these temp dirs on startup
+regardless of whether your workload uses them — for buffering
+large request bodies, proxy responses, FastCGI responses, etc. The
+defaults reference `/var/lib/nginx/tmp/*` which our non-root user
+can't write. Pointing them at `/tmp` removes the dependency on
+`/var/lib/nginx` entirely.
+
+```nginx
+worker_processes  auto;
+error_log         /dev/stderr  warn;
+pid               /tmp/nginx.pid;
+
+events {
+    worker_connections  1024;
+}
+
+http {
+    include            /etc/nginx/mime.types;
+    default_type       application/octet-stream;
+    access_log         /dev/stdout;
+    sendfile           on;
+    keepalive_timeout  65;
+
+    client_body_temp_path  /tmp/nginx-client-body;
+    proxy_temp_path        /tmp/nginx-proxy;
+    fastcgi_temp_path      /tmp/nginx-fastcgi;
+    uwsgi_temp_path        /tmp/nginx-uwsgi;
+    scgi_temp_path         /tmp/nginx-scgi;
+
+    server {
+        listen       8080  default_server;
+        listen       [::]:8080  default_server;
+        server_name  _;
+        root         /usr/share/nginx/html;
+
+        location / {
+            index  index.html;
+        }
+    }
+}
+```
+
+Same shape as the package default, just rewritten to be friendly to
+non-root operation and to `kubectl logs`. Worth saving as a starting
+point for your own containerized nginx deployments — the principles
+generalize.
 
 ### Loading the image into minikube
 

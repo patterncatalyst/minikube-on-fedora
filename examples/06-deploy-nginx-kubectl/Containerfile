@@ -3,9 +3,8 @@
 # Multi-stage build: UBI 9 builder → UBI 9 Minimal runtime.
 #
 # Both base images are freely redistributable per Red Hat's UBI EULA;
-# neither requires subscription-manager registration to install packages
-# from the public UBI repos (this is what distinguishes UBI from full
-# RHEL container images).
+# neither requires subscription-manager registration to install
+# packages from the public UBI repos.
 #
 # Why multi-stage for a static-content nginx?
 #   The pattern scales naturally to real workloads where the builder
@@ -42,29 +41,29 @@ RUN microdnf install -y nginx && \
     microdnf clean all && \
     rm -rf /var/cache/dnf /var/cache/yum
 
-# Reconfigure nginx for non-root operation:
-#   1. Listen on 8080 instead of 80 (no CAP_NET_BIND_SERVICE needed)
-#   2. PID file in /tmp (writable by any user)
-#   3. Group-writable permissions on the working directories so a
-#      non-root USER can write logs and temp files
-RUN sed -i \
-        -e 's/listen[[:space:]]\+80[[:space:]]*default_server;/listen 8080 default_server;/' \
-        -e 's|listen[[:space:]]\+\[::\]:80[[:space:]]*default_server;|listen [::]:8080 default_server;|' \
-        -e 's|^pid[[:space:]]\+.*$|pid /tmp/nginx.pid;|' \
-        /etc/nginx/nginx.conf && \
-    chgrp -R 0 /var/lib/nginx /var/log/nginx /usr/share/nginx/html && \
-    chmod -R g+rwX /var/lib/nginx /var/log/nginx /usr/share/nginx/html
+# Replace the default nginx.conf with our minimal version. Reasoning
+# is in the head comment of the nginx.conf file — short version: the
+# default RHEL nginx.conf has a `user nginx;` directive (warns for
+# non-root), logs to files under /var/log/nginx (which kubectl logs
+# can't see), and uses /run for the pid file (root-only). Our config
+# fixes all three.
+COPY nginx.conf /etc/nginx/nginx.conf
 
 # Copy the staged content from the builder stage. This is the
 # "COPY --from=builder" pattern that keeps the runtime image clean of
 # any build-time scaffolding.
 COPY --from=builder /build/index.html /usr/share/nginx/html/index.html
 
-# Run as a non-root UID. OpenShift assigns arbitrary UIDs at runtime, so
-# UID 1001 is conventional rather than required — what matters is that
-# the directory permissions (chgrp 0 + g+rwX above) let any non-root
-# user write the files nginx needs.
-USER 1001
+# Make the document root readable by any UID. (Already world-readable
+# at 755 by default; this is belt-and-suspenders for safety.)
+RUN chmod -R a+rX /usr/share/nginx/html
+
+# Run as non-root with GID 0. OpenShift assigns arbitrary UIDs at
+# runtime, all in group 0; the `:0` here makes the same pattern work
+# in plain Kubernetes. With our custom nginx.conf, the only paths
+# nginx writes to are /tmp and /dev/std{out,err}, both world-writable;
+# no chgrp/chmod dance on /var/log/nginx or /var/lib/nginx is needed.
+USER 1001:0
 
 EXPOSE 8080
 
