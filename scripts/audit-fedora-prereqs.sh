@@ -12,7 +12,17 @@
 #   ./scripts/audit-fedora-prereqs.sh > /tmp/audit.txt # capture to file
 
 section() { printf '\n=== %s ===\n' "$*"; }
-maybe()   { "$@" 2>&1 || echo "(command failed or tool not present)"; }
+
+# Run a command if its first argument is on PATH; otherwise report
+# cleanly. Avoids bash's "command not found" stderr noise that the
+# r03 version of this script let through.
+maybe() {
+    if command -v "$1" >/dev/null 2>&1; then
+        "$@" 2>&1 || echo "  (command failed)"
+    else
+        echo "  ($1 not present)"
+    fi
+}
 
 section "platform"
 cat /etc/fedora-release 2>&1 || echo "(not a Fedora system?)"
@@ -25,8 +35,10 @@ df -h ~ /
 
 section "container engine: podman"
 maybe podman --version
+# Note: CgroupVersion field was removed from podman info template in
+# podman 5.x; dropped to keep output clean.
 maybe podman info --format \
-  '{{.Host.OS}} {{.Host.Arch}} rootless={{.Host.Security.Rootless}} cgroupVersion={{.Host.CgroupVersion}}'
+  '{{.Host.OS}} {{.Host.Arch}} rootless={{.Host.Security.Rootless}}'
 
 section "container engine: docker CLI (optional)"
 maybe docker --version
@@ -44,15 +56,16 @@ section "current versions (where installed)"
 maybe minikube version
 maybe kubectl version --client=true
 maybe helm version --short
-maybe istioctl version --remote=false 2>/dev/null
+maybe istioctl version --remote=false
 
 section "what's in Fedora 44 dnf repos"
-for pkg in minikube kubectl kubernetes-client helm stern kubectx; do
+for pkg in minikube kubectl kubernetes-client helm stern kubectx httpie yq; do
     printf '\n--- dnf info %s ---\n' "$pkg"
-    dnf info "$pkg" 2>&1 \
-      | awk '/^Name|^Version|^Release|^Repository|^Summary/{print}' \
-      | head -10
-    if ! dnf info "$pkg" >/dev/null 2>&1; then
+    if dnf info "$pkg" >/dev/null 2>&1; then
+        dnf info "$pkg" 2>&1 \
+          | awk '/^Name|^Version|^Release|^Repository|^Summary/{print}' \
+          | head -10
+    else
         echo "(no package named $pkg in current repos)"
     fi
 done
