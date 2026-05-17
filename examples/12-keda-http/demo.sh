@@ -236,17 +236,38 @@ HEY_SUMMARY=$(echo "${HEY_OUTPUT}" | grep -E "Summary|Total:|Requests/sec:|Statu
 info "hey summary:"
 echo "${HEY_SUMMARY}" | sed 's/^/    /'
 
-# Parse hey's status code distribution. The hey output has a
-# "Status code distribution:" section listing each status code with
-# its count. We want ALL responses to be 200.
-STATUS_LINES=$(echo "${HEY_OUTPUT}" | awk '/^  Status code distribution:/,/^$/' | grep -E '^\s+\[[0-9]+\]' || true)
-BAD_STATUSES=$(echo "${STATUS_LINES}" | grep -vE '^\s+\[2[0-9][0-9]\]' || true)
-TOTAL_OK=$(echo "${STATUS_LINES}" | grep -E '^\s+\[200\]' | awk '{print $2}' | head -1)
-TOTAL_OK="${TOTAL_OK:-0}"
+# Parse hey's status code distribution. hey emits the section header
+# at column 0 (no leading whitespace), followed by lines like
+# `  [200]\t500 responses` (2-space indent, tab separator).
+#
+# Two parsing gotchas this code now handles:
+# 1. Don't anchor on leading whitespace before "Status code distribution:"
+#    — earlier versions used `awk '/^  Status...'` which never matched
+#    because hey outputs it at column 0
+# 2. Every pipe ending in grep needs `|| true` to suppress nonzero exit
+#    codes when there's nothing to match. Without it, `set -e` + `pipefail`
+#    aborts the script silently before the assertion code runs
 
-if [[ -n "${BAD_STATUSES}" ]]; then
+# Find every "[CODE]\tCOUNT responses" line anywhere in the output.
+STATUS_LINES=$(echo "${HEY_OUTPUT}" \
+    | grep -E '\[[0-9]+\][[:space:]]+[0-9]+[[:space:]]+responses' \
+    || true)
+
+# 2xx lines (good), non-2xx (bad)
+GOOD_LINES=$(echo "${STATUS_LINES}" | grep -E '\[2[0-9][0-9]\]' || true)
+BAD_LINES=$(echo "${STATUS_LINES}" | grep -vE '\[2[0-9][0-9]\]' || true)
+# Strip empty lines (grep -v of empty input can yield blank)
+BAD_LINES=$(echo "${BAD_LINES}" | grep -v '^[[:space:]]*$' || true)
+
+# Sum the 2xx response counts. Column 2 of each line is the count.
+TOTAL_OK=0
+if [[ -n "${GOOD_LINES}" ]]; then
+    TOTAL_OK=$(echo "${GOOD_LINES}" | awk '{sum += $2} END {print sum+0}')
+fi
+
+if [[ -n "${BAD_LINES}" ]]; then
     info "hey returned non-2xx responses:"
-    echo "${BAD_STATUSES}" | sed 's/^/    /'
+    echo "${BAD_LINES}" | sed 's/^/    /'
     info ""
     info "Interceptor logs (last 30 lines):"
     kubectl logs -n keda -l app.kubernetes.io/component=interceptor \

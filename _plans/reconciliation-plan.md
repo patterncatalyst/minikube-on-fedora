@@ -1062,16 +1062,75 @@ have to derive them.
   Verified row count: **103** (up from 100). One additional
   promotion expected on r13d demo re-run
 
+- **r13e** (2026-05-17, §12 HTTP — silent demo abort due to
+  parsing bugs) — fifth Phase 5 sub-iteration. With r13d's
+  hey `-host` fix in place, the routing finally worked end
+  to end (500/500 returned HTTP 200, replicas climbed to 1
+  then KEDA would have scaled it back to 0). But the demo
+  script aborted silently right after printing the hey
+  summary — no SUCCESS banner, no scale-down phase, just an
+  immediate jump to the cleanup trap.
+
+  Two compounded bugs in the r13c parsing block:
+  - **Awk pattern requires 2 leading spaces** —
+    `awk '/^  Status code distribution:/,/^$/'` expected
+    `"  Status code distribution:"` but hey outputs it at
+    column 0. So `STATUS_LINES` was always empty regardless
+    of what hey actually printed
+  - **Missing `|| true` on `TOTAL_OK` pipe** — with
+    `STATUS_LINES` empty, the pipe
+    `echo "${STATUS_LINES}" | grep -E '\[200\]' | awk ... | head -1`
+    had grep return nonzero (no match). Under
+    `set -e + pipefail`, that nonzero exit propagated from
+    inside `$(...)` and aborted the script. The error went
+    nowhere because `fail` (which prints to stderr) was
+    never reached. Bash quietly exited
+
+  Fixes in r13e (`examples/12-keda-http/demo.sh` parsing block):
+  - Parse strategy switched from "extract a section, then grep
+    inside it" to "find every status-code line directly across
+    the whole hey output". Pattern:
+    `grep -E '\[[0-9]+\][[:space:]]+[0-9]+[[:space:]]+responses'`
+  - Sum the success counts via `awk '{sum += $2} END {print
+    sum+0}'` (handles multiple 2xx codes if hey ever emits
+    them separately, e.g., [200] and [204])
+  - Every grep pipeline now ends in `|| true` so a missing
+    section can't silently abort
+  - Long comment block above the parsing explaining both
+    gotchas — "earlier versions used awk '/^  Status...' which
+    never matched" and "every pipe ending in grep needs ||
+    true to suppress nonzero exit codes when there's nothing
+    to match"
+
+  Local test harness verified three cases:
+  1. Real hey success output (tab-separated): TOTAL_OK=500,
+     no BAD_LINES → would pass
+  2. All-404 output: TOTAL_OK=0, BAD_LINES populated → would
+     fail with the "non-2xx responses" diagnostic dump
+  3. Garbage/empty hey output: TOTAL_OK=0, BAD_LINES empty
+     → would fail honestly with "fewer than half succeeded"
+     rather than silently aborting
+
+  No promotions yet. The HTTP demo's user-facing behavior
+  on the previous r13d run was actually fine end-to-end
+  (routing worked, all 500 hey requests succeeded), but
+  the assertions never reached the scale-down phase because
+  the script aborted earlier. Once r13e is applied and the
+  demo runs through to `SUCCESS`, three rows promote:
+  hey load drives scale-up, scale-down after scaledownPeriod,
+  and Section C `examples/12-keda-http/`
+
+  Verified row count: **103** (unchanged)
+
 **Open, priority-ordered:**
 
 1. **Re-run `examples/12-keda-http/demo.sh`** after applying
-   r13d. With the `-host` fix in place, the full 0→N→0
-   lifecycle should complete cleanly: hey sends sustained
-   load that hits nginx, KEDA scales up (probably to max=5
-   since concurrency=50 / targetValue=5), nginx serves all
-   500 requests, KEDA scales back to 0 after
-   `scaledownPeriod`. On `✓ SUCCESS`, 3 more Section B rows
-   promote + Section C `examples/12-keda-http/`
+   r13e. With the parsing fix in place, the demo should
+   complete past the hey summary, through the scale-down
+   wait, to a real `✓ SUCCESS`. On confirmed clean run,
+   3 more Section B rows promote + Section C
+   `examples/12-keda-http/` → verified row count 106,
+   **§12 fully complete**
 2. Optional: §10 row promotions, §8 PV auto-delete, §7
    leftovers — low priority
 3. **r14–r16** — tail sections (§13 wrap-up, §14
