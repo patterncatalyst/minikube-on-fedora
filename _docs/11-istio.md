@@ -327,29 +327,56 @@ nginx-istio-xxxxxxx-aaaaa     2/2     Running   0          12s
 nginx-istio-xxxxxxx-bbbbb     2/2     Running   0          12s
 ```
 
-**`READY 2/2`** — that's the key difference. Each Pod has two
-containers now: the nginx application (one) and the
-`istio-proxy` Envoy sidecar (two).
+**`READY 2/2`** — that's the key visual indicator. The Pod now has
+two containers contributing to its readiness: the nginx
+application and the `istio-proxy` Envoy sidecar.
 
-`kubectl describe pod` confirms:
+> **Sidebar: native sidecars.** Where istio-proxy *lives* in the
+> Pod spec depends on the Kubernetes version. **Kubernetes 1.28+
+> with Istio 1.29+** (your situation) uses *native sidecars*
+> ([KEP-753](https://kep.dev/sig-node/753)): the sidecar is an
+> init container with `restartPolicy: Always` rather than a main
+> container. Two practical consequences:
+>
+> 1. `kubectl get pods` still shows `2/2` — the Kubernetes
+>    readiness accounting counts native sidecars in the totals
+> 2. JSONPath queries against `.status.containerStatuses[]` will
+>    NOT find istio-proxy. It's in `.status.initContainerStatuses[]`,
+>    or `.spec.initContainers[]` on the spec side
+>
+> If you want to verify injection in a script, look at both
+> `.spec.containers[*].name` and `.spec.initContainers[*].name`
+> for `istio-proxy`. The §11 demo does this. On pre-1.28
+> Kubernetes, istio-proxy is still injected as a main container;
+> the demo's spec-based check handles both modes.
+
+`kubectl describe pod` confirms the layout — note where
+istio-proxy appears:
 
 ```
 Init Containers:
   istio-init:
-    Image:  docker.io/istio/proxyv2:1.29.2
+    Image:           docker.io/istio/proxyv2:1.29.2
+    State:           Terminated (Completed)
+    Restart Count:   0
+    ...
+  istio-proxy:
+    Image:           docker.io/istio/proxyv2:1.29.2
+    State:           Running
+    Restart Policy:  Always              ← this makes it a native sidecar
     ...
 Containers:
   nginx:
-    Image:  nginx-custom:v1
-    ...
-  istio-proxy:
-    Image:  docker.io/istio/proxyv2:1.29.2
+    Image:           nginx-custom:v1
+    State:           Running
     ...
 ```
 
 The `istio-init` init container runs once (sets up iptables to
-redirect traffic through Envoy), exits. `istio-proxy` runs as
-the sidecar for the Pod's lifetime.
+redirect traffic through Envoy), exits. `istio-proxy` runs for
+the Pod's lifetime — listed under "Init Containers" because it
+runs init-first, but with `restartPolicy: Always` so it never
+"completes" the way a normal init container does.
 
 ### Inspecting the sidecar
 

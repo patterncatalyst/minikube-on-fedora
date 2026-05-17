@@ -134,9 +134,9 @@ Fedora 44.
 | **verified (Fedora 44)** | A dedicated `istio` minikube profile with `--memory=6g --cpus=4 --rootless=true --container-runtime=containerd` starts cleanly on Fedora 44 | §11 | r12a/r12b user run (with inotify limits raised): minikube start completed, kubelet ready, kubectl reachable; "Done! kubectl is now configured to use 'istio' cluster" |
 | **verified (Fedora 44)** | `istioctl install --set profile=demo -y` brings up istiod + ingressgateway + egressgateway with all three Pods Running within ~30s | §11 | r12a/r12b user run: "Istio core / Istiod / Egress gateways / Ingress gateways installed" + "Installation complete"; all three Pods 1/1 Running |
 | **verified (Fedora 44)** | The Istio sidecar-injector `MutatingWebhookConfiguration` registers AFTER istiod's Deployment reaches `condition=Available` — there is a brief window (typically 2-10s) where the API server has the webhook config but its `caBundle` is empty, during which sidecar injection silently no-ops | §11 | r12a/r12b user run: nginx Pod deployed immediately after `kubectl wait Available` succeeded, came up with one container (no sidecar). Diagnostic chain matched the well-known Istio install-then-deploy race. r12c demo now polls `mutatingwebhookconfiguration/istio-sidecar-injector` for non-empty `.webhooks[0].clientConfig.caBundle` before deploying workloads; also adds buffer sleep after namespace label + diagnostic-dump + retry-once on injection failure |
-| unverified              | Labeling `default` namespace `istio-injection=enabled` causes new Pods to be sidecar-injected (`READY 2/2`) | §11 | r12 demo claim; r12c webhook-readiness fix should unblock; promote when full demo passes |
+| **verified (Fedora 44)** | Labeling `default` namespace `istio-injection=enabled` causes new Pods to be sidecar-injected | §11 | r12c user run: nginx-istio Pod created with `sidecar.istio.io/status` annotation populated showing `initContainers:[istio-init, istio-proxy]` (native sidecar mode); istiod logs showed new xDS connection from the nginx Pod within 2s of creation |
+| **verified (Fedora 44)** | Istio 1.29+ on Kubernetes 1.28+ injects `istio-proxy` as a **native sidecar** ([KEP-753](https://kep.dev/sig-node/753)) — an init container with `restartPolicy: Always`, not as a main container. JSONPath checks against `.status.containerStatuses[]` or `.spec.containers[]` will MISS it; need to also check `.status.initContainerStatuses[]` / `.spec.initContainers[]`. Human-readable `kubectl get pods` READY column still shows `2/2` because native sidecars count toward readiness totals | §11 | r12c user run: Pod's `sidecar.istio.io/status` annotation showed `"initContainers":["istio-init","istio-proxy"]`, `"containers":null` — istiod's own injection-status report confirmed istio-proxy went into initContainers. r12d demo's check now reads both `.spec.containers[*].name` and `.spec.initContainers[*].name` so it works for both native-sidecar mode (current default in K8s 1.28+) and the older "main container" mode (still seen on K8s ≤1.27) |
 | **verified (Fedora 44)** | `scripts/setup-istio.sh` downloads + extracts Istio 1.29.2 and installs istioctl to `~/.local/bin/` | §11 | r12 user run: clean output through all 5 steps (directories, download via istio.io, istioctl install, symlink, PATH check); ended with `client version: 1.29.2` |
-| unverified              | Labeling `default` namespace `istio-injection=enabled` causes new Pods to be sidecar-injected (`READY 2/2`) | §11 | r12 demo claim; the central mesh-injection mechanism |
 | **verified (Fedora 44)** | minikube image cache is per-profile — `nginx-custom:v1` from the `minikube` profile is NOT visible on the `istio` profile | §11 | r12 user run: "image not present on istio; building from §6's Containerfile" → multi-stage build (ubi9 builder + ubi9-minimal runtime) completed in ~10s; image then available on istio profile |
 | unverified              | Bookinfo sample app deploys cleanly with all 4 microservices + 6 Pods reaching Available | §11 | r12 demo claim; first cross-profile use of upstream Istio sample images |
 | unverified              | `bookinfo-gateway.yaml` (Gateway + VirtualService) exposes productpage at `istio-ingressgateway:80` reachable via `kubectl port-forward` | §11 | r12 demo claim |
@@ -546,14 +546,54 @@ and what's next.
      learning); 5 other §11 rows promote based on user run
      output (profile start, istio install, setup-istio.sh,
      per-profile image cache)
+- **r12d** (2026-05-17, native sidecars finding + false-negative
+  check fix) — r12c user run got further: webhook-readiness check
+  passed (`caBundle populated after 1s`), namespace labeled, Pod
+  deployed. But the sidecar check failed twice on retry — except
+  the diagnostic dump revealed that **injection actually
+  succeeded both times**. The Pod's `sidecar.istio.io/status`
+  annotation explicitly showed `"initContainers":["istio-init",
+  "istio-proxy"], "containers":null`. istiod's logs showed new
+  xDS connections from the meshed Pod within 2s. The webhook
+  fired correctly; the check was looking in the wrong place.
+
+  Root cause: **Istio 1.29 on Kubernetes 1.28+ uses native
+  sidecars** (KEP-753) — istio-proxy is injected as an init
+  container with `restartPolicy: Always`, not as a main
+  container. The demo's jsonpath query
+  `'{.status.containerStatuses[*].name}'` reads only main
+  containers, so it returned just `nginx,` — false-negative.
+  Old pre-1.28 Istio docs (and many web search results) still
+  describe istio-proxy as a main container, which is now
+  outdated for current K8s versions.
+
+  r12d fixes:
+  1. `examples/11-istio/demo.sh` `check_sidecar_injected()` now
+     reads `.spec.containers[*].name` AND
+     `.spec.initContainers[*].name` (spec-based, works for both
+     native-sidecar mode and the legacy mode on K8s ≤1.27)
+  2. `_docs/11-istio.md` adds a sidebar callout under
+     "Sidecar in action" explaining native sidecars: where
+     istio-proxy lives, why JSONPath checks need to look in
+     both places, why `kubectl get pods` still shows `2/2`,
+     and what the corrected `kubectl describe pod` output
+     looks like (istio-proxy under "Init Containers:" with
+     `Restart Policy: Always`)
+  3. Two §11 Section B rows promoted to verified — namespace
+     injection works (the r12c diagnostic dump proved it),
+     plus the new native-sidecars finding gets its own row.
+     This is a genuinely useful piece of Istio knowledge worth
+     keeping in the plan: anyone scripting against post-1.29
+     Istio needs to know
 
 **Open, priority-ordered:**
 
-1. Re-run `examples/11-istio/demo.sh` after applying r12c. On
-   `✓ SUCCESS`, the remaining 6 §11 Section B rows promote
-   (namespace-label-injection, bookinfo deploy, gateway
-   exposure, the two routing assertions, analyze, context
-   save/restore) plus Section C `examples/11-istio/`
+1. Re-run `examples/11-istio/demo.sh` after applying r12d. The
+   Pod-injection check now uses the right jsonpath; should pass
+   instantly (no retry needed). On `✓ SUCCESS`, the remaining 5
+   §11 rows promote (bookinfo deploy, gateway exposure, the two
+   routing assertions, analyze) plus Section C
+   `examples/11-istio/`
 2. Optional: install the observability addons (`kubectl apply -f
    ~/.local/share/istio-current/samples/addons/`) and explore via
    `istioctl dashboard kiali`. Not a verification gate

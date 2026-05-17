@@ -266,10 +266,17 @@ dump_injection_diagnostics() {
 
 check_sidecar_injected() {
     NGINX_POD=$(kubectl get pod -l app=nginx-istio -o jsonpath='{.items[0].metadata.name}')
+    # Istio 1.29+ on Kubernetes 1.28+ uses "native sidecars" (KEP-753):
+    # istio-proxy is injected as an init container with
+    # restartPolicy=Always, not as a main container. So checking only
+    # .status.containerStatuses[] misses it. Look at the Pod spec,
+    # which is authoritative regardless of native-vs-classic sidecar
+    # mode — both .spec.containers[] and .spec.initContainers[].
     NGINX_CONTAINERS=$(kubectl get pod "${NGINX_POD}" \
-        -o jsonpath='{range .status.containerStatuses[*]}{.name},{end}')
-    case "${NGINX_CONTAINERS}" in
-        *nginx*istio-proxy*|*istio-proxy*nginx*)
+        -o jsonpath='{.spec.containers[*].name} {.spec.initContainers[*].name}' \
+        2>/dev/null)
+    case " ${NGINX_CONTAINERS} " in
+        *" istio-proxy "*)
             return 0
             ;;
         *)
@@ -282,7 +289,7 @@ step "deploying nginx-with-sidecar"
 deploy_nginx_with_sidecar
 
 if check_sidecar_injected; then
-    pass "nginx-istio Pod has nginx + istio-proxy (mesh injection working)"
+    pass "nginx-istio Pod has istio-proxy injected (mesh injection working — native sidecar mode in Istio 1.29+/K8s 1.28+)"
 else
     info "first deploy did not inject sidecar — Pod containers: ${NGINX_CONTAINERS}"
     info "dumping diagnostics, then retrying once after a brief pause"
@@ -291,7 +298,7 @@ else
     sleep 10
     deploy_nginx_with_sidecar
     if check_sidecar_injected; then
-        pass "nginx-istio Pod has nginx + istio-proxy on retry (mesh injection working)"
+        pass "nginx-istio Pod has istio-proxy injected on retry (mesh injection working)"
     else
         info "still no sidecar on retry — Pod containers: ${NGINX_CONTAINERS}"
         dump_injection_diagnostics
