@@ -145,6 +145,8 @@ Fedora 44.
 | **verified (Fedora 44)** | `virtual-service-all-v1.yaml` pins 100% of reviews traffic to v1 (verified via response-hash distribution: ≤3 distinct hashes across 10 samples) | §11 | r12e user run: **exactly 1 distinct hash** (`b6e5bbdddade...`) across 10 samples. productpage with only v1 reviews is fully deterministic — zero noise. Strongest mesh-routing assertion in the tutorial |
 | **verified (Fedora 44)** | `virtual-service-reviews-50-v3.yaml` (or `-jason-v2-v3.yaml` fallback) produces multiple distinct response patterns (≥2 distinct hashes / 20 samples) when applied to bookinfo traffic | §11 | r12e user run: 2 distinct hashes across 20 samples, 11/9 distribution (55/45%) between the v1 hash (`b6e5bbdddade...`) and the v3 hash (`0491712a6626...`). v3 also produced a single deterministic hash, suggesting current Bookinfo seeds randomness from request ID |
 | **verified (Fedora 44)** | kubectl context can be saved + restored across a demo run via `kubectl config use-context` (so `istio` profile work doesn't disturb `minikube` profile state) | §11 | r12e user run: demo started with `current kubectl context: minikube`, switched to `istio` for the work, and on exit ("cleanup: stopping port-forward..." → "restoring kubectl context to minikube") restored cleanly. §6-§9 demos remain runnable without manual switching |
+| **verified (Fedora 44)** | `kubectl apply -f $ISTIO_DIR/samples/addons/` installs Kiali, Prometheus, Grafana, Jaeger, and Loki cleanly on the `istio` profile in ~3-5 minutes | §11 | r12g user run: `deployment.apps/kiali condition met`, `prometheus condition met`, `grafana condition met`, `jaeger condition met` returned within timeout; `loki-0` StatefulSet `2/2 Running`. Current `samples/addons/` includes Loki alongside the canonical four; Kiali integrates with Prometheus + Loki + Jaeger for the unified observability view |
+| **verified (Fedora 44)** | Kiali Traffic Graph renders a live mesh visualization with traffic animation, success/error rates per edge, and namespace-scoped filtering. Switching the namespace dropdown from `istio-system` to `default` reveals the application call graph (productpage → details / reviews → ratings) with live request rates | §11 | r12g user run: 200-curl traffic loop against `/productpage` produced a Kiali Overview with 4 applications, climbing inbound-traffic sparkline, and a Traffic Graph showing istio-ingressgateway → productpage with 1.89 req/s sustained at 100% success. Screenshots captured in `assets/screenshots/kiali-{overview,traffic-graph}.png` |
 
 ## C. Testing matrix
 
@@ -656,21 +658,77 @@ docs in clearly-findable form. Now they're captured as verified
 knowledge in the reconciliation plan — future readers don't
 have to derive them.
 
+- ✅ **r12g** (2026-05-17, observability addons + §11 prose
+  addendum) — user ran the §11 observability addons step:
+  `kubectl apply -f $ISTIO_DIR/samples/addons/` installed
+  Kiali, Prometheus, Grafana, Jaeger, and Loki cleanly within
+  ~5 minutes; all four `kubectl wait deployment/<x>` calls
+  returned `condition met`. Loki StatefulSet showed `2/2
+  Running`. Then user generated 200 productpage requests
+  through the ingressgateway and opened Kiali; the dashboard
+  rendered both the Overview (showing namespace cards with
+  live inbound-traffic sparklines) and the Traffic Graph
+  (showing istio-ingressgateway → productpage at 1.89 req/s
+  100% success with traffic animation enabled).
+
+  Two screenshots captured:
+  - `assets/screenshots/kiali-overview.png` — namespace cards
+    showing `default: 4 applications` with climbing traffic
+    rate
+  - `assets/screenshots/kiali-traffic-graph.png` — live
+    Traffic Graph with green edges and the right-panel stats
+
+  Failure mode discovered along the way: the §11 demo's
+  cleanup trap deletes Bookinfo (workload + Gateway +
+  VirtualService) on exit, so opening Kiali immediately after
+  `✓ SUCCESS` shows the control plane but no application
+  traffic to graph, and `kubectl port-forward` to the
+  ingressgateway fails with `connection refused` because no
+  Gateway is configured. The §11 prose previously didn't
+  surface this — readers running the demo then exploring
+  Kiali would hit the same wall.
+
+  r12g fixes:
+  1. New `## Exploring with Kiali after the demo` subsection
+     inserted into `_docs/11-istio.md` between the existing
+     "Verification" and "Cleanup" sections. Explicit explanation
+     of why the trap deletes Bookinfo, full recipe to redeploy
+     for exploration (workload + Gateway + DestinationRules),
+     observability-addons install commands, Kiali walkthrough
+     with both screenshots embedded inline via Jekyll's
+     `relative_url` filter (the standard pattern; both image
+     tags are wrapped in `{% raw %}` blocks since the prose is
+     in `_docs/` and the rest of the §11 file is subject to
+     Liquid rendering), three interactive demonstrations to try
+     in Kiali (v1 pinning, fault injection, other dashboards),
+     and clean teardown commands at the end
+  2. Two screenshots committed at `assets/screenshots/kiali-{
+     overview,traffic-graph}.png`. ~120KB combined; well under
+     any reasonable repo-size budget
+  3. Two new `verified` Section B rows record the addons-install
+     working + the Kiali visualization working
+
+  Total verified row count after r12g: **85** (up from 83).
+  Section D priorities updated to remove the now-completed
+  observability item
+
 **Open, priority-ordered:**
 
 1. **r13** — §12 KEDA (optional section per PRD; "reference
-   material for KEDA + HTTP add-on"). Lighter than §11 — uses
-   the existing `minikube` profile (no second cluster), installs
-   via helm, demo will exercise scale-from-zero with `hey`
-2. Optional: install the §11 observability addons (`kubectl
-   apply -f ~/.local/share/istio-current/samples/addons/`) and
-   explore via `istioctl dashboard kiali`. Not a verification
-   gate; valuable for hands-on understanding of the mesh
-3. Optional: §10 row promotions (`which k9s`, `kubectl
+   material for KEDA + HTTP add-on"). Confirmed setup: existing
+   `minikube` profile (6 CPU / 16 GB / rootless / containerd /
+   podman). Allocated resources on idle profile: ~1050m CPU
+   requests, ~510Mi memory — plenty of headroom for Strimzi +
+   KEDA + scaled workloads. Per user direction: **Strimzi** for
+   Kafka (acknowledged "mixed results" historically — r13 plan
+   includes defensive scripting + an honest Bitnami fallback
+   note in prose); HTTP add-on demo uses `nginx-custom:v1` (the
+   same image as §6-§9, scale-from-zero with `hey`)
+2. Optional: §10 row promotions (`which k9s`, `kubectl
    completion zsh | head`, etc.) — low priority
-4. Optional: §8 PV auto-delete, §7 leftover claims — low
+3. Optional: §8 PV auto-delete, §7 leftover claims — low
    priority, can stay unverified
-5. **r14–r16** — tail sections (§13 wrap-up, §14
+4. **r14–r16** — tail sections (§13 wrap-up, §14
    troubleshooting?, §15 where-next-pointers), diagrams (paired
    `.svg` + `.excalidraw`), editorial pass across all section
    prose, final reconciliation refresh

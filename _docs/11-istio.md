@@ -598,6 +598,151 @@ minutes to come up and aren't critical for the routing exercises.
 Install them when you want the visual feedback; uninstall with
 `kubectl delete -f ~/.local/share/istio-current/samples/addons/`.
 
+## Exploring with Kiali after the demo
+
+Two practical notes for anyone who wants to spend time in Kiali
+visualizing the mesh after the `demo.sh` run completes:
+
+**The demo's cleanup trap deletes Bookinfo on exit.** This is by
+design — `demo.sh` is idempotent, leaves no leftover state on
+the `istio` profile, and any subsequent run starts fresh.
+**But it means the productpage and the routing rules are gone
+the moment the demo finishes.** If you open Kiali immediately
+after a `✓ SUCCESS` run, you'll see the mesh control plane
+(istio-ingressgateway, istiod, the gateways) but no application
+traffic to graph, and a `kubectl port-forward` to the
+ingressgateway will fail with "connection refused" because no
+Gateway resource is configured to make Envoy bind to port 8080.
+
+To explore Kiali with a live mesh, redeploy Bookinfo manually
+after the demo runs:
+
+```bash
+ISTIO_DIR=~/.local/share/istio-current
+kubectl config use-context istio
+
+# Redeploy the workload + Gateway + DestinationRules
+kubectl apply -f $ISTIO_DIR/samples/bookinfo/platform/kube/bookinfo.yaml
+kubectl wait --for=condition=Available --timeout=180s \
+    deployment/productpage-v1 deployment/details-v1 deployment/ratings-v1 \
+    deployment/reviews-v1 deployment/reviews-v2 deployment/reviews-v3
+kubectl apply -f $ISTIO_DIR/samples/bookinfo/networking/bookinfo-gateway.yaml
+kubectl apply -f $ISTIO_DIR/samples/bookinfo/networking/destination-rule-all.yaml
+```
+
+Now Bookinfo is running independently of the demo. Install the
+observability addons (Kiali / Prometheus / Grafana / Jaeger /
+Loki) which the demo deliberately doesn't install — they take
+3-5 minutes to come up and aren't required for the routing
+assertions:
+
+```bash
+kubectl apply -f $ISTIO_DIR/samples/addons/
+kubectl wait --for=condition=Available --timeout=300s \
+    deployment/kiali deployment/prometheus deployment/grafana deployment/jaeger \
+    -n istio-system
+```
+
+Generate some traffic so Kiali has data to graph:
+
+```bash
+kubectl port-forward -n istio-system service/istio-ingressgateway 8080:80 &
+for i in {1..200}; do curl -s http://127.0.0.1:8080/productpage >/dev/null; sleep 0.15; done
+```
+
+Open Kiali:
+
+```bash
+istioctl dashboard kiali
+```
+
+The Kiali UI opens at `http://localhost:20001/kiali/`. The
+**Overview** page shows namespace cards with live inbound
+traffic rates per namespace. The default namespace card should
+show `4 application` (productpage, details, ratings, reviews)
+with a climbing inbound-traffic sparkline as the curl loop
+runs:
+
+{% raw %}
+![Kiali Overview showing namespace cards with live traffic]({{ "/assets/screenshots/kiali-overview.png" | relative_url }})
+{% endraw %}
+
+Navigate to **Traffic Graph → Namespace: default** for the
+mesh visualization. With **Display → Traffic Animation** turned
+on, you see animated dots traveling along the edges between
+services — individual requests flowing through the mesh in
+near-real time. Green edges are healthy (100% success); errors
+and slowdowns show as yellow or red:
+
+{% raw %}
+![Kiali Traffic Graph showing live mesh traffic with success metrics]({{ "/assets/screenshots/kiali-traffic-graph.png" | relative_url }})
+{% endraw %}
+
+The right-hand panel shows aggregate stats for the selected
+subgraph — requests/second, success rate, error rate, and a
+histogram of HTTP status codes. Switch namespaces in the
+dropdown (from `istio-system` to `default`) to see the full
+bookinfo call graph: productpage as the hub, branching to
+details and reviews, with reviews further branching to ratings.
+
+A few interactive demonstrations worth trying in Kiali while
+it's open:
+
+1. **Apply v1 pinning** in another terminal:
+   ```bash
+   kubectl apply -f $ISTIO_DIR/samples/bookinfo/networking/virtual-service-all-v1.yaml
+   for i in {1..100}; do curl -s http://127.0.0.1:8080/productpage >/dev/null; sleep 0.1; done
+   ```
+   Kiali's graph redraws within 10-15 seconds. Traffic now
+   flows exclusively to `reviews-v1`; `reviews-v2` and
+   `reviews-v3` either drop off entirely or appear greyed out
+
+2. **Apply fault injection** to see what unhealthy looks like:
+   ```bash
+   kubectl apply -f $ISTIO_DIR/samples/bookinfo/networking/virtual-service-ratings-test-delay.yaml
+   for i in {1..50}; do curl -s -o /dev/null http://127.0.0.1:8080/productpage; done
+   ```
+   The ratings edge goes yellow or red as Kiali notices the 7s
+   artificial delay. Refresh productpage in a browser — the
+   ratings panel takes seven seconds to render
+
+3. **Other dashboards** are one command each:
+   - `istioctl dashboard grafana` — pre-built dashboards for
+     mesh metrics
+   - `istioctl dashboard jaeger` — distributed traces of
+     productpage requests through the call graph
+   - `istioctl dashboard prometheus` — raw metrics queries, for
+     the curious
+
+This is the moment §11 stops being abstract: every Service-to-
+Service call you've configured through DestinationRule and
+VirtualService is happening in front of you, with live
+telemetry, mTLS, and request-level observability — all without
+any application code knowing the mesh exists.
+
+When you're done exploring, remove the addons (they're heavy
+and not needed for §12 or anything later in the tutorial):
+
+```bash
+kubectl delete -f $ISTIO_DIR/samples/addons/
+```
+
+This keeps Istio itself installed; just removes the four
+observability tools. To also clean up the manually-redeployed
+Bookinfo:
+
+```bash
+kubectl delete -f $ISTIO_DIR/samples/bookinfo/networking/
+kubectl delete -f $ISTIO_DIR/samples/bookinfo/platform/kube/bookinfo.yaml
+```
+
+Then switch back to the `minikube` profile for the rest of the
+tutorial:
+
+```bash
+kubectl config use-context minikube
+```
+
 ## Cleanup
 
 The §11 demo's trap cleans up Bookinfo, our nginx, and the
