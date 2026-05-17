@@ -17,6 +17,8 @@ the Service from your host, scaled the Deployment up and down, and
 rolled out a new image version. Same vocabulary you'll use for
 every real workload after this.
 
+![Kubernetes workload primitives]({{ "/assets/diagrams/06-k8s-primitives.svg" | relative_url }})
+
 ## The mental model: Pods, ReplicaSets, Deployments
 
 Three Kubernetes objects work together to run your workload. Each

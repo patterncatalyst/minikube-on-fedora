@@ -34,6 +34,8 @@ is the right primitive. By the end you'll have:
    based on HTTP traffic (via the KEDA HTTP add-on), then back
    to 0 after the load stops
 
+![HPA vs KEDA scaling models]({{ "/assets/diagrams/12-hpa-vs-keda.svg" | relative_url }})
+
 ## HPA vs KEDA
 
 The default HPA looks like this:
@@ -520,6 +522,8 @@ drops to zero, after 30 seconds of idle, KEDA scales down to 0.
 The visible signature of success: replica count climbs from 0,
 peaks at some value, then drops back to 0. The demo prints the
 replica count at each phase for transparency.
+
+![KEDA HTTP add-on data flow]({{ "/assets/diagrams/12-keda-http-addon.svg" | relative_url }})
 
 ## Pattern B: HTTP request scaling with the KEDA HTTP add-on
 

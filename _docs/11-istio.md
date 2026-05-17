@@ -27,6 +27,8 @@ avoid stepping on §6-§9 work. By the end you'll have:
 6. Optional: Kiali / Prometheus / Grafana / Jaeger for visualizing
    the mesh
 
+![Istio service mesh — control plane and data plane]({{ "/assets/diagrams/11-istio-mesh.svg" | relative_url }})
+
 ## What's a service mesh
 
 In §6-§9, when one Pod talked to another (e.g., a Deployment of

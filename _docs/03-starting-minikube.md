@@ -17,6 +17,8 @@ commands the prose walks through, packaged as a smoke test.
 This section assumes §2 is complete (minikube, kubectl, and the
 supporting tools are on `PATH`).
 
+![minikube on Fedora 44 topology]({{ "/assets/diagrams/03-minikube-topology.svg" | relative_url }})
+
 ## Set sensible defaults
 
 Before the first `minikube start`, set defaults so you don't have

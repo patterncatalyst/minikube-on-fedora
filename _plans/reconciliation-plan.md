@@ -1455,25 +1455,75 @@ have to derive them.
 
   Verified row count unchanged at **107**.
 
+- **r16b** (2026-05-17, prose splices via auto-script) —
+  ships `scripts/splice-diagrams.sh`, a one-shot bash
+  script that inserts SVG embed references into §3, §6,
+  §11, §12 prose. r16 shipped the assets and r16a fixed
+  the §14 + diagram clarity issues, but neither updated
+  the section prose to actually reference the diagrams,
+  leaving them unembedded. User caught this on review.
+
+  Script design:
+  - Idempotent — uses `grep -qF "$diagram"` to skip files
+    already referencing the embed. Safe to re-run any
+    number of times.
+  - Insertion heuristic — finds front matter close
+    (second `---`), then first `## ` heading after that,
+    then inserts the embed (with surrounding blank lines)
+    just before that heading. Net effect: diagram appears
+    after the section's intro paragraph but before the
+    first sub-section.
+  - §12 special case — the section has two diagrams.
+    HPA-vs-KEDA inserts before first `## `. HTTP add-on
+    uses anchor regex `^## .*[Hh][Tt][Tt][Pp]` to match
+    the HTTP-related sub-heading specifically.
+  - Fallback — if no anchor matches, the diagram is
+    appended at EOF with a warning, so it's still visible
+    and the user can move it manually.
+  - Missing-file handling — warns rather than crashing if
+    a target `_docs/NN-*.md` doesn't exist.
+
+  Smoke-tested in a fake repo before shipping: confirmed
+  correct insertion location for §3 and both §12
+  diagrams, plus confirmed idempotent skip-on-rerun.
+
+  After user runs the script and reviews `git diff`,
+  diagrams will be visible at:
+  - §3: between the intro paragraph and the first sub-
+    section
+  - §6: same pattern — before first sub-section
+  - §11: same pattern
+  - §12: HPA-vs-KEDA before first sub-section; HTTP
+    add-on before the HTTP-related sub-section
+
+  If any placement is wrong, the embed is a single line of
+  Markdown and trivial to move manually.
+
+  Lesson recorded: the r16 reconciliation plan flagged
+  "pending prose splices" as a follow-up but didn't ship
+  them, leaving the diagrams stranded. For r17 final pass:
+  visit the deployed preview, eyeball every section, and
+  only then close out. Future projects: never ship assets
+  without their referencing prose in the same iteration.
+
+  Verified row count unchanged at **107**.
+
 **Open, priority-ordered:**
 
-1. **Prose splices for §3, §6, §11, §12** — embed the
-   SVGs into the relevant section prose. User can do these
-   inline with the r16/r16a apply step or pass me the
-   current ASCII text and I'll do them in a follow-up
-2. **r17** — Editorial pass. Read every section's prose
-   front-to-back. Tighten word choice, ensure consistent
-   voice ("you" for reader, passive otherwise), verify
-   cross-references between sections, sweep for stale TODO
-   markers, ensure each section's "Verification" subsection
-   points to the right example dir. Update the homepage's
-   section list if it was auto-generated from `_docs/*.md`
-   to reflect the now-complete §1-§15 set
-3. Optional: §10 row promotions (`which k9s` etc.) — low
+1. **r17** — Editorial pass + deployed-preview review.
+   Read every section's prose front-to-back. Tighten word
+   choice, ensure consistent voice ("you" for reader,
+   passive otherwise), verify cross-references between
+   sections, sweep for stale TODO markers, ensure each
+   section's "Verification" subsection points to the right
+   example dir. Update the homepage's section list if it
+   was auto-generated from `_docs/*.md` to reflect the
+   now-complete §1-§15 set. **Visit the deployed preview**
+   and eyeball every section's rendered output — both for
+   layout quality (diagrams placed sensibly, prose flow
+   reads well) and for any other kramdown / Liquid
+   collisions we may have missed
+2. Optional: §10 row promotions (`which k9s` etc.) — low
    priority, can stay unverified
-4. Optional: §8 PV auto-delete row, §7 leftovers — low
-   priority, can stay unverified
-4. Optional: §10 row promotions (`which k9s` etc.) — low
-   priority, can stay unverified
-5. Optional: §8 PV auto-delete row, §7 leftovers — low
+3. Optional: §8 PV auto-delete row, §7 leftovers — low
    priority, can stay unverified
