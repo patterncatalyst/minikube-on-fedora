@@ -86,11 +86,17 @@ Fedora 44.
 | **verified (Fedora 44)** | minikube under rootless podman additionally requires `--container-runtime=containerd` | §3 | r05b user output: rootless+default(docker)-runtime failed with `docker.service` start error; r05c sets containerd explicitly |
 | **verified (Fedora 44)** | kindnet CNI works under rootless podman + containerd on Fedora 44           | §3      | r05c user output: kindnet-4kmdd pod Running, node Ready, pod networking observed ✓ |
 | unverified              | `minikube pause/unpause/stop/delete` cluster-lifecycle commands work         | §3      | Pause/stop not exercised in driver-check; defer or add lifecycle demo later |
-| unverified              | `minikube profile list/start/delete -p NAME` profile lifecycle works         | §4      | r06 prose claim; profiles not exercised in driver-check; verify ad-hoc      |
+| **verified (Fedora 44)** | `minikube profile list/start/delete -p NAME` profile lifecycle works         | §4      | r06 verification recipe: `scratch` profile created with `--cpus=2 --memory=2048`, listed, deleted cleanly ✓ |
+| **verified (Fedora 44)** | Per-cluster `--cpus`/`--memory` flags override the global defaults          | §4      | r06 verification recipe: `scratch` came up with 2/2048 despite config defaults of 6/16384 ✓ |
 | unverified              | `minikube start --nodes=N` creates a multi-node cluster on rootless podman   | §4      | r06 prose claim; promote when first multi-node verification happens         |
-| unverified              | `minikube addons enable metrics-server` makes `kubectl top` work             | §5      | r06 prose claim; promote when first §5 walkthrough is run                   |
-| unverified              | `minikube addons enable ingress` brings up NGINX ingress-nginx pods          | §5      | r06 prose claim; promote when first ingress is observed running             |
-| unverified              | `minikube addons enable dashboard` + `minikube dashboard --url` returns a URL | §5     | r06 prose claim; promote when first dashboard access is observed            |
+| **verified (Fedora 44)** | `minikube addons enable metrics-server` makes `kubectl top` work            | §5      | r06 verification recipe: enabled metrics-server, `kubectl top nodes` returned `minikube 102m 0% 534Mi 0%` ✓ |
+| **verified (Fedora 44)** | `minikube addons enable ingress` brings up NGINX ingress-nginx pods         | §5      | r06 verification recipe: enabled ingress, three pods observed (1 controller Running, 2 admission jobs Completed) ✓ |
+| **verified (Fedora 44)** | `minikube addons enable dashboard` + `minikube dashboard --url` returns a URL | §5     | r06 verification recipe: enabled dashboard, `minikube dashboard --url` returned `http://127.0.0.1:40735/...` ✓ |
+| unverified              | UBI `registry.access.redhat.com/ubi9/nginx-124` is pullable from minikube's kicbase | §6 | r07 prose/manifest claim; promote when `examples/06-deploy-nginx-kubectl/demo.sh` passes |
+| unverified              | A two-replica Deployment with the manifest in §6 becomes `Available` within 3 minutes | §6 | r07 manifest claim; promote on demo pass |
+| unverified              | `kubectl port-forward service/nginx 18080:80` opens a working tunnel        | §6      | r07 demo claim; promote on demo pass                                        |
+| unverified              | `kubectl scale deployment/nginx --replicas=3` brings count to 3 Running pods | §6     | r07 demo claim; promote on demo pass                                        |
+| unverified              | UBI nginx default page contains "Test Page" or "nginx" markers              | §6      | r07 demo response check; promote on demo pass                               |
 
 ## C. Testing matrix
 
@@ -102,7 +108,7 @@ are still aspirational.
 | Status     | Example                              | Section | Notes                                                 |
 |------------|--------------------------------------|---------|-------------------------------------------------------|
 | **verified (Fedora 44)** | `examples/03-driver-check/`        | §3      | r05c user run: cluster up, all 8 kube-system pods Running, ✓ SUCCESS |
-| unverified | `examples/06-deploy-nginx-kubectl`   | §6      | Deploy UBI nginx via `kubectl apply`, hit NodePort    |
+| **in flight** | `examples/06-deploy-nginx-kubectl`   | §6      | Shipped in r07; awaiting user run on Fedora 44                          |
 | unverified | `examples/07-nodeport-service`       | §7      | Expose Deployment via NodePort, retrieve URL          |
 | unverified | `examples/08-persistent-volume`      | §8      | `hostPath` PV + dynamic PVC                           |
 | unverified | `examples/09-deploy-nginx-helm`      | §9      | Same UBI nginx via an authored small helm chart       |
@@ -155,41 +161,59 @@ and what's next.
   Final r05c demo run: cluster up on containerd 2.2.1, kindnet
   CNI, all 8 kube-system pods Running, ✓ SUCCESS
 
+- ✅ **r06** (2026-05-17) — `_docs/04-profiles-multi-node.md` +
+  `_docs/05-addons-dashboard.md` (small sections combined per
+  the plan). §3 polish: expected-output block aligned with
+  r05c user run; harmless kic-artifacts callout added.
+  Iteration plan refreshed (Phase 1 + 2 marked ✅; `sleep 5`
+  baked into verification rhythm; sub-iteration calibration
+  recorded). Section C `examples/03-driver-check/` promoted to
+  `verified (Fedora 44)` — first row out of `in flight`. User
+  verification recipe (profile lifecycle + three-addon enable
+  flow) passed cleanly: scratch profile up/listed/deleted with
+  per-cluster resource override observed; metrics-server +
+  ingress + dashboard all enabled with expected pod state and
+  dashboard URL returned
+
 **Phase 2 done** (2026-05-17).
 
 **In flight:**
 
-- **r06** — `_docs/04-profiles-multi-node.md` + `_docs/05-addons-dashboard.md`
-  drafted (small sections combined per the iteration plan). §3
-  gains a small polish: expected-output block updated to match
-  what the r05c user run actually showed (including
-  `MINIKUBE_ROOTLESS=true`, the v1.39 deprecation hint, the
-  CNI-configuration line, and the kic-artifacts noise) plus a
-  callout explaining the harmless `E0516 cache.go:239` line
-  (upstream #8426). Iteration plan updated: Phase 1 + 2 marked
-  ✅, r06 in flight, within-iteration verification rhythm bakes
-  in `sleep 5` before `gh run watch`. Reconciliation Section A
-  unchanged; Section B promotes four rows from the r05c demo
-  output (podman driver works without virtualization, kubectl
-  against the cluster, minikube start brings up a healthy
-  cluster, kindnet CNI) and adds five new `unverified` rows for
-  §4 profiles/multi-node and §5 addons claims; Section C
-  promotes `examples/03-driver-check/` to `verified (Fedora 44)` —
-  first row out of `in flight`
+- **r07** — §6 first real workload-deployment iteration.
+  `_docs/06-deploying-with-kubectl.md` drafted (25-min section
+  on Pods/ReplicaSets/Deployments mental model, manifest
+  walkthrough, apply/inspect/expose/port-forward/scale/rolling-
+  update sequence). `examples/06-deploy-nginx-kubectl/` shipped
+  with two manifests (Deployment + Service, separated for
+  clarity), demo.sh covering deploy → port-forward → curl-
+  validate → scale (rolling-update is prose-only), and a README
+  documenting failure modes. UBI image pinned to
+  `registry.access.redhat.com/ubi9/nginx-124` (UBI 9, nginx 1.24,
+  runs as user 1001, listens on 8080 — rootless-friendly).
+  §3 polish: new callout warns about the auto-detect trap that
+  bit the r06 follow-up verification (docker-cli installed
+  alongside podman can confuse minikube's driver auto-detect
+  when only `rootless=true` is set). Reconciliation: six
+  Section B rows promoted from r06 user run (§4 profile
+  lifecycle, per-cluster resource override, §5 metrics-server /
+  ingress / dashboard), five new §6 unverified rows added,
+  Section C row for `examples/06-deploy-nginx-kubectl/` set to
+  `in flight`
 
 **Open, priority-ordered:**
 
-1. **r07** — draft §6 kubectl + `examples/06-deploy-nginx-kubectl/`
-   — first example to deploy a workload, not just verify cluster
-   health. UBI nginx image. Expected to surface SELinux + ports
-   choices that have been deferred since §1
-2. **r08–r09** — §7 + §8 with examples (NodePort access, PVs)
-3. **r10** — §9 helm + authored small chart; helm 4.x compat
-   claim from Section B promotes when first `helm install` lands
-4. **r11** — §10 editor/shell/terminal; will request local-setup
-   specifics (warp.dev workflows, CLion settings)
-5. **r12** — §11 Istio (resource bump pre-flight; expect Section B
+1. Run `examples/06-deploy-nginx-kubectl/demo.sh` against the
+   default minikube cluster. On `✓ SUCCESS`, five §6 Section B
+   rows promote plus Section C
+2. **r08** — §7 NodePort + `examples/07-nodeport-service/`.
+   First example to expose a workload externally
+3. **r09** — §8 PVs + `examples/08-persistent-volume/`
+4. **r10** — §9 helm + authored small chart; helm-4-against-
+   helm-3-chart compat claim from Section B promotes here
+5. **r11** — §10 editor/shell/terminal; will request local-setup
+   specifics
+6. **r12** — §11 Istio (resource bump pre-flight; expect Section B
    resource claims to surface here)
-6. **r13** — §12 KEDA (optional section)
-7. **r14–r16** — tail sections, diagrams, editorial pass, final
+7. **r13** — §12 KEDA (optional section)
+8. **r14–r16** — tail sections, diagrams, editorial pass, final
    reconciliation refresh

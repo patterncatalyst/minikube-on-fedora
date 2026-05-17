@@ -20,9 +20,10 @@ supporting tools are on `PATH`).
 ## Set sensible defaults
 
 Before the first `minikube start`, set defaults so you don't have
-to remember flags every time. Use the values from the §1 hardware
-table that match your plan — these are good "comfortable for
-most of the tutorial" picks:
+to remember flags every time. **Run all five `config set` commands
+below before any other minikube command.** Use the values from
+the §1 hardware table that match your plan — these are good
+"comfortable for most of the tutorial" picks:
 
 ```bash
 minikube config set cpus 6
@@ -31,6 +32,15 @@ minikube config set driver podman
 minikube config set rootless true
 minikube config set container-runtime containerd
 ```
+
+> **Run all five together before anything else.** Without `driver`
+> set, minikube auto-detects a driver on each `minikube start`. On
+> Fedora dev machines with both Podman and the Docker CLI installed
+> (a common shape — `dnf` makes both available), the auto-detect
+> can pick Docker. Combined with `rootless=true` already set, that
+> fails confusingly: `Using rootless Docker driver was required,
+> but the current Docker does not seem rootless`. Setting
+> `driver=podman` explicitly avoids the trap.
 
 These get written to `~/.minikube/config/config.json` and are
 applied by every future `minikube start` that doesn't override
