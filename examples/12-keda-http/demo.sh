@@ -194,9 +194,19 @@ pass "cold-start succeeded — HTTP 200 with nginx content after ${COLD_START_S}
 
 # ── Phase 7: Drive load with hey ────────────────────────────────────────────
 step "driving load: hey -n ${LOAD_REQUESTS} -c ${LOAD_CONCURRENCY}"
+# IMPORTANT — Host header gotcha:
+# hey is written in Go. Go's net/http package silently IGNORES Host
+# headers set via the headers map (issue golang/go#7682). So
+# `hey -H "Host: nginx.local"` does NOT set the Host — Go sends the
+# Host from the URL (`127.0.0.1:18080`), the interceptor sees no
+# matching route, and returns 404 for every request.
+# hey provides a dedicated `-host` flag for this — it sets the Go
+# request's `Host` field directly, which IS sent on the wire.
+# curl handles `-H 'Host:'` correctly as a special case, which is
+# why the cold-start curl above works.
 # Run hey in background so we can watch replicas during the load
 hey -n "${LOAD_REQUESTS}" -c "${LOAD_CONCURRENCY}" \
-    -H "Host: ${HOST_HEADER}" \
+    -host "${HOST_HEADER}" \
     "http://127.0.0.1:${INTERCEPTOR_PORT}/" > /tmp/hey-output.txt 2>&1 &
 HEY_PID=$!
 info "hey running as PID ${HEY_PID}; watching replicas..."

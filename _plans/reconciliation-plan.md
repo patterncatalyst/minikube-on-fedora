@@ -156,8 +156,9 @@ Fedora 44.
 | **verified (Fedora 44)** | A KEDA `ScaledObject` with `minReplicaCount: 0` and a Kafka trigger results in **zero replicas at idle** (no consumer Pods running until messages arrive) | §12 | r13b user run: assertion passed immediately after applying the manifests |
 | **verified (Fedora 44)** | Producing 200 messages to a Kafka topic causes KEDA to scale the consumer Deployment from 0 to ≥1 replicas within 120 seconds. Peak replicas bounded by `maxReplicaCount: 3` (also bounded by 3 topic partitions) | §12 | r13b user run: replicas climbed to 1 at the 5s polling tick; peaked at 3 by the 10s tick. With `lagThreshold: "5"` and 200 messages of lag, HPA would ask for 40 replicas but caps at 3 |
 | **verified (Fedora 44)** | After the topic drains and `cooldownPeriod` (30s) elapses, KEDA scales the consumer back to 0 replicas | §12 | r13b user run: scaled back to 0 at 62s after drain wait. The cooldown is wall-clock from "lag-reaches-0" not from "scale-up-completed", so the observed time = drain delay + cooldownPeriod + small reconciliation lag |
-| unverified              | KEDA HTTP add-on `HTTPScaledObject` (CRD: `http.keda.sh/v1alpha1`) with `replicas.min: 0` results in zero replicas at idle | §12 | r13 HTTPScaledObject claim |
-| unverified              | The HTTP add-on **interceptor buffers a cold-start request** until the workload Pod is Ready, returning a 200 response instead of a 5xx (typically 3-8s on minikube) | §12 | r13 demo claim; the interceptor's killer feature vs naive scale-to-zero |
+| **verified (Fedora 44)** | KEDA HTTP add-on `HTTPScaledObject` (CRD: `http.keda.sh/v1alpha1`) with `replicas.min: 0` results in zero replicas at idle | §12 | r13c user run: applied manifests, initial assertion `current replicas: 0` passed |
+| **verified (Fedora 44)** | The HTTP add-on **interceptor buffers a cold-start request** until the workload Pod is Ready, returning a 200 response with backend (nginx) content. Measured 3 seconds on this minikube setup (image cached, Pod startup dominated by readinessProbe `initialDelaySeconds: 1` + `periodSeconds: 2`) | §12 | r13c user run: cold-start curl returned HTTP 200 with nginx content after exactly 3s. Tightened r13c assertions verify status code AND nginx content (not just any HTML) |
+| **verified (Fedora 44)** | `hey` (Go-based load tester) does NOT respect `-H 'Host: x'` for setting the HTTP Host header — Go's `net/http` package silently strips Host headers from the headers map (issue golang/go#7682, open since 2014). Use `hey -host x` instead, which sets Go's special `Request.Host` field directly. Symptom of misuse: all requests through a virtual-host-based proxy (KEDA HTTP add-on interceptor, Istio gateway, nginx vhost, traefik with Host rules, etc.) return 404. curl handles `-H 'Host:'` correctly because curl treats it as a special case | §12 | r13c → r13d: r13's demo used `-H "Host: nginx.local"`, causing all 500 hey requests to return 404 while the cold-start curl (3s, 200, nginx content) worked. r13d fixed the demo to use `-host` and updated the README's "When this fails" section so future readers don't lose time to this |
 | unverified              | `hey -n 500 -c 50` sustained HTTP load drives the HTTPScaledObject's concurrency metric, scaling nginx from 0 to N replicas within 120s | §12 | r13 demo claim |
 | unverified              | After `scaledownPeriod` (30s) of zero traffic, the HTTP add-on scales the workload back to 0 replicas | §12 | r13 demo claim; completes the HTTP scale-from-zero lifecycle |
 | **verified (Fedora 44)** | KEDA Pod count after `setup-keda.sh` completes: **10 Pods** in the `keda` namespace — 1 keda-operator, 1 keda-admission-webhooks, 1 keda-operator-metrics-apiserver (KEDA core, 3 Pods), 1 keda-add-ons-http-controller-manager, 3 keda-add-ons-http-external-scaler (replicated by default), 3 keda-add-ons-http-interceptor (replicated by default) (HTTP add-on, 7 Pods) | §12 | r13b user run: the r13 plan row said 7 Pods which assumed single replicas for all components. The HTTP add-on's helm chart actually deploys the external-scaler and interceptor with 3 replicas each by default for HA. Row corrected on promotion |
@@ -1002,21 +1003,78 @@ have to derive them.
   what it claimed to). Plan now correctly reflects that the
   §12 HTTP demo has never had a real verified run
 
+- **r13d** (2026-05-17, §12 HTTP — hey `-H 'Host:'` gotcha)
+  — fourth Phase 5 sub-iteration, one-line fix. With r13c's
+  tightened assertions, the demo's actual failure mode was
+  clearly visible: cold-start curl returned **HTTP 200 with
+  nginx content after 3s** (perfect), but the hey load test
+  reported **all 500 requests as HTTP 404** in 0.035 seconds
+  (clearly an instant rejection, not a routing-to-nginx
+  scenario).
+
+  Asymmetric failure between curl and hey on the same target
+  with the same `-H "Host: nginx.local"` argument turned out
+  to be the diagnostic. The root cause is a well-known Go
+  quirk:
+  - hey is written in Go and uses `net/http`
+  - Go's `net/http.Request` has a special `Host` field
+    separate from the `Header` map
+  - When code calls `req.Header.Add("Host", x)`, Go silently
+    strips the Host header from the map before sending
+    (documented in golang/go#7682, open since 2014)
+  - So `hey -H "Host: nginx.local"` results in Go sending
+    `Host: 127.0.0.1:18080` (from the URL) on the wire
+  - The KEDA HTTP add-on interceptor sees no matching route
+    for `127.0.0.1:18080`, returns 404 for everything
+  - curl handles `-H 'Host:'` correctly because curl treats
+    Host as a special case in its argument parsing
+
+  hey actually provides a dedicated `-host` flag for exactly
+  this purpose. Source confirms (rakyll/hey hey.go):
+  `hostHeader = flag.String("host", "", "")`. Using `-host
+  nginx.local` instead of `-H "Host: nginx.local"` sets Go's
+  `Request.Host` field directly, which IS sent on the wire.
+
+  Fix in r13d:
+  - `examples/12-keda-http/demo.sh`: hey flag changed from
+    `-H "Host: ${HOST_HEADER}"` to `-host "${HOST_HEADER}"`.
+    A long comment block explains the gotcha so the next
+    maintainer doesn't accidentally "fix" it back
+  - `examples/12-keda-http/README.md`: "When this fails"
+    section now leads with this gotcha as the most common
+    failure mode (because anyone hitting it without context
+    will lose hours to it). Includes the Go issue link
+
+  Promotions on the back of this fix:
+  - HTTPScaledObject scale-to-zero at idle: VERIFIED (r13c
+    run showed `current replicas: 0` after applying manifests)
+  - Cold-start interceptor buffering: VERIFIED (r13c run
+    showed 3s, HTTP 200, nginx content)
+  - New verified row capturing the hey gotcha — for the
+    Section B "lessons learned" track. Future readers don't
+    have to rediscover this
+
+  Still unverified pending the next demo run after r13d:
+  - hey load drives sustained traffic, scale-up
+  - Scale-down after `scaledownPeriod`
+  - Section C `examples/12-keda-http/`
+
+  Verified row count: **103** (up from 100). One additional
+  promotion expected on r13d demo re-run
+
 **Open, priority-ordered:**
 
-1. **r13d — HTTP routing investigation** — the actual fix
-   for whatever is causing the interceptor to return 404 for
-   matched-host requests. Likely candidates: HTTPScaledObject
-   CRD schema changed in 0.12.x, namespace/scope of the
-   matched host, missing pathPrefixes, or interceptor-side
-   admin-port vs proxy-port confusion. The tightened r13c
-   assertions will surface the exact symptom on next run
-2. Re-run `examples/12-keda-http/demo.sh` after r13d. On
-   real `✓ SUCCESS`, 6 §12 HTTP Section B rows promote +
-   Section C `examples/12-keda-http/`
-3. Optional: §10 row promotions, §8 PV auto-delete, §7
+1. **Re-run `examples/12-keda-http/demo.sh`** after applying
+   r13d. With the `-host` fix in place, the full 0→N→0
+   lifecycle should complete cleanly: hey sends sustained
+   load that hits nginx, KEDA scales up (probably to max=5
+   since concurrency=50 / targetValue=5), nginx serves all
+   500 requests, KEDA scales back to 0 after
+   `scaledownPeriod`. On `✓ SUCCESS`, 3 more Section B rows
+   promote + Section C `examples/12-keda-http/`
+2. Optional: §10 row promotions, §8 PV auto-delete, §7
    leftovers — low priority
-4. **r14–r16** — tail sections (§13 wrap-up, §14
+3. **r14–r16** — tail sections (§13 wrap-up, §14
    troubleshooting?, §15 where-next-pointers), diagrams
    (paired `.svg` + `.excalidraw` in `assets/diagrams/`),
    editorial pass across all section prose, final

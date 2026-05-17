@@ -66,7 +66,17 @@ Pod startup dominated by readinessProbe `initialDelaySeconds`).
 
 ## When this fails
 
-1. **`hey` not installed** — `go install
+1. **All hey requests return 404 (most common gotcha)** — caused
+   by using `-H 'Host: nginx.local'` instead of `-host nginx.local`.
+   hey is written in Go; Go's `net/http` silently strips Host
+   headers set via the headers map (issue
+   [golang/go#7682](https://github.com/golang/go/issues/7682),
+   open since 2014). The dedicated `-host` flag works because hey
+   sets Go's special `Request.Host` field directly. **Always use
+   `-host` with hey when targeting virtual-host-based proxies.**
+   curl handles `-H 'Host:'` correctly because curl treats Host as
+   a special case
+2. **`hey` not installed** — `go install
    github.com/rakyll/hey@latest` per §2
 2. **HTTP add-on not installed** — symptom: pre-flight
    complains about `keda-add-ons-http-interceptor` not found.
