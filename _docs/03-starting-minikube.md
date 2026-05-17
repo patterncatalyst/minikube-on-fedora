@@ -84,10 +84,19 @@ You'll see output like:
 
 ```
 😄  minikube v1.38.x on Fedora 44
+    ▪ MINIKUBE_ROOTLESS=true
 ✨  Using the podman driver based on user configuration
-🌟  Selected podman driver. Recommended: ...
+❗  Starting v1.39.0, minikube will default to "containerd" container runtime. See #21973 for more info.
+📌  Using rootless Podman driver
+👍  Starting "minikube" primary control-plane node in "minikube" cluster
+🚜  Pulling base image v0.0.50 ...
+💾  Downloading Kubernetes v1.35.x preload ...
+    > preloaded-images-k8s-...:  272 MiB / 272 MiB  100.00%
+    > gcr.io/k8s-minikube/kicbase...:  519 MiB / 519 MiB  100.00%
+E0516 ... cache.go:239] Error downloading kic artifacts: not yet implemented, see issue #8426
 🔥  Creating podman container (CPUs=6, Memory=16384MB) ...
-🐳  Preparing Kubernetes v1.35.x on containerd ...
+📦  Preparing Kubernetes v1.35.x on containerd 2.2.x ...
+🔗  Configuring CNI (Container Networking Interface) ...
 🔎  Verifying Kubernetes components...
 🌟  Enabled addons: storage-provisioner, default-storageclass
 🏄  Done! kubectl is now configured to use "minikube" cluster
@@ -96,6 +105,14 @@ You'll see output like:
 The last line is the important one — minikube has updated your
 `~/.kube/config` so `kubectl` points at the cluster you just
 started.
+
+> **About that red `E0516 ... cache.go:239] Error downloading kic
+> artifacts` line.** Harmless. minikube has a stub code path for
+> fetching auxiliary "kic" (Kubernetes-in-Container) image artifacts
+> via the podman driver that was never fully wired up — it returns
+> `ErrNotImplemented` and is logged at error level when it should be
+> info. Tracked as kubernetes/minikube#8426 (open since 2021). The
+> cluster comes up fine; ignore the line.
 
 ### What just happened
 

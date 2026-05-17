@@ -73,18 +73,24 @@ Fedora 44.
 | unverified              | 6 CPU / 16 GB RAM / 50 GB free disk is comfortable for §1–§12                | §1      | "Comfortable for all" recommendation; verify once §11 + §12 are complete    |
 | **verified (Fedora 44)** | Podman runs rootless on Fedora 44 with the §1 UBI test command              | §1      | r03 user output: `podman run --rm ubi9/ubi-minimal echo OK` → `OK` ✓        |
 | **verified (Fedora 44)** | UBI images at `registry.access.redhat.com` are pullable without subscription | §1      | r03 user output: pull + run + exec all succeeded against ubi9/ubi-minimal ✓ |
-| unverified              | The podman driver works without KVM/qemu/VirtualBox on Fedora 44             | §1, §3  | Promotes when `examples/03-driver-check/demo.sh` passes (needs r05b rootless fix first) |
+| **verified (Fedora 44)** | The podman driver works without KVM/qemu/VirtualBox on Fedora 44             | §1, §3  | r05c user output: driver-check demo passed; no virtualization layer touched ✓ |
 | unverified              | No SELinux `:Z` flag needed for minikube hostPath PVs                        | §1, §8  | Resolve in r09 when persistent-volume example lands                         |
 | **verified (Fedora 44)** | `minikube` RPM from `storage.googleapis.com` installs cleanly via `dnf`     | §2      | r05 user output: dnf install completed, /usr/bin/minikube present ✓         |
 | unverified              | `helm 4.1.x` from Fedora repos works against Helm 3-format charts            | §2, §9  | Install verified; chart-compat promotes in r10 when first `helm install` lands |
 | **verified (Fedora 44)** | `helm` from Fedora repos installs cleanly via `dnf`                          | §2      | r05 user output: `dnf install helm` succeeded, /usr/bin/helm present ✓      |
-| unverified              | `kubectl 1.35.x` client works against minikube-default 1.35.x cluster        | §2, §3  | Implied by version skew policy; promotes when driver-check demo passes      |
+| **verified (Fedora 44)** | `kubectl 1.35.x` client works against minikube-default 1.35.x cluster        | §2, §3  | r05c user output: `kubectl get nodes` and `kubectl wait` all succeeded against the 1.35.1 cluster ✓ |
 | **verified (Fedora 44)** | krew installer + `kubectl krew install stern ctx ns` works as documented    | §2      | r05 user output: krew bootstrap + three plugin installs all succeeded ✓     |
 | **verified (Fedora 44)** | mikefarah yq is `dnf install yq` on Fedora 44 (not python-yq)               | §2      | r05 user output: `dnf install yq` succeeded; package is 4.47.1 mikefarah ✓  |
-| unverified              | `minikube start --driver=podman` brings up a healthy cluster                 | §3      | r05 user output: failed without `--rootless`; r05b adds the flag, retry needed |
+| **verified (Fedora 44)** | `minikube start --driver=podman` brings up a healthy cluster                 | §3      | r05c user output: cluster up, all 8 kube-system pods Running, ✓ SUCCESS     |
 | **verified (Fedora 44)** | minikube's podman driver requires `--rootless` (or `config set rootless true`) on Fedora 44 | §3 | r05 user output: rootful default failed with `sudo: a password is required`; r05b prose + config + demo flag added |
 | **verified (Fedora 44)** | minikube under rootless podman additionally requires `--container-runtime=containerd` | §3 | r05b user output: rootless+default(docker)-runtime failed with `docker.service` start error; r05c sets containerd explicitly |
+| **verified (Fedora 44)** | kindnet CNI works under rootless podman + containerd on Fedora 44           | §3      | r05c user output: kindnet-4kmdd pod Running, node Ready, pod networking observed ✓ |
 | unverified              | `minikube pause/unpause/stop/delete` cluster-lifecycle commands work         | §3      | Pause/stop not exercised in driver-check; defer or add lifecycle demo later |
+| unverified              | `minikube profile list/start/delete -p NAME` profile lifecycle works         | §4      | r06 prose claim; profiles not exercised in driver-check; verify ad-hoc      |
+| unverified              | `minikube start --nodes=N` creates a multi-node cluster on rootless podman   | §4      | r06 prose claim; promote when first multi-node verification happens         |
+| unverified              | `minikube addons enable metrics-server` makes `kubectl top` work             | §5      | r06 prose claim; promote when first §5 walkthrough is run                   |
+| unverified              | `minikube addons enable ingress` brings up NGINX ingress-nginx pods          | §5      | r06 prose claim; promote when first ingress is observed running             |
+| unverified              | `minikube addons enable dashboard` + `minikube dashboard --url` returns a URL | §5     | r06 prose claim; promote when first dashboard access is observed            |
 
 ## C. Testing matrix
 
@@ -95,7 +101,7 @@ are still aspirational.
 
 | Status     | Example                              | Section | Notes                                                 |
 |------------|--------------------------------------|---------|-------------------------------------------------------|
-| **in flight** | `examples/03-driver-check/`       | §3      | Shipped in r05; awaiting user run on Fedora 44        |
+| **verified (Fedora 44)** | `examples/03-driver-check/`        | §3      | r05c user run: cluster up, all 8 kube-system pods Running, ✓ SUCCESS |
 | unverified | `examples/06-deploy-nginx-kubectl`   | §6      | Deploy UBI nginx via `kubectl apply`, hit NodePort    |
 | unverified | `examples/07-nodeport-service`       | §7      | Expose Deployment via NodePort, retrieve URL          |
 | unverified | `examples/08-persistent-volume`      | §8      | `hostPath` PV + dynamic PVC                           |
@@ -130,96 +136,60 @@ and what's next.
   binary (corrected in r05 — see below), krew installer +
   `stern`/`ctx`/`ns` via krew, hey via `go install`.
   Audit script bugs fixed (podman 5.x `CgroupVersion` template,
-  `maybe()` stderr leak). User re-ran audit post-r04;
-  surfaced one finding rolled into r05
+  `maybe()` stderr leak)
+- ✅ **r05** (2026-05-17) — `_docs/03-starting-minikube.md`
+  drafted (cluster start, layers, status, lifecycle, drivers,
+  in-cluster runtime). `examples/03-driver-check/` added —
+  project's first runnable demo. **r04 follow-up fix in §2**:
+  yq is packaged in Fedora 44 as mikefarah's yq (4.47.1), so
+  §2's install instruction is now `sudo dnf install -y yq`.
+  Three sub-iterations (r05a/b/c) resolved before demo green:
+  - r05a: added `jekyll-seo-tag` to Gemfile (skeleton bug
+    breaking every Pages build since r02)
+  - r05b: added `--rootless` flag — rootful default failed with
+    `sudo: a password is required`; fixed audit script's krew
+    plugin detection
+  - r05c: added `--container-runtime=containerd` and orphaned-
+    podman-volume cleanup — rootless+docker-runtime failed on
+    `docker.service` start inside the cluster container
+  Final r05c demo run: cluster up on containerd 2.2.1, kindnet
+  CNI, all 8 kube-system pods Running, ✓ SUCCESS
+
+**Phase 2 done** (2026-05-17).
 
 **In flight:**
 
-- **r05** — `_docs/03-starting-minikube.md` drafted (cluster
-  start, layers, status, lifecycle, drivers, in-cluster
-  runtime). `examples/03-driver-check/` added — the project's
-  first runnable demo. **r04 follow-up fix in §2**: yq is
-  packaged in Fedora 44 as mikefarah's yq (4.47.1, confirmed
-  via r04-post audit), so §2's install instruction is now
-  `sudo dnf install -y yq` rather than the upstream binary
-  download; the historical "python-yq" concern doesn't apply
-  on Fedora 44
-- **r05a** (2026-05-17, build-fix) — `_layouts/default.html`
-  uses `{% seo title=false %}` (the `jekyll-seo-tag` plugin
-  tag), but the Gemfile shipped from the skeleton didn't
-  include the plugin in its `:jekyll_plugins` group. Every
-  build since r02 has been failing with
-  `Liquid syntax error (line 10): Unknown tag 'seo'`. r05a
-  adds `gem "jekyll-seo-tag"` to the Gemfile to resolve.
-  Worth a `gh run list --workflow=pages.yml --limit 10` after
-  this deploys to see how long the build has actually been
-  broken — possible the original r02 "site is up" was a
-  GitHub Pages placeholder rather than rendered content. Skeleton
-  bug that should be reported upstream for the next person who
-  uses it
-- **r05b** (2026-05-17, demo-fix + audit-fix) — Two issues
-  surfaced in the r05 user run:
-  1. `minikube start --driver=podman` failed with
-     `PROVIDER_PODMAN_NOT_RUNNING: sudo: a password is required`
-     because minikube defaults to **rootful** podman (shells
-     out to `sudo podman`). Fedora 44 ships rootless podman.
-     Fix: r05b adds `minikube config set rootless true` to §3's
-     defaults block, an explainer paragraph about why, and an
-     explicit `--rootless` flag to `examples/03-driver-check/demo.sh`
-     (so the demo doesn't depend on the config being set)
-  2. The audit script reported `krew`, `stern`, `kubectx`,
-     `kubens` as "(not installed)" even though all four were
-     successfully installed. Root cause: those are kubectl
-     plugins under `~/.krew/bin/kubectl-<name>` invoked as
-     `kubectl <name>`, not top-level binaries — `command -v
-     stern` returns false. Fix: the audit script now checks
-     `~/.krew/bin/kubectl-<plugin>` paths explicitly for
-     krew-managed tools, reports them as `kubectl <plugin>`
-     to reflect actual invocation
-- **r05c** (2026-05-17, demo-fix + prose-correction) — Issues
-  from the r05b user run:
-  1. With `--rootless` accepted, `minikube start` got further
-     but failed during in-cluster provisioning with
-     `Job for docker.service failed`. Root cause: minikube
-     v1.38.x picks **docker** as the in-cluster container
-     runtime by default for the podman driver, and the
-     in-container Docker daemon needs systemd-managed cgroup
-     delegation that doesn't initialize cleanly in a rootless
-     container. The minikube output itself flagged the v1.39
-     pivot to containerd. Fix: r05c adds
-     `minikube config set container-runtime containerd` to §3
-     defaults, `--container-runtime=containerd` to demo.sh,
-     and rewrites §3's "In-cluster container runtime" section
-     (which had wrongly claimed containerd was the v1.38.x
-     default)
-  2. The failed-first-attempt left an orphaned podman volume
-     named `driver-check`, which blocked the second attempt
-     with `volume already exists`. Fix: demo.sh's pre-flight
-     and trap-cleanup now both call `podman volume rm
-     ${PROFILE}` in addition to `minikube delete`. Also added
-     `--delete-on-failure` to `minikube start` so minikube's
-     own retry logic cleans up before retrying
+- **r06** — `_docs/04-profiles-multi-node.md` + `_docs/05-addons-dashboard.md`
+  drafted (small sections combined per the iteration plan). §3
+  gains a small polish: expected-output block updated to match
+  what the r05c user run actually showed (including
+  `MINIKUBE_ROOTLESS=true`, the v1.39 deprecation hint, the
+  CNI-configuration line, and the kic-artifacts noise) plus a
+  callout explaining the harmless `E0516 cache.go:239` line
+  (upstream #8426). Iteration plan updated: Phase 1 + 2 marked
+  ✅, r06 in flight, within-iteration verification rhythm bakes
+  in `sleep 5` before `gh run watch`. Reconciliation Section A
+  unchanged; Section B promotes four rows from the r05c demo
+  output (podman driver works without virtualization, kubectl
+  against the cluster, minikube start brings up a healthy
+  cluster, kindnet CNI) and adds five new `unverified` rows for
+  §4 profiles/multi-node and §5 addons claims; Section C
+  promotes `examples/03-driver-check/` to `verified (Fedora 44)` —
+  first row out of `in flight`
 
 **Open, priority-ordered:**
 
-1. Run §2 install commands (if not already) and §3 happy path
-   on Fedora 44; then run `examples/03-driver-check/demo.sh`.
-   On `✓ SUCCESS`, the demo's Section C row promotes to
-   `verified (Fedora 44)`, along with §1/§3 claims about the
-   podman driver, kubectl-against-cluster, and the §2 install
-   paths
-2. **r06** — draft §4 profiles/multi-node + §5 addons (small
-   sections combined)
-3. **r07** — draft §6 kubectl + `examples/06-deploy-nginx-kubectl/`
-   — first example to deploy a workload, not just verify
-   cluster health
-4. **r08–r09** — §7 + §8 with examples
-5. **r10** — §9 helm + authored small chart; helm 4.x compat
+1. **r07** — draft §6 kubectl + `examples/06-deploy-nginx-kubectl/`
+   — first example to deploy a workload, not just verify cluster
+   health. UBI nginx image. Expected to surface SELinux + ports
+   choices that have been deferred since §1
+2. **r08–r09** — §7 + §8 with examples (NodePort access, PVs)
+3. **r10** — §9 helm + authored small chart; helm 4.x compat
    claim from Section B promotes when first `helm install` lands
-6. **r11** — §10 editor/shell/terminal; will request local-setup
+4. **r11** — §10 editor/shell/terminal; will request local-setup
    specifics (warp.dev workflows, CLion settings)
-7. **r12** — §11 Istio (resource bump pre-flight; expect Section B
+5. **r12** — §11 Istio (resource bump pre-flight; expect Section B
    resource claims to surface here)
-8. **r13** — §12 KEDA (optional section)
-9. **r14–r16** — tail sections, diagrams, editorial pass,
-    final reconciliation refresh
+6. **r13** — §12 KEDA (optional section)
+7. **r14–r16** — tail sections, diagrams, editorial pass, final
+   reconciliation refresh

@@ -13,26 +13,26 @@ cadence in `CONTRIBUTING.md` at the repo root. The
 [reconciliation plan]({{ "/plans/reconciliation-plan/" | relative_url }})
 tracks verification state for every claim across all iterations.
 
-## Phase 1 — Foundation
+## Phase 1 — Foundation ✅
 
 | r#  | Deliverables                                                                          | Status     |
 |-----|---------------------------------------------------------------------------------------|------------|
 | r01 | PRD drafted; decisions logged                                                         | ✅ done    |
 | r02 | Skeleton branded: `_config.yml`, README, outline, recon plan, LICENSE, index.html; PRD fix | ✅ done    |
 
-## Phase 2 — Setup and install
+## Phase 2 — Setup and install ✅
 
 | r#  | Deliverables                                                                          | Status     |
 |-----|---------------------------------------------------------------------------------------|------------|
-| r03 | `_docs/01-prerequisites.md`; iteration plan; `CONTRIBUTING.md`; Fedora 44 audit script | in flight  |
-| r04 | `_docs/02-installation.md` with version pins from r03 audit output                    | open       |
-| r05 | `_docs/03-starting-minikube.md` + `examples/03-driver-check/`                         | open       |
+| r03 | `_docs/01-prerequisites.md`; iteration plan; `CONTRIBUTING.md`; Fedora 44 audit script | ✅ done    |
+| r04 | `_docs/02-installation.md` with version pins from r03 audit output                    | ✅ done    |
+| r05 | `_docs/03-starting-minikube.md` + `examples/03-driver-check/` (with r05a/b/c fix-ups) | ✅ done    |
 
 ## Phase 3 — Core minikube operations
 
 | r#  | Deliverables                                                                          | Status     |
 |-----|---------------------------------------------------------------------------------------|------------|
-| r06 | `_docs/04-profiles-multi-node.md` + `_docs/05-addons-dashboard.md` (small sections combined) | open       |
+| r06 | `_docs/04-profiles-multi-node.md` + `_docs/05-addons-dashboard.md` (small sections combined) | in flight |
 | r07 | `_docs/06-deploying-with-kubectl.md` + `examples/06-deploy-nginx-kubectl/`             | open       |
 | r08 | `_docs/07-services-nodeport.md` + `examples/07-nodeport-service/`                     | open       |
 | r09 | `_docs/08-persistent-volumes.md` + `examples/08-persistent-volume/`                   | open       |
@@ -65,19 +65,25 @@ For any iteration that ships an example, the pattern is:
 
 1. Tarball delivered with example dir, section prose, and updated
    reconciliation rows marked `in flight`
-2. Extract into `~/Dev/minikube-on-fedora/`, push, `gh run watch`
-   confirms the site build is green
+2. Extract into `~/Dev/minikube-on-fedora/`, push, then
+   `sleep 5 && gh run watch` confirms the site build is green.
+   The `sleep 5` gives the new run time to register before
+   `gh run watch` attaches — without it, `gh` may grab the
+   previous already-finished run
 3. `cd examples/NN-name/ && ./demo.sh`; output shared back
 4. **If pass:** next iteration's first move is bumping that row
    to `verified (Fedora 44)` in the reconciliation plan's
-   Section C testing matrix
+   Section C testing matrix, plus any Section A/B claims the
+   demo's success implies
 5. **If fail:** diagnose from output, fix in same iteration as
-   `_rNNa`, re-run
+   `_rNNa` / `_rNNb` / etc., re-run. r05 is the precedent —
+   three fix-ups (rootless flag, containerd runtime, volume
+   cleanup) before the demo went green
 
-This honors "tested code first, then prose" from
-`LESSONS-LEARNED.md` without doubling the iteration count — the
-prose ships alongside the code, but doesn't claim `verified`
-status until the test passes on real Fedora 44 hardware.
+This honors "tested code first, then prose" without doubling the
+iteration count — the prose ships alongside the code, but doesn't
+claim `verified` status until the test passes on real Fedora 44
+hardware.
 
 ## Optionality and flex points
 
@@ -108,6 +114,15 @@ If a "single section" iteration turns out lightweight, it merges
 with the next. **Phase boundaries are stable; iteration boundaries
 inside them are not.**
 
+### Sub-iteration fix-ups are normal, not exceptional
+
+r05's three fix-ups (r05a Gemfile, r05b rootless, r05c containerd
++ volumes) are a useful calibration: getting the rootless +
+containerd combination right on first delivery is hard without a
+real Fedora 44 to test against. Budget for at least one fix-up
+per example-shipping iteration; more for iterations that touch
+new infrastructure layers (§11 Istio, §12 KEDA HTTP add-on).
+
 ### Section order is also flexible
 
 If a real-world need elsewhere (a separate project bottlenecked
@@ -121,7 +136,8 @@ regardless of section ordering.
 ### When a phase completes
 
 At the end of each phase, the phase table above gets its rows
-flipped to ✅, and the reconciliation plan's Section D gets a
-`## Phase N done` heading appended with the date. If priorities
-shift mid-stream, this document is the one that gets revised; the
-PRD's decision log records the rationale.
+flipped to ✅ and the phase heading gets a ✅. The reconciliation
+plan's Section D gets a `## Phase N done` heading appended with
+the date. If priorities shift mid-stream, this document is the
+one that gets revised; the PRD's decision log records the
+rationale.
