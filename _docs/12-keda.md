@@ -291,8 +291,8 @@ metadata:
     strimzi.io/kraft: enabled
 spec:
   kafka:
-    version: 3.9.0           # NOT 3.9.2 — known Strimzi 0.51 bug
-    metadataVersion: 3.9-IV0
+    version: 4.1.0           # Strimzi 0.51 supports ONLY 4.1.0/4.1.1/4.2.0
+    # metadataVersion omitted: Strimzi defaults to match version
     listeners:
       - name: plain
         port: 9092
@@ -318,8 +318,12 @@ Notable choices:
 - **Dual-role node** — combines controller + broker in one Pod.
   Smaller resource footprint than separate controller/broker
   pools. Production deployments split them
-- **Kafka 3.9.0** — pinned. Strimzi 0.51 fails to reconcile
-  Kafka 3.9.2 with `Unsupported Kafka.spec.kafka.version` errors
+- **Kafka 4.1.0** — pinned. Strimzi 0.51 dropped support for
+  Kafka 3.x entirely; only 4.1.0, 4.1.1, and 4.2.0 are accepted.
+  The `metadataVersion` field is omitted from the manifest —
+  Strimzi defaults it to match the Kafka version on first
+  cluster creation. Kafka 4.x removed ZooKeeper completely
+  (KRaft-only), so there's no zk-vs-kraft choice to make
 - **Replication factor 1** everywhere — single-broker cluster
   can't replicate, so insisting on RF≥2 would break topic
   creation

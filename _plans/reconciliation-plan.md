@@ -149,7 +149,8 @@ Fedora 44.
 | **verified (Fedora 44)** | Kiali Traffic Graph renders a live mesh visualization with traffic animation, success/error rates per edge, and namespace-scoped filtering. Switching the namespace dropdown from `istio-system` to `default` reveals the application call graph (productpage → details / reviews → ratings) with live request rates | §11 | r12g user run: 200-curl traffic loop against `/productpage` produced a Kiali Overview with 4 applications, climbing inbound-traffic sparkline, and a Traffic Graph showing istio-ingressgateway → productpage with 1.89 req/s sustained at 100% success. Screenshots captured in `assets/screenshots/kiali-{overview,traffic-graph}.png` |
 | unverified              | `scripts/setup-keda.sh` installs KEDA core 2.19.0 + KEDA HTTP add-on 0.12.2 into the `keda` namespace via helm | §12 | r13 setup script claim; promote when first §12 demo passes |
 | unverified              | `scripts/setup-strimzi.sh` installs Strimzi Cluster Operator 0.51.0 into the `kafka` namespace via helm | §12 | r13 setup script claim |
-| unverified              | A single-node Strimzi Kafka cluster (combined controller+broker role) with Kafka **3.9.0** (NOT 3.9.2 — known Strimzi 0.51 reconciliation bug) reaches `condition=Ready` within 5 minutes on minikube | §12 | r13 manifest claim; the most likely flaky step in the tutorial per Strimzi's historic reconciliation quirks |
+| **verified (Fedora 44)** | Strimzi 0.51.0 supports ONLY Kafka **4.1.0, 4.1.1, 4.2.0** — the 3.x line was dropped entirely. Mis-pinning to 3.x manifests as a `Kafka` CR `NotReady` condition with `reason: UnsupportedKafkaVersionException` and `message: Unsupported Kafka.spec.kafka.version: X.Y.Z. Supported versions are: [4.1.0, 4.1.1, 4.2.0]`. Kafka 4.x removed ZooKeeper completely — KRaft is the only mode. The `metadataVersion` field can be omitted; Strimzi defaults it to match the Kafka version on first cluster creation | §12 | r13 → r13a: original ship pinned Kafka 3.9.0 based on a misread of Strimzi 0.51 release notes (which were actually flagging a 3.9.2-specific upgrade-path bug, not establishing 3.x as supported). r13a corrected to 4.1.0 and recorded the finding |
+| unverified              | A single-node Strimzi Kafka cluster (combined controller+broker role) with Kafka **4.1.0** reaches `condition=Ready` within 5 minutes on minikube | §12 | r13a manifest claim (was 3.9.0 in r13, which failed); the most likely flaky step in the tutorial per Strimzi's historic reconciliation quirks |
 | unverified              | A `KafkaTopic` CR with 3 partitions reaches `condition=Ready` via Strimzi's Topic Operator | §12 | r13 manifest claim |
 | unverified              | The Python `order-processor` consumer image builds cleanly from a multi-stage UBI Containerfile (ubi9 builder + ubi9-minimal runtime, kafka-python==2.0.6 in venv) | §12 | r13 image claim; follows same pattern as §6 nginx-custom |
 | unverified              | A KEDA `ScaledObject` with `minReplicaCount: 0` and a Kafka trigger results in **zero replicas at idle** (no consumer Pods running until messages arrive) | §12 | r13 demo claim; the core scale-to-zero assertion for Pattern A |
@@ -825,6 +826,49 @@ have to derive them.
 
   This is consistent with §11's six-iteration cadence;
   budgeting 3-5 sub-iterations for §12 is reasonable
+
+- **r13a** (2026-05-17, §12 Kafka version pin fix) — first
+  Phase 5 sub-iteration. setup-keda.sh and setup-strimzi.sh
+  both passed cleanly on user's Fedora 44 box. KEDA: 7 Pods
+  Running. Strimzi: 1 Pod Available. The Kafka demo failed
+  at `kubectl wait kafka/my-kafka condition=Ready` with a
+  clear error in the Kafka CR status block: `Unsupported
+  Kafka.spec.kafka.version: 3.9.0. Supported versions are:
+  [4.1.0, 4.1.1, 4.2.0]`.
+
+  Root cause: r13's manifest pinned Kafka 3.9.0 based on a
+  misread of the Strimzi 0.51 release notes. The upstream
+  note about "Kafka 3.9.2 unsupported" was flagging a
+  specific upgrade-path failure mode for users coming from
+  older Strimzi, NOT establishing that 3.9.x in general is
+  supported. Strimzi 0.51 dropped Kafka 3.x entirely and
+  supports only Kafka 4.1.0, 4.1.1, and 4.2.0. Kafka 4.x has
+  been GA since early 2025 and removed ZooKeeper completely.
+
+  Fix in r13a:
+  - `examples/12-keda-kafka/manifests/kafka-cluster.yaml`:
+    `version: 3.9.0` → `version: 4.1.0`; explicit
+    `metadataVersion: 3.9-IV0` field removed (Strimzi
+    defaults it to match the Kafka version on first creation,
+    which is safer than guessing the right `4.1-IV?` value)
+  - `_docs/12-keda.md`: prose updated to reflect 4.1.0,
+    "Notable choices" bullet rewritten to explain the actual
+    version constraint (Strimzi dropped 3.x) and the
+    metadataVersion omission
+
+  Compatibility check: kafka-python 2.0.6 in our consumer
+  image is protocol-compatible with Kafka 4.x brokers per
+  upstream documentation ("tested against broker versions
+  4.0 through 0.8.0") and KIP-896 (which sets the new client
+  baseline at Kafka 2.1, well below kafka-python's 2.0.x
+  capabilities). No consumer image rebuild required.
+
+  Reconciliation plan: Section B Strimzi-Kafka-readiness row
+  rewritten to reference 4.1.0; new verified row added for
+  the version-support finding so future readers don't need
+  to rediscover this. r13's manifest-version claim was
+  unverified; r13a's is also unverified pending the next
+  demo run.
 
 **Open, priority-ordered:**
 
