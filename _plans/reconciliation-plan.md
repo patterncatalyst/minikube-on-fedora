@@ -1,6 +1,7 @@
 ---
 title: Reconciliation plan
 description: What in this tutorial is verified, what is in flight, and what still needs validation.
+render_with_liquid: false
 ---
 
 This document tracks the **gap between what the tutorial claims and
