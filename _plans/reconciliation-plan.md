@@ -47,15 +47,15 @@ in the document implicitly assumes these.
 |-------------------------|------------------|---------------|-----------------------|------------------------------------------------------------|
 | **verified (Fedora 44)** | Fedora           | 44 (Forty Four) | §1 platform statement | `cat /etc/fedora-release` reports Fedora 44 ✓ r03 audit    |
 | **verified (Fedora 44)** | Podman           | 5.8.2         | §1 prereq check       | `podman --version` returns 5.8.2 ✓ r03 audit               |
-| unverified              | minikube         | v1.38.x       | §2 install (RPM)      | `minikube version` matches after running §2 install        |
-| unverified              | kubectl          | v1.34.x+ (1.35.3 observed) | §2 install (upstream binary; skipped if recent already present) | `kubectl version --client=true` reports 1.34+ |
-| unverified              | helm             | 4.1.1         | §2 install (`dnf install helm`) | `helm version --short` reports v4.1.1                   |
-| unverified              | httpie           | 3.2.4         | §2 install (`dnf install httpie`) | `http --version` reports 3.2.4                         |
-| unverified              | yq (mikefarah)   | 4.47.1        | §2 install (`dnf install yq`) | `yq --version` reports v4.x                                |
-| unverified              | krew             | latest        | §2 install (upstream installer) | `kubectl krew version` reports installed                |
-| unverified              | stern            | latest (krew) | §2 install (`kubectl krew install stern`) | `kubectl plugin list` shows stern                     |
-| unverified              | kubectx / kubens (krew names: ctx, ns) | latest (krew) | §2 install (`kubectl krew install ctx ns`) | `kubectl plugin list` shows ctx and ns |
-| unverified              | hey              | latest (Go)   | §2 install (`go install`); pre-existing acceptable | `hey --help` returns help text                |
+| **verified (Fedora 44)** | minikube         | v1.38.1       | §2 install (RPM)      | `minikube version --short` reports v1.38.1 ✓ r05 install   |
+| **verified (Fedora 44)** | kubectl          | v1.35.3       | §2 install (upstream binary; pre-existing accepted) | `kubectl version --client=true` ✓ r05 audit |
+| **verified (Fedora 44)** | helm             | 4.1.1         | §2 install (`dnf install helm`) | `helm version --short` returns `v4.1.1+g5caf004` ✓ r05 install |
+| **verified (Fedora 44)** | httpie           | 3.2.4         | §2 install (`dnf install httpie`) | Installed via dnf ✓ r05 install                         |
+| **verified (Fedora 44)** | yq (mikefarah)   | 4.47.1        | §2 install (`dnf install yq`) | Installed via dnf ✓ r05 install                            |
+| **verified (Fedora 44)** | krew             | latest        | §2 install (upstream installer) | `~/.krew/bin/kubectl-krew` exists ✓ r05 install          |
+| **verified (Fedora 44)** | stern            | latest (krew) | §2 install (`kubectl krew install stern`) | `~/.krew/bin/kubectl-stern` exists ✓ r05 install        |
+| **verified (Fedora 44)** | kubectx / kubens (krew names: ctx, ns) | latest (krew) | §2 install (`kubectl krew install ctx ns`) | `~/.krew/bin/kubectl-{ctx,ns}` exist ✓ r05 install |
+| **verified (Fedora 44)** | hey              | latest (Go)   | §2 install (`go install`); pre-existing acceptable | `~/go/bin/hey` exists ✓ r05 audit              |
 | unverified              | istioctl         | TBD           | §11 install commands  | `istioctl version` matches                                 |
 | unverified              | KEDA             | TBD           | §12 helm install args | `helm list -n keda` shows the documented chart version     |
 | unverified              | KEDA HTTP add-on | TBD           | §12 helm install args | `helm list -n keda` shows the add-on chart version         |
@@ -73,14 +73,16 @@ Fedora 44.
 | unverified              | 6 CPU / 16 GB RAM / 50 GB free disk is comfortable for §1–§12                | §1      | "Comfortable for all" recommendation; verify once §11 + §12 are complete    |
 | **verified (Fedora 44)** | Podman runs rootless on Fedora 44 with the §1 UBI test command              | §1      | r03 user output: `podman run --rm ubi9/ubi-minimal echo OK` → `OK` ✓        |
 | **verified (Fedora 44)** | UBI images at `registry.access.redhat.com` are pullable without subscription | §1      | r03 user output: pull + run + exec all succeeded against ubi9/ubi-minimal ✓ |
-| unverified              | The podman driver works without KVM/qemu/VirtualBox on Fedora 44             | §1, §3  | Promotes when `examples/03-driver-check/demo.sh` passes (r05)               |
+| unverified              | The podman driver works without KVM/qemu/VirtualBox on Fedora 44             | §1, §3  | Promotes when `examples/03-driver-check/demo.sh` passes (needs r05b rootless fix first) |
 | unverified              | No SELinux `:Z` flag needed for minikube hostPath PVs                        | §1, §8  | Resolve in r09 when persistent-volume example lands                         |
-| unverified              | `minikube` RPM from `storage.googleapis.com` installs cleanly via `dnf`      | §2      | r04 prose claim; promote once user runs §2 install                          |
-| unverified              | `helm 4.1.x` from Fedora repos works against Helm 3-format charts            | §2, §9  | r04 prose claim; promote in r10 when first helm install lands               |
+| **verified (Fedora 44)** | `minikube` RPM from `storage.googleapis.com` installs cleanly via `dnf`     | §2      | r05 user output: dnf install completed, /usr/bin/minikube present ✓         |
+| unverified              | `helm 4.1.x` from Fedora repos works against Helm 3-format charts            | §2, §9  | Install verified; chart-compat promotes in r10 when first `helm install` lands |
+| **verified (Fedora 44)** | `helm` from Fedora repos installs cleanly via `dnf`                          | §2      | r05 user output: `dnf install helm` succeeded, /usr/bin/helm present ✓      |
 | unverified              | `kubectl 1.35.x` client works against minikube-default 1.35.x cluster        | §2, §3  | Implied by version skew policy; promotes when driver-check demo passes      |
-| unverified              | krew installer + `kubectl krew install stern ctx ns` works as documented     | §2      | r04 prose claim; promote once user runs §2 install                          |
-| unverified              | mikefarah yq is `dnf install yq` on Fedora 44 (not python-yq)                | §2      | r05 prose correction; promote once user runs §2 install                     |
-| unverified              | `minikube start --driver=podman` brings up a healthy cluster                 | §3      | Promotes when driver-check demo passes                                      |
+| **verified (Fedora 44)** | krew installer + `kubectl krew install stern ctx ns` works as documented    | §2      | r05 user output: krew bootstrap + three plugin installs all succeeded ✓     |
+| **verified (Fedora 44)** | mikefarah yq is `dnf install yq` on Fedora 44 (not python-yq)               | §2      | r05 user output: `dnf install yq` succeeded; package is 4.47.1 mikefarah ✓  |
+| unverified              | `minikube start --driver=podman` brings up a healthy cluster                 | §3      | r05 user output: failed without `--rootless`; r05b adds the flag, retry needed |
+| **verified (Fedora 44)** | minikube's podman driver requires `--rootless` (or `config set rootless true`) on Fedora 44 | §3 | r05 user output: rootful default failed with `sudo: a password is required`; r05b prose + config + demo flag added |
 | unverified              | `minikube pause/unpause/stop/delete` cluster-lifecycle commands work         | §3      | Pause/stop not exercised in driver-check; defer or add lifecycle demo later |
 
 ## C. Testing matrix
@@ -154,6 +156,25 @@ and what's next.
   GitHub Pages placeholder rather than rendered content. Skeleton
   bug that should be reported upstream for the next person who
   uses it
+- **r05b** (2026-05-17, demo-fix + audit-fix) — Two issues
+  surfaced in the r05 user run:
+  1. `minikube start --driver=podman` failed with
+     `PROVIDER_PODMAN_NOT_RUNNING: sudo: a password is required`
+     because minikube defaults to **rootful** podman (shells
+     out to `sudo podman`). Fedora 44 ships rootless podman.
+     Fix: r05b adds `minikube config set rootless true` to §3's
+     defaults block, an explainer paragraph about why, and an
+     explicit `--rootless` flag to `examples/03-driver-check/demo.sh`
+     (so the demo doesn't depend on the config being set)
+  2. The audit script reported `krew`, `stern`, `kubectx`,
+     `kubens` as "(not installed)" even though all four were
+     successfully installed. Root cause: those are kubectl
+     plugins under `~/.krew/bin/kubectl-<name>` invoked as
+     `kubectl <name>`, not top-level binaries — `command -v
+     stern` returns false. Fix: the audit script now checks
+     `~/.krew/bin/kubectl-<plugin>` paths explicitly for
+     krew-managed tools, reports them as `kubectl <plugin>`
+     to reflect actual invocation
 
 **Open, priority-ordered:**
 

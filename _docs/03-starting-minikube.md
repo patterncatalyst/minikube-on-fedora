@@ -19,15 +19,16 @@ supporting tools are on `PATH`).
 
 ## Set sensible defaults
 
-Before the first `minikube start`, set the resource defaults so
-you don't have to remember the flags every time. Use the values
-from the §1 hardware table that match your plan — these are good
-"comfortable for most of the tutorial" picks:
+Before the first `minikube start`, set defaults so you don't have
+to remember flags every time. Use the values from the §1 hardware
+table that match your plan — these are good "comfortable for
+most of the tutorial" picks:
 
 ```bash
 minikube config set cpus 6
 minikube config set memory 16384
 minikube config set driver podman
+minikube config set rootless true
 ```
 
 These get written to `~/.minikube/config/config.json` and are
@@ -40,6 +41,29 @@ minikube config view
 
 If you set values you later regret, `minikube config unset <key>`
 clears them, or just rerun `set` with a new value.
+
+### Why `rootless true`
+
+minikube's podman driver defaults to **rootful** mode — it shells
+out to `sudo podman ...` to talk to the system podman. That's the
+historical mainstream and works fine if you've configured passwordless
+sudo for podman. Fedora 44 ships rootless podman as default
+(verified in §1: `podman info` showed `rootless=true`), and the
+tutorial assumes that posture. Without `rootless true`, your first
+`minikube start` will fail with:
+
+```
+💣  Exiting due to PROVIDER_PODMAN_NOT_RUNNING:
+    "sudo -n -k podman version ..." exit status 1: sudo: a password is required
+```
+
+The fix is what we just set: `minikube config set rootless true`
+makes minikube use rootless podman directly — no `sudo`, no
+passwordless-sudo plumbing needed. Functionally equivalent
+clusters, the rootless one just has slightly different network
+plumbing under the hood. For everything in this tutorial, it
+doesn't matter which mode you use; the rootless choice avoids
+the password prompt.
 
 ## Start the cluster
 

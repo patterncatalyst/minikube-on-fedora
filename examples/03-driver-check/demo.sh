@@ -48,10 +48,11 @@ minikube delete -p "${PROFILE}" >/dev/null 2>&1 || true
 pass "no stale ${PROFILE} profile"
 
 # ── Start ───────────────────────────────────────────────────────────────────
-step "starting cluster (profile=${PROFILE}, driver=podman, k8s=${KUBE_VERSION})"
+step "starting cluster (profile=${PROFILE}, driver=podman, k8s=${KUBE_VERSION}, rootless)"
 minikube start \
     --profile "${PROFILE}" \
     --driver=podman \
+    --rootless \
     --cpus="${CPUS}" \
     --memory="${MEMORY_MB}" \
     --kubernetes-version="${KUBE_VERSION}" \
