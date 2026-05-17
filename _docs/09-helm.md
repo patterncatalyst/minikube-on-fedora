@@ -57,10 +57,10 @@ chart/
 
 Each file in `templates/` is a Go template that produces a
 Kubernetes manifest when rendered. The template syntax is
-**Go templating + Sprig functions** — `{{ .Values.foo }}` inserts
+{% raw %}**Go templating + Sprig functions** — `{{ .Values.foo }}` inserts
 a value, `{{ if .Values.bar }}` conditionally renders a block,
 `{{ include "..." . | nindent N }}` interpolates a reusable
-template defined in `_helpers.tpl`.
+template defined in `_helpers.tpl`.{% endraw %}
 
 `values.yaml` provides the default values. The user (or a CI
 pipeline) can override any of them at install time with
@@ -114,6 +114,7 @@ The chart has three manifests in `templates/`:
 
 `templates/configmap.yaml`:
 
+{% raw %}
 ```yaml
 apiVersion: v1
 kind: ConfigMap
@@ -129,6 +130,7 @@ data:
     <p>Replicas: {{ .Values.replicaCount }} · Service port:
        {{ .Values.service.port }}</p>
 ```
+{% endraw %}
 
 The ConfigMap stores `index.html` as a key. The values from
 `values.yaml` get interpolated at install time. Override
@@ -139,6 +141,7 @@ and the rendered ConfigMap reflects that.
 
 `templates/deployment.yaml` (abbreviated):
 
+{% raw %}
 ```yaml
 apiVersion: apps/v1
 kind: Deployment
@@ -170,6 +173,7 @@ spec:
         configMap:
           name: {{ include "nginx-helm.fullname" . }}-content
 ```
+{% endraw %}
 
 The ConfigMap is mounted at `/usr/share/nginx/html`. Same overlay
 trick as §8 — the image's baked-in content is hidden by the mount.
@@ -178,6 +182,7 @@ trick as §8 — the image's baked-in content is hidden by the mount.
 
 `templates/service.yaml`:
 
+{% raw %}
 ```yaml
 apiVersion: v1
 kind: Service
@@ -194,12 +199,14 @@ spec:
     targetPort: 8080
     protocol: TCP
 ```
+{% endraw %}
 
 ### _helpers.tpl
 
 `templates/_helpers.tpl` defines the named templates the manifests
 reference:
 
+{% raw %}
 ```
 {{/* Fullname: "release-chart" pattern, truncated to 63 chars */}}
 {{- define "nginx-helm.fullname" -}}
@@ -220,6 +227,7 @@ app.kubernetes.io/name: {{ .Chart.Name }}
 app.kubernetes.io/instance: {{ .Release.Name }}
 {{- end -}}
 ```
+{% endraw %}
 
 Three templates. `fullname` produces a `<release>-<chart>` name
 that's truncated to fit Kubernetes' 63-character DNS limit;

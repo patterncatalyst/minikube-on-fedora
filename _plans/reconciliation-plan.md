@@ -114,6 +114,7 @@ Fedora 44.
 | **verified (Fedora 44)** | A PVC mount at `/usr/share/nginx/html` overlays `nginx-custom:v1`'s baked-in content | §8 | r09 user run: served HTML was the initContainer-written file, not §6's `Test Page for nginx on UBI 9 Minimal` |
 | **verified (Fedora 44)** | Deleting a Pod and waiting for the Deployment replacement preserves PV content (PV is independent of Pod lifecycle) | §8 | r09 user run: timestamps `2026-05-17T12:28:19Z` matched exactly before and after `kubectl delete pod nginx-pv-864c5dfd8b-zvpwn` |
 | unverified              | `standard` StorageClass's `Delete` reclaim policy auto-deletes the PV when the PVC is deleted | §8 | r09 cleanup behavior; promote when post-`kubectl delete` `kubectl get pv` shows no orphaned PV |
+| **verified (Fedora 44)** | Jekyll's Liquid templating collides with Go template syntax (`{{ }}`) in code blocks — `{% raw %}` / `{% endraw %}` wrappers are required around any code block showing Go/helm/jinja templates | site-build | r10 Jekyll CI build failure: `liquid-4.0.4 standardfilters.rb:253:in 'replace': wrong number of arguments` from helm's `{{ ... \| replace "+" "_" }}` being parsed as a Liquid pipeline. r10a wraps all four §9 helm template code blocks plus the §1 `podman info --format` line with raw tags. Applies prospectively to §11 Istio, §12 KEDA, anywhere Go templates appear in prose |
 | unverified              | helm 4.x lints an `apiVersion: v2` chart with no warnings                   | §9 | r10 prose claim; promote when `examples/09-deploy-nginx-helm/demo.sh` passes |
 | unverified              | `helm template` renders all chart templates without applying to the cluster | §9 | r10 prose claim; demo verifies output contains ConfigMap + Deployment + Service kinds |
 | unverified              | `helm install` with `--set` overrides default values from `values.yaml`    | §9 | r10 demo claim; promote when installed HTML contains the install-time title |
@@ -328,6 +329,26 @@ and what's next.
   rows added to Section B (including a promoted §2 helm-4-reads-
   helm-3-chart claim that finally has demo backing), Section C
   `examples/09-deploy-nginx-helm/` set to `in flight`
+- **r10a** (2026-05-17, jekyll build fix) — r10 broke Jekyll's
+  GitHub Actions build with a fatal `liquid-4.0.4
+  standardfilters.rb:253:in 'replace': wrong number of arguments`
+  error. Root cause: Liquid's templating uses `{{ }}` and so do
+  Go templates; when §9 prose embedded helm template snippets in
+  markdown code blocks, Jekyll's Liquid parser ate them. Most
+  generated harmless warnings; one specific line in the
+  _helpers.tpl example —
+  `{{ ... | replace "+" "_" }}` — actually parsed as a Liquid
+  pipeline and crashed Liquid's `replace` filter (different arity
+  than helm's). Fix: wrap each affected code block (and the
+  inline-mentions paragraph) with `{% raw %}` / `{% endraw %}`
+  so Liquid passes the content through verbatim. Six wraps total:
+  one in `_docs/01-prerequisites.md` (podman info --format line —
+  was generating warnings, not fatal; fixed while we're here),
+  five in `_docs/09-helm.md` (inline-mentions paragraph plus
+  four template code blocks: ConfigMap, Deployment, Service,
+  _helpers.tpl). New `verified` Section B row records the
+  lesson; applies prospectively to §11 Istio, §12 KEDA, or
+  anywhere Go templates appear in prose
 
 **Open, priority-ordered:**
 

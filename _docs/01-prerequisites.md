@@ -88,9 +88,11 @@ that's what's actually on a typical Fedora workstation.
 
 Check whether you already have Podman:
 
+{% raw %}
 ```bash
 podman --version && podman info --format '{{.Host.OS}} {{.Host.Arch}}'
 ```
+{% endraw %}
 
 You want Podman 5.x or newer; 4.x will work but lacks a couple of
 quality-of-life features used in §3. If `podman` isn't installed:
