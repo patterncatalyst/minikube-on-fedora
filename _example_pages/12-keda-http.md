@@ -1,13 +1,12 @@
 ---
-title: "12-keda-http"
+title: "§12 keda http"
 order: 12
 example_dir: examples/12-keda-http
 permalink: /examples/12-keda-http/
 layout: docs
 ---
 
-> Source: [`examples/12-keda-http/`](https://github.com/patterncatalyst/minikube-on-fedora/tree/main/examples/12-keda-http)
-> &nbsp;&nbsp;|&nbsp;&nbsp; [← Back to examples index]({{ "/docs/16-examples/" | relative_url }})
+> Source: [`examples/12-keda-http/`](https://github.com/patterncatalyst/minikube-on-fedora/tree/main/examples/12-keda-http) &nbsp;|&nbsp; [← Back to examples index]({{ "/docs/16-examples/" | relative_url }})
 
 Demonstrates KEDA's **HTTP add-on** (BETA) — scale-from-zero
 on HTTP request traffic. Same workload as §6 (nginx-custom:v1),

@@ -43,26 +43,28 @@ end.
 ## All examples
 
 The list below is generated from `_example_pages/*.md` and sorted
-by tutorial-section order.
+by tutorial-section order. Each example links to its dedicated
+page (rendered from the example's `README.md`) and to the source
+directory on GitHub.
 
-<ul class="example-list">
 {% assign sorted = site.example_pages | sort: "order" %}
 {% for ex in sorted %}
-  <li>
-    <strong>§{{ ex.order }}</strong> —
-    <a href="{{ ex.url | relative_url }}">{{ ex.title }}</a>
-    {% if ex.description %}<br><span class="example-description">{{ ex.description }}</span>{% endif %}
-    <br><small>Source: <a href="https://github.com/patterncatalyst/minikube-on-fedora/tree/main/{{ ex.example_dir }}"><code>{{ ex.example_dir }}/</code></a></small>
-  </li>
+### {{ ex.title }}
+
+[**Read the walkthrough →**]({{ ex.url | relative_url }})
+
+Source: [`{{ ex.example_dir }}/`](https://github.com/patterncatalyst/minikube-on-fedora/tree/main/{{ ex.example_dir }})
+
+{% if ex.description %}{{ ex.description }}{% endif %}
+
 {% endfor %}
-</ul>
 
 ## Verification status
 
 The examples are the canonical record of "what's been tested vs.
 what's claimed". Each example's verification status against
 Fedora 44 is tracked in
-[`_plans/reconciliation-plan.md`]({{ "/_plans/reconciliation-plan.md" | relative_url }})
+[`_plans/reconciliation-plan.md`](https://github.com/patterncatalyst/minikube-on-fedora/blob/main/_plans/reconciliation-plan.md)
 (viewable in the repo). The default status for any new claim is
 `unverified`; promotion to `verified` requires a real test run by
 a human on Fedora 44.

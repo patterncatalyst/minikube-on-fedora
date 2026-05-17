@@ -1,13 +1,12 @@
 ---
-title: "08-persistent-volume"
+title: "§8 persistent volume"
 order: 8
 example_dir: examples/08-persistent-volume
 permalink: /examples/08-persistent-volume/
 layout: docs
 ---
 
-> Source: [`examples/08-persistent-volume/`](https://github.com/patterncatalyst/minikube-on-fedora/tree/main/examples/08-persistent-volume)
-> &nbsp;&nbsp;|&nbsp;&nbsp; [← Back to examples index]({{ "/docs/16-examples/" | relative_url }})
+> Source: [`examples/08-persistent-volume/`](https://github.com/patterncatalyst/minikube-on-fedora/tree/main/examples/08-persistent-volume) &nbsp;|&nbsp; [← Back to examples index]({{ "/docs/16-examples/" | relative_url }})
 
 Demonstrates Kubernetes **PersistentVolumes** (PVs) and
 **PersistentVolumeClaims** (PVCs) by deploying nginx with content

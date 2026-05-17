@@ -1,13 +1,12 @@
 ---
-title: "06-deploy-nginx-kubectl"
+title: "§6 deploy nginx kubectl"
 order: 6
 example_dir: examples/06-deploy-nginx-kubectl
 permalink: /examples/06-deploy-nginx-kubectl/
 layout: docs
 ---
 
-> Source: [`examples/06-deploy-nginx-kubectl/`](https://github.com/patterncatalyst/minikube-on-fedora/tree/main/examples/06-deploy-nginx-kubectl)
-> &nbsp;&nbsp;|&nbsp;&nbsp; [← Back to examples index]({{ "/docs/16-examples/" | relative_url }})
+> Source: [`examples/06-deploy-nginx-kubectl/`](https://github.com/patterncatalyst/minikube-on-fedora/tree/main/examples/06-deploy-nginx-kubectl) &nbsp;|&nbsp; [← Back to examples index]({{ "/docs/16-examples/" | relative_url }})
 
 First workload-deployment example in the tutorial. A smoke test that
 builds a small nginx image with a two-stage `Containerfile` (UBI 9

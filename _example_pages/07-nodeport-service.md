@@ -1,13 +1,12 @@
 ---
-title: "07-nodeport-service"
+title: "§7 nodeport service"
 order: 7
 example_dir: examples/07-nodeport-service
 permalink: /examples/07-nodeport-service/
 layout: docs
 ---
 
-> Source: [`examples/07-nodeport-service/`](https://github.com/patterncatalyst/minikube-on-fedora/tree/main/examples/07-nodeport-service)
-> &nbsp;&nbsp;|&nbsp;&nbsp; [← Back to examples index]({{ "/docs/16-examples/" | relative_url }})
+> Source: [`examples/07-nodeport-service/`](https://github.com/patterncatalyst/minikube-on-fedora/tree/main/examples/07-nodeport-service) &nbsp;|&nbsp; [← Back to examples index]({{ "/docs/16-examples/" | relative_url }})
 
 Exposes the §6 nginx workload through a **NodePort Service** instead
 of ClusterIP. The educational point is "this Service exposes the

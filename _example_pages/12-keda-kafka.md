@@ -1,13 +1,12 @@
 ---
-title: "12-keda-kafka"
+title: "§12 keda kafka"
 order: 12
 example_dir: examples/12-keda-kafka
 permalink: /examples/12-keda-kafka/
 layout: docs
 ---
 
-> Source: [`examples/12-keda-kafka/`](https://github.com/patterncatalyst/minikube-on-fedora/tree/main/examples/12-keda-kafka)
-> &nbsp;&nbsp;|&nbsp;&nbsp; [← Back to examples index]({{ "/docs/16-examples/" | relative_url }})
+> Source: [`examples/12-keda-kafka/`](https://github.com/patterncatalyst/minikube-on-fedora/tree/main/examples/12-keda-kafka) &nbsp;|&nbsp; [← Back to examples index]({{ "/docs/16-examples/" | relative_url }})
 
 Demonstrates KEDA's canonical pattern: a Kafka consumer that
 scales **from zero based on consumer lag**, then back to zero

@@ -5,9 +5,14 @@
 #
 # For each examples/NN-name/ directory containing a README.md, generates
 # _example_pages/NN-name.md with proper Jekyll front matter and the
-# README body inlined. The first H1 line of the README becomes the page
-# title (the H1 itself is stripped from the body since the layout will
-# render the title from front matter).
+# README body inlined.
+#
+# Title extraction:
+#   1. Use the first H1 from the README, if present AND it's not just
+#      the directory name (e.g. "# 03-driver-check" is too slug-like
+#      to make a good page title).
+#   2. Otherwise, derive a readable title from the slug:
+#      "03-driver-check" → "§3 driver check"
 #
 # Idempotent — safe to re-run anytime example READMEs change. The
 # generated _example_pages/*.md files should be committed to git so
@@ -27,6 +32,12 @@ mkdir -p _example_pages
 
 declare -i generated=0
 declare -i skipped=0
+
+# Normalize a string for comparison: lowercase, collapse whitespace,
+# strip leading/trailing whitespace.
+normalize() {
+    printf '%s' "$1" | tr '[:upper:]' '[:lower:]' | tr -s ' ' | sed 's/^ //; s/ $//'
+}
 
 for example_dir in examples/*/; do
     [[ -d "$example_dir" ]] || continue
@@ -48,19 +59,38 @@ for example_dir in examples/*/; do
     fi
     order=$((10#$nn))
 
-    # Extract first H1 as title. If none, fall back to a derived title.
-    title=$(awk '
+    # Build the readable-slug fallback title.
+    # "06-deploy-nginx-kubectl" → slug "deploy-nginx-kubectl" → "deploy nginx kubectl"
+    slug="${name#*-}"
+    readable_slug="${slug//-/ }"
+    fallback_title="§${order} ${readable_slug}"
+
+    # Extract first H1 from README.
+    h1_title=$(awk '
         /^#[[:space:]]/ {
             sub(/^#[[:space:]]+/, "")
             print
             exit
         }
     ' "$readme")
-    if [[ -z "$title" ]]; then
-        # Derive a title from the slug: "06-deploy-nginx-kubectl" → "Example §6: deploy nginx kubectl"
-        slug="${name#*-}"
-        readable_slug="${slug//-/ }"
-        title="Example §${order}: ${readable_slug}"
+
+    # Decide which title to use.
+    # If H1 is missing → fallback.
+    # If H1 normalizes to the same string as the directory name or its
+    # readable form → it's too slug-like to be a good title, use the
+    # fallback.
+    # Otherwise → use the H1 as-is.
+    if [[ -z "$h1_title" ]]; then
+        title="$fallback_title"
+    else
+        norm_h1=$(normalize "$h1_title")
+        norm_dirname=$(normalize "$name")
+        norm_readable=$(normalize "$readable_slug")
+        if [[ "$norm_h1" == "$norm_dirname" || "$norm_h1" == "$norm_readable" ]]; then
+            title="$fallback_title"
+        else
+            title="$h1_title"
+        fi
     fi
 
     # Extract body — everything after the first H1 (if there was one), else everything.
@@ -73,7 +103,7 @@ for example_dir in examples/*/; do
         { print }
     ' "$readme")
 
-    # Trim leading blank lines from body
+    # Trim leading blank lines from body.
     body=$(printf '%s\n' "$body" | awk 'NF || started { started = 1; print }')
 
     output="_example_pages/${name}.md"
@@ -85,12 +115,11 @@ for example_dir in examples/*/; do
         printf 'permalink: /examples/%s/\n' "$name"
         printf 'layout: docs\n'
         printf -- '---\n\n'
-        printf '> Source: [`examples/%s/`](https://github.com/patterncatalyst/minikube-on-fedora/tree/main/examples/%s)\n' "$name" "$name"
-        printf '> &nbsp;&nbsp;|&nbsp;&nbsp; [← Back to examples index]({{ "/docs/16-examples/" | relative_url }})\n\n'
+        printf '> Source: [`examples/%s/`](https://github.com/patterncatalyst/minikube-on-fedora/tree/main/examples/%s) &nbsp;|&nbsp; [← Back to examples index]({{ "/docs/16-examples/" | relative_url }})\n\n' "$name" "$name"
         printf '%s\n' "$body"
     } > "$output"
 
-    printf 'OK   %s → %s\n' "$readme" "$output"
+    printf 'OK   %s → %s (title: %s)\n' "$readme" "$output" "$title"
     generated+=1
 done
 
