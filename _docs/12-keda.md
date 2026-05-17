@@ -321,7 +321,7 @@ Once the Strimzi operator has reconciled the `Kafka` CR,
 `kubectl get kafka,kafkanodepool,pod -n kafka` shows the
 fully-converged state:
 
-![Strimzi Kafka cluster Ready, version 4.1.0, metadata version 4.1-IV1]({% raw %}{{ "/assets/screenshots/strimzi-kafka-cluster-ready.png" | relative_url }}{% endraw %})
+![Strimzi Kafka cluster Ready, version 4.1.0, metadata version 4.1-IV1]({{ "/assets/screenshots/strimzi-kafka-cluster-ready.png" | relative_url }})
 
 Reading top to bottom:
 

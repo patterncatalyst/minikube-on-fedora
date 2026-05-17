@@ -1579,22 +1579,120 @@ have to derive them.
 
   Verified row count unchanged at **107**.
 
-**Open, priority-ordered:**
+- **r17** (2026-05-17, editorial pass + audit tooling — final
+  iteration) — closes out the project. Three deliverables, two
+  fixes, one document.
 
-1. **r17** — Editorial pass + deployed-preview review.
-   Read every section's prose front-to-back. Tighten word
-   choice, ensure consistent voice ("you" for reader,
-   passive otherwise), verify cross-references between
-   sections, sweep for stale TODO markers, ensure each
-   section's "Verification" subsection points to the right
-   example dir. Update the homepage's section list if it
-   was auto-generated from `_docs/*.md` to reflect the
-   now-complete §1-§15 set. **Visit the deployed preview**
-   and eyeball every section's rendered output — both for
-   layout quality (diagrams placed sensibly, prose flow
-   reads well) and for any other kramdown / Liquid
-   collisions we may have missed
-2. Optional: §10 row promotions (`which k9s` etc.) — low
+  **Deliverables (scripts):**
+  - `scripts/check-cross-references.sh` — finds every internal
+    Jekyll link (`]({{ "/..." | relative_url }})`) across
+    `_docs/*.md` and verifies each `/docs/SLUG/` target
+    corresponds to a real `_docs/NN-slug.md`. Exit 1 if any
+    are broken. Catches stale section-rename links like the
+    §12→§13-wrap-up case from r16c. Smoke-tested against a
+    synthetic repo with a deliberately broken link before
+    shipping
+  - `scripts/editorial-audit.sh` — advisory grep battery for
+    known problem patterns: stale "13-wrap-up" references,
+    bare `<placeholder>` inside inline backticks (kramdown
+    collision risk; only flagged outside fenced blocks via
+    fence-counting), "minikube VM" references that should be
+    "minikube node container" under the podman driver,
+    first-person plural voice, `{% raw %}`-wrapped
+    `relative_url` URLs (broken image src pattern), stale
+    TODO/FIXME/XXX markers, and duplicate flags within a
+    single shell command (continuation-aware — correctly
+    handles `\` line-continuations and doesn't flag separate
+    commands that happen to share a flag)
+  - `_plans/prd-reconciliation.md` — the "what shipped vs what
+    was planned" document the PRD template anticipated would
+    be useful at project close. Covers goals/non-goals
+    actual vs intent, audience concretization, the shipped
+    section outline, divergences (macOS dropped, UBI instead
+    of Hummingbird, vendor-neutral relaxed for §13,
+    Podman not version-pinned), and six process observations
+    worth carrying to future projects
+
+  **Real fixes applied:**
+  - **§11**: removed duplicate `--container-runtime=containerd`
+    flag in the `minikube start -p istio` block (caught by the
+    audit script; would have caused `cobra` to warn but minikube
+    would still start — sloppy but not broken)
+  - **§11 + §12**: removed `{% raw %}{{ ... | relative_url }}{% endraw %}`
+    wraps from three image embeds (two Kiali screenshots in §11,
+    one Strimzi screenshot in §12). The `{% raw %}` prevented
+    Liquid from evaluating the `relative_url` filter, leaving
+    the literal `{{ ... }}` string as the image src. These
+    images would not have rendered correctly on the deployed
+    site; r17 fixes them. The PRD reconciliation document
+    records this as Process Observation #3
+
+  **Findings deliberately NOT fixed:**
+  - 7 instances of "we" voice ("we'll", "we go with", etc.)
+    in §11 and §12. Most are contextual ("if we had one";
+    quoted KEDA README text "we can't yet recommend"; "we go
+    with Strimzi" introducing a tutorial choice). Mechanical
+    rewriting would introduce awkward phrasing. The audit
+    script flags them so they can be reviewed by section if
+    desired; the editorial judgment is the audit's purpose
+
+  **What r17 did NOT cover (and why):**
+  - **Editorial pass on §1-§10 prose.** I don't have the file
+    contents for those sections in the current context. The
+    audit scripts work on every section the user runs them
+    against, so when they're run against the deployed repo
+    they'll surface any §1-§10 findings — and r17a can target
+    fixes if anything turns up
+  - **Deployed-preview render review.** This is inherently a
+    human task: open the rendered site in a browser, eyeball
+    each section, flag visual issues that build-success
+    doesn't catch. Recorded as the next step for the user
+
+  **Closing out the reconciliation plan:**
+
+  The project is structurally complete. §1–§12 are verified
+  end-to-end on Fedora 44 (**107 verified rows**). §13–§15 are
+  shipped as prose. All five diagrams are SVG, embedded in the
+  right positions. The cross-reference link audit script and
+  the editorial audit script make ongoing quality checks
+  one-command operations. The PRD reconciliation document
+  records what we built vs what we planned, with rationale for
+  each divergence.
+
+  This entry is the last Section D entry I expect to write
+  for this project. If anything turns up in deployed-preview
+  review, the relevant fix will get its own r17a / r17b /
+  etc. entry — but as of r17 the tutorial is feature-complete.
+
+  Files shipped in r17:
+  - `scripts/check-cross-references.sh`
+  - `scripts/editorial-audit.sh`
+  - `_docs/11-istio.md` (4 fixes)
+  - `_docs/12-keda.md` (1 fix)
+  - `_plans/prd-reconciliation.md` (new)
+  - `_plans/reconciliation-plan.md` (this entry)
+
+  Verified row count unchanged at **107**.
+
+---
+
+**Open priorities (after r17):**
+
+1. **Deployed-preview render review** — your part. Open the
+   GitHub Pages site, click through every section, verify
+   diagrams render at the right size on whatever viewports
+   matter to you (desktop, tablet, mobile if applicable),
+   prose paragraphs aren't excessively long, code blocks
+   don't horizontally scroll on common widths, and the
+   navigation between sections works as expected
+2. **Run the audit scripts** — `./scripts/check-cross-references.sh`
+   and `./scripts/editorial-audit.sh` from the repo root.
+   Any findings beyond what r17 cleaned up are candidates for
+   r17a fixes; let me know if anything turns up
+3. Optional: §10 row promotions (`which k9s` etc.) — low
    priority, can stay unverified
-3. Optional: §8 PV auto-delete row, §7 leftovers — low
+4. Optional: §8 PV auto-delete row, §7 leftovers — low
    priority, can stay unverified
+5. Optional: re-run the §11–§12 editorial audit against §1–§10
+   when convenient; paste any findings and I'll ship r17a if
+   meaningful fixes are needed

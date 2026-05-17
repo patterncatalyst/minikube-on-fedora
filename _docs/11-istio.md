@@ -126,8 +126,7 @@ minikube start -p istio \
     --memory=6g \
     --cpus=4 \
     --container-runtime=containerd \
-    --rootless=true \
-    --container-runtime=containerd
+    --rootless=true
 ```
 
 (The same flags as §3, just on a fresh profile and with more
@@ -643,9 +642,7 @@ show `4 application` (productpage, details, ratings, reviews)
 with a climbing inbound-traffic sparkline as the curl loop
 runs:
 
-{% raw %}
 ![Kiali Overview showing namespace cards with live traffic]({{ "/assets/screenshots/kiali-overview.png" | relative_url }})
-{% endraw %}
 
 Navigate to **Traffic Graph → Namespace: default** for the
 mesh visualization. With **Display → Traffic Animation** turned
@@ -654,9 +651,7 @@ services — individual requests flowing through the mesh in
 near-real time. Green edges are healthy (100% success); errors
 and slowdowns show as yellow or red:
 
-{% raw %}
 ![Kiali Traffic Graph showing live mesh traffic with success metrics]({{ "/assets/screenshots/kiali-traffic-graph.png" | relative_url }})
-{% endraw %}
 
 The right-hand panel shows aggregate stats for the selected
 subgraph — requests/second, success rate, error rate, and a
