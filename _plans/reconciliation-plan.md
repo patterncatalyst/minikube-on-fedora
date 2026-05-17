@@ -1696,3 +1696,179 @@ have to derive them.
 5. Optional: re-run the §11–§12 editorial audit against §1–§10
    when convenient; paste any findings and I'll ship r17a if
    meaningful fixes are needed
+
+   # Reconciliation plan addition — r18
+
+   > Merge instructions: append the entry below to Section D of
+   > `_plans/reconciliation-plan.md`, right after the r17 entry
+   > and just before the `**Open priorities (after r17):**`
+   > section. Then update the "Open priorities" section to
+   > reflect r18 close-out.
+
+   ---
+
+   - **r18** (project close-out — examples-as-pages, onboarding
+     folder, top-level README rewrite) — landed the last cluster
+     of changes before declaring victory. Six deliverables:
+
+     **1. Examples-as-pages structure.** Each runnable example in
+     `examples/NN-name/` now has a corresponding published Jekyll
+     page at `/examples/NN-name/`, generated from the example's
+     `README.md` via `scripts/sync-example-pages.sh`. Implementation:
+
+     - New Jekyll collection `example_pages` configured in
+       `_config.yml` with `output: true` and
+       `permalink: /examples/:name/`
+     - New directory `_example_pages/` holds the generated pages.
+       Filenames mirror `examples/NN-name/` (so the slug is the
+       same; the URL is `/examples/NN-name/` not `/examples/name/`)
+     - `scripts/sync-example-pages.sh` reads every
+       `examples/*/README.md`, extracts the H1 as the page title,
+       inlines the rest as the body, prepends Jekyll front matter
+       (order, example_dir, permalink, layout), and writes to
+       `_example_pages/`. Idempotent — safe to re-run anytime
+       a README changes
+     - `_docs/16-examples.md` is the new hub page. It iterates
+       over `site.example_pages` (sorted by `order`), renders a
+       bulleted list with title, example-dir source link, and
+       description. Also documents the "what's NOT an example"
+       list (§1, §2, §5, §10, §13–§15)
+
+     Trade-off recorded: the example README is the source of
+     truth; the `_example_pages/*.md` files are generated
+     artifacts that get committed to the repo (so GitHub Pages
+     builds can use them without running the sync). Edit the
+     README, re-run sync, commit both. The audit scripts catch
+     drift if the user forgets to re-sync.
+
+     **2. Onboarding folder.** `LESSONS-LEARNED.md`,
+     `GETTING-STARTED.md`, and `STARTING-WITH-CLAUDE.md` moved
+     from repo root into a new `onboarding/` directory. New
+     `onboarding/README.md` is the folder's navigation hub —
+     three short paragraphs pointing each of three audiences
+     ("setting up", "understanding the why", "continuing the
+     collaboration") at the right doc. Top-level `README.md`
+     links to the onboarding folder.
+
+     **3. LESSONS-LEARNED.md updates.** Shipped as an addendum
+     file (`onboarding/LESSONS-LEARNED-r18-additions.md`) that
+     the user merges into the existing
+     `onboarding/LESSONS-LEARNED.md` after the move. The
+     addendum covers ~25 lessons from r1–r18 organized into:
+     Process, Jekyll/kramdown, Shell/scripts,
+     Kubernetes/minikube, Image/packaging, Tooling, and
+     Project management. Reason for the addendum-merge pattern:
+     r18 was developed without access to the existing
+     `LESSONS-LEARNED.md` contents (couldn't fetch from
+     raw.githubusercontent.com), so blind replacement would
+     have risked losing prior content.
+
+     **4. Top-level README rewrite.** The new `README.md`
+     reflects the actual shipped structure: `onboarding/`
+     folder, `_example_pages/` collection, `scripts/` with the
+     three audit/sync scripts, expanded `_plans/` with both the
+     reconciliation plan and the PRD reconciliation. The
+     "Project layout" tree is updated to match. Adds explicit
+     pointers to `onboarding/` for new contributors. Adds the
+     "Quality checks" section documenting the two audit scripts
+     shipped in r17 and the sync script shipped in r18. Adds
+     references to the published per-example pages.
+
+     **5. PRD additions.** Shipped as a patch document
+     (`_plans/PRD-r18-additions.md`) that the user merges into
+     the existing `PRD.md`. Covers: shipped deliverables
+     expanded to include audit tooling + per-example pages
+     + onboarding folder + PRD reconciliation; shipped section
+     outline with "Has Example Page" column; non-goals expanded
+     to acknowledge the three intentional divergences from the
+     original PRD (vendor-neutral relaxed, "we" voice not
+     strictly avoided, Podman not version-pinned); shipped
+     audience concretization (Fedora 44 / basic-container-literacy
+     primary); project state (107 verified, audit clean, closed).
+
+     **6. Reconciliation plan close-out** — this entry, plus an
+     updated "Open priorities" section that retires the
+     pre-r17 priorities and replaces them with the post-r18
+     state: project closed, future work as new iterations.
+
+     Files shipped in r18 (delivered as tarball, applied via
+     `tar -xzf` + `bash scripts/r18-reorganize.sh` for the
+     moves):
+
+     - `scripts/sync-example-pages.sh` (new)
+     - `_docs/16-examples.md` (new hub page)
+     - `README.md` (rewritten)
+     - `onboarding/README.md` (new navigation hub)
+     - `onboarding/LESSONS-LEARNED-r18-additions.md` (addendum
+       to merge)
+     - `_plans/PRD-r18-additions.md` (addendum to merge)
+     - `_plans/reconciliation-plan.md` (this entry — spliced
+       via the merge instructions in
+       `_plans/reconciliation-plan-r18-addition.md`)
+     - `r18-INSTRUCTIONS.md` (manual steps reference)
+
+     Verified row count unchanged at **107**.
+
+     **Manual steps required after extracting r18 tarball:**
+
+     1. Move the three onboarding files into `onboarding/`:
+        `mv LESSONS-LEARNED.md GETTING-STARTED.md STARTING-WITH-CLAUDE.md onboarding/`
+     2. Edit `_config.yml` to add the `example_pages` collection
+        (block provided in `r18-INSTRUCTIONS.md`)
+     3. Merge `onboarding/LESSONS-LEARNED-r18-additions.md`
+        contents into `onboarding/LESSONS-LEARNED.md`; delete
+        the additions file
+     4. Merge `_plans/PRD-r18-additions.md` contents into
+        `PRD.md`; delete the additions file
+     5. Splice this reconciliation-plan entry into
+        `_plans/reconciliation-plan.md` per the instructions
+        above; delete `_plans/reconciliation-plan-r18-addition.md`
+     6. Run `./scripts/sync-example-pages.sh` to generate the
+        `_example_pages/` files from the current
+        `examples/*/README.md` files
+     7. Update §15 footer: change
+        `[← Back to outline]({{ "/" | relative_url }})` (or
+        wherever §15 currently ends) to also add a forward link
+        `[On to §16: Examples →]({{ "/docs/16-examples/" | relative_url }})`
+     8. Run `./scripts/check-cross-references.sh` to verify the
+        new §15→§16 link and the §16→§15 back-link resolve
+     9. `git add -A && git status` for review; commit and push
+
+   ---
+
+   **Replace the "Open priorities (after r17)" section with:**
+
+   **Project state (post-r18): closed**
+
+   The tutorial is feature-complete. §1–§15 deliver the linear
+   narrative; §16 indexes the per-example pages. 107 facts
+   verified on Fedora 44. Audit scripts pass clean (or report
+   only judgment-call findings like "we" voice that were
+   deliberately not changed). Onboarding folder centralizes
+   orientation docs; top-level README reflects actual layout;
+   PRD updated to match shipped reality.
+
+   Any future work happens as **new iterations** (r19+)
+   addressing specific findings from continued use of the
+   tutorial, not as a continuation of the original project
+   plan.
+
+   The "Open priorities" tracked through r17 are retired:
+
+   - ~~Deployed-preview render review~~ — user's responsibility,
+     ongoing
+   - ~~Run the audit scripts~~ — done; user confirmed
+     "looks like it worked" after r17
+   - §10 row promotions, §8/§7 leftovers — remain `unverified`;
+     acceptable per the reconciliation discipline (default is
+     unverified, promotion requires explicit human test)
+
+   What "victory" looks like, recorded for future projects:
+
+   1. Every claim verified or marked unverified — done (107 verified)
+   2. Every internal cross-reference resolves — done (audit clean)
+   3. The "what shipped vs. what was planned" diff written down —
+      done (`_plans/prd-reconciliation.md`)
+
+   Not on the victory list: "every section reads perfectly" (that's
+   infinite work). Knowing when to ship is the discipline.

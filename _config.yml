@@ -41,6 +41,9 @@ collections:
   plans:
     output: true
     permalink: /plans/:name/
+  example_pages:
+    output: true
+    permalink: /examples/:name/
 
 # Default front-matter — saves typing `layout: tutorial` on every doc.
 defaults:
@@ -69,3 +72,4 @@ exclude:
   - LESSONS-LEARNED.md
   - GETTING-STARTED.md
   - STARTING-WITH-CLAUDE.md
+  - r18-INSTRUCTIONS.md
