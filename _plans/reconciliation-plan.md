@@ -141,6 +141,19 @@ and what's next.
   `sudo dnf install -y yq` rather than the upstream binary
   download; the historical "python-yq" concern doesn't apply
   on Fedora 44
+- **r05a** (2026-05-17, build-fix) — `_layouts/default.html`
+  uses `{% seo title=false %}` (the `jekyll-seo-tag` plugin
+  tag), but the Gemfile shipped from the skeleton didn't
+  include the plugin in its `:jekyll_plugins` group. Every
+  build since r02 has been failing with
+  `Liquid syntax error (line 10): Unknown tag 'seo'`. r05a
+  adds `gem "jekyll-seo-tag"` to the Gemfile to resolve.
+  Worth a `gh run list --workflow=pages.yml --limit 10` after
+  this deploys to see how long the build has actually been
+  broken — possible the original r02 "site is up" was a
+  GitHub Pages placeholder rather than rendered content. Skeleton
+  bug that should be reported upstream for the next person who
+  uses it
 
 **Open, priority-ordered:**
 

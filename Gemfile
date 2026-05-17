@@ -7,10 +7,10 @@ gem "jekyll", "~> 4.3"
 gem "kramdown-parser-gfm"
 gem "rouge"
 
-# Optional but useful: live reload in `jekyll serve`
 group :jekyll_plugins do
   gem "jekyll-feed"     # generates /feed.xml automatically
   gem "jekyll-sitemap"  # generates /sitemap.xml automatically
+  gem "jekyll-seo-tag"  # provides {% seo %} — used in _layouts/default.html
 end
 
 # Windows and macOS sometimes need this explicitly
