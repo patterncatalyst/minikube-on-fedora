@@ -1180,18 +1180,64 @@ have to derive them.
 | §10 Editor/shell/terminal | (mostly verified, some `which`-tier rows still unverified — low-value) |
 | §11 Istio | ✓ | Bookinfo + native sidecars + Kiali addons |
 | §12 KEDA | ✓ | Strimzi Kafka 4.1.0 lag scaling + HTTP add-on |
+| §13 Wrap-up | ✓ (prose) | Closing recap shipped in r14 |
+
+- **r14** (2026-05-17, §13 wrap-up — Phase 6 begins) —
+  first ship of the tail-section work. §13 is a closing
+  prose chapter, not a demo:
+  - **What you've built**: recap of cluster state, cached
+    UBI images, installed tooling, the bigger mental models
+    the reader should now have (Deployment/Service/Pod
+    relationships, PV+initContainer pattern, helm as both
+    package manager + templating engine, operator pattern,
+    scale-to-zero as a generalized primitive)
+  - **Patterns that kept coming up**: rootless containerd
+    via podman, UBI as runtime base, multi-stage builds,
+    operator pattern for stateful workloads, defensive
+    scripting around external dependencies, honest
+    assertions (with the §12 false-positive episode named
+    explicitly), inotify limits at multi-cluster scale.
+    These are the recurring themes worth naming because the
+    reader will keep making them in any future K8s project
+  - **Where to go next**: two buckets. "Going deeper on what
+    you've built" — run §12 Kafka demo with real workload,
+    use `hey -z` to drive sustained §12 HTTP load, modify
+    Istio VirtualService for header-based routing.
+    "Production-like next steps" — replace NodePort with
+    ingress-nginx + cert-manager, adopt GitOps (ArgoCD or
+    Flux), set up real observability (kube-prometheus-stack),
+    multi-node on real hardware (k3s or kubeadm), build CI
+    to push to the cluster
+  - **Useful resources**: bookmark-worthy external links
+    (kubernetes.io, CNCF landscape, Istio docs, KEDA scalers
+    catalog, Strimzi docs)
+  - **Closing thought**: brief reflection on the hands-on
+    learning approach the tutorial encourages, without
+    being preachy about it
+
+  1900 words, ~10 minute read. Voice intentionally looser
+  than the technical sections — it's a closing chapter, not
+  a how-to, so reflective prose works where step-by-step
+  instructions would feel out of place. Liquid-safe (no
+  `{{ }}` collisions). Links use the standard relative_url
+  helper. No `{% raw %}` blocks needed (no code samples).
+
+  Footer link goes back to the outline rather than forward
+  to a next section, since this is the end of the tutorial
+  body. The cross-reference at the end of §12 ("On to §13:
+  Wrap-up →") now resolves correctly.
+
+  Reconciliation plan: §13 added to the phase coverage map.
+  No Section B rows because there's nothing to verify — the
+  section is reflective prose pointing at external resources.
+  Verified row count unchanged at **107**.
+
+  Anticipated r15 (diagrams) and r16 (editorial pass) ship
+  next, completing Phase 6 and the tutorial as a whole
 
 **Open, priority-ordered:**
 
-1. **r14** — §13 "Wrap-up". A short closing section that
-   recaps what the reader has built (one cluster running
-   §3-§10 demos, optionally a second `istio` profile for
-   §11, KEDA + Strimzi on the main profile for §12) and
-   names the tutorial's themes (rootless containerd via
-   podman, operator-pattern for stateful workloads, UBI as
-   the runtime base, defensive scripting around external
-   dependencies). One-page section, no demo, prose only
-2. **r15** — Diagrams. Paired `.svg` + `.excalidraw` source
+1. **r15** — Diagrams. Paired `.svg` + `.excalidraw` source
    files in `assets/diagrams/`. Anticipated set: (a)
    §3-§5 minikube topology overview, (b) §6-§9
    Deployment/Service/Ingress relationships, (c) §11 Istio
@@ -1200,14 +1246,18 @@ have to derive them.
    add-on architecture (interceptor + scaler + operator).
    The current prose ASCII diagrams are placeholders that
    work but don't scale well; SVG versions render properly
-   on hi-DPI displays and can be edited
-3. **r16** — Editorial pass. Read every section's prose
+   on hi-DPI displays and can be edited via `.excalidraw`
+2. **r16** — Editorial pass. Read every section's prose
    front-to-back as if for the first time. Tighten word
    choice, ensure consistent voice ("you" for reader,
    passive otherwise), verify cross-references between
    sections, sweep for stale TODO markers, ensure each
    section's "Verification" subsection points to the right
    example dir
+3. Optional: §10 row promotions (`which k9s` etc.) — low
+   priority, can stay unverified
+4. Optional: §8 PV auto-delete row, §7 leftovers — low
+   priority, can stay unverified
 4. Optional: §10 row promotions (`which k9s` etc.) — low
    priority, can stay unverified
 5. Optional: §8 PV auto-delete row, §7 leftovers — low
