@@ -183,6 +183,108 @@ the list of commits. The rule of thumb:
 The reconciliation plan is the honest source of truth for what's
 real vs. what's drafted-but-untested. Keep it honest.
 
+## Site authoring conventions
+
+Jekyll's Liquid templating uses `{{ }}` and `{% %}` syntax. Several
+things this tutorial discusses also use `{{ }}` — Go templates in
+helm charts, kustomize templated YAML, `podman info --format`
+strings, future Istio config patterns. When Liquid encounters
+these in markdown, it tries to evaluate them. Best case: noisy
+warnings during build. Worst case: the build crashes because
+Liquid's parser tries to run the foreign template as a Liquid
+pipeline and hits an arity mismatch (the kind that exits the
+build with code 1).
+
+Two conventions handle this cleanly. Different file types use
+different mechanisms because the trade-offs differ.
+
+### `_docs/*.md` — wrap individual blocks
+
+The section pages mix intentional Liquid (`{{ "/docs/foo/" |
+relative_url }}` in nav links, `{% seo %}` in the layout) with
+content that *describes* templates from other tools (helm, podman
+format strings, etc.). The right granularity is per-block.
+
+For any markdown code block containing `{{ }}` syntax that isn't
+Liquid:
+
+```markdown
+{% raw %}
+``yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "nginx-helm.fullname" . }}-content
+``
+{% endraw %}
+```
+
+(Triple-backticks shown as double here so this markdown file
+itself doesn't break. Use real triple-backticks in your actual
+content.)
+
+The `{% raw %}` / `{% endraw %}` tags sit outside the code fence;
+the markdown renderer still treats the fenced block as code, and
+Liquid passes its contents through verbatim.
+
+Inline mentions in prose work the same way — wrap the paragraph:
+
+```markdown
+{% raw %}**Go templating + Sprig functions** — `{{ .Values.foo }}`
+inserts a value …{% endraw %}
+```
+
+### `_plans/*.md` — disable Liquid wholesale
+
+The plan files (`reconciliation-plan.md`, `iteration-plan.md`)
+describe project state in prose, including frequent references to
+templating syntax inside markdown table cells. Wrapping every
+mention in `{% raw %}` works but breaks table rendering in some
+edge cases — table cells don't always play nicely with embedded
+Liquid tags.
+
+These files don't actually use any Liquid features. Disable
+Liquid for the entire file via front matter:
+
+```yaml
+---
+title: Reconciliation plan
+description: …
+render_with_liquid: false
+---
+```
+
+The `render_with_liquid: false` directive (Jekyll 3.0+) tells the
+build to skip Liquid processing for this page. Markdown rendering
+still happens. No raw tags needed anywhere in the body.
+
+### Catching collisions before push
+
+`scripts/check-liquid-collisions.sh` runs a static check for both
+conventions. It's bash + awk, runs in well under a second, doesn't
+need Ruby/Bundler/Jekyll installed:
+
+```bash
+./scripts/check-liquid-collisions.sh
+```
+
+What it catches in `_docs/`:
+
+- `{{ .UpperCase }}` patterns (Go template variable access; Liquid
+  uses lowercase by convention)
+- `{{ printf }}`, `{{ define }}`, `{{ range }}`, `{{ with }}`,
+  `{{ include "..." . }}` (Go-only constructs)
+- `{{/* ... */}}` Go template comments
+
+What it catches in `_plans/`:
+
+- Any `{{ }}` content in a file missing
+  `render_with_liquid: false` in front matter
+
+Run it whenever a section adds template-heavy content. CI also
+catches the same issues via the actual Jekyll build — this is an
+optional pre-flight that gives faster feedback than push-then-wait.
+
 ## Branching and PRs
 
 - Default branch: `main`
