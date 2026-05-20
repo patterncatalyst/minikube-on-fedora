@@ -1,0 +1,34 @@
+apiVersion: v2
+name: capstone
+description: §17 capstone data-mesh umbrella chart — orchestrates platform components (Strimzi, KEDA, Istio, observability, Apicurio, OpenMetadata, Prefect, Postgres) and the five domain services (order, inventory, payment, shipping, notification).
+type: application
+version: 0.1.0-skeleton
+appVersion: "r20"
+keywords:
+  - data-mesh
+  - tutorial
+  - capstone
+  - minikube
+  - fedora
+sources:
+  - https://github.com/patterncatalyst/minikube-on-fedora
+
+# Dependencies will be declared incrementally as subcharts land in r21+.
+# Skeleton ships without dependencies; values.yaml defines feature flags
+# for every component so the deploy can be staged.
+#
+# Anticipated subchart additions (in iteration order):
+#   r21  charts/order-service
+#   r22  charts/inventory-service, charts/payment-service,
+#        charts/shipping-service, charts/notification-service
+#   r24  charts/graphql-gateway
+#   r25  charts/strimzi-cluster   (Kafka cluster CR, not the operator)
+#   r25  charts/apicurio
+#   r26  charts/keda-scaling      (ScaledObjects for our services)
+#   r27  charts/observability     (OTEL Collector, Prometheus, Tempo, Grafana)
+#   r27  charts/openmetadata
+#   r28  charts/prefect
+#
+# Strimzi, KEDA, and Istio control planes are installed separately via
+# their own helm releases (consistent with §11/§12); they are platform
+# infrastructure, not part of this umbrella chart.

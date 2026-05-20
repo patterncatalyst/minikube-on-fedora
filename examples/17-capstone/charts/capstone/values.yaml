@@ -1,0 +1,240 @@
+# §17 capstone umbrella chart values.
+#
+# Every component has an `enabled` flag so the deploy can be staged
+# incrementally. Default values represent the steady-state full-deploy
+# configuration; flip `enabled: false` to omit a component from a
+# partial-stack deploy.
+#
+# Resource defaults are sized for a 24 GB / 16 CPU `capstone` minikube
+# profile (see scripts/setup-capstone-profile.sh). Adjust if you've
+# given the profile more or less.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Global settings (consumed by subcharts via helm's `global` mechanism)
+# ─────────────────────────────────────────────────────────────────────────────
+global:
+  # Single namespace for the capstone deploy. Istio injection is enabled here.
+  namespace: capstone
+
+  # Image-pull policy across all services. IfNotPresent works for both
+  # locally-built (minikube image cache) and registry-sourced images.
+  imagePullPolicy: IfNotPresent
+
+  # OTLP endpoint for all services. Points at the OTEL Collector service
+  # within the capstone namespace.
+  otlpEndpoint: "otel-collector.capstone.svc.cluster.local:4317"
+
+  # Apicurio Registry endpoint for schema + API contract publication.
+  apicurioEndpoint: "http://apicurio.capstone.svc.cluster.local:8080"
+
+  # Kafka bootstrap endpoint (Strimzi-managed). Matches §12's naming.
+  kafkaBootstrap: "my-kafka-kafka-bootstrap.capstone.svc.cluster.local:9092"
+
+  # Postgres connection target (single cluster, schema per service).
+  postgresHost: "capstone-postgres-rw.capstone.svc.cluster.local"
+  postgresPort: 5432
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Platform components (shared infrastructure)
+# ─────────────────────────────────────────────────────────────────────────────
+strimziCluster:
+  enabled: true
+  # Kafka cluster CR — the Strimzi operator must already be installed
+  # (per §12 pattern). The cluster runs in the capstone namespace.
+  version: "4.1.0"
+  replicas: 1   # single-broker dev cluster, NOT production-shaped
+  storage:
+    size: 10Gi
+
+apicurio:
+  enabled: true
+  # Apicurio Registry with Postgres backend
+  storage:
+    type: postgres   # vs in-memory; persists schemas across restarts
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+openmetadata:
+  enabled: true
+  # OpenMetadata with Postgres backend (lighter than Mysql+ES default).
+  # The OpenMetadata operator is installed separately; this subchart deploys
+  # the OpenMetadata server CR.
+  resources:
+    requests:
+      cpu: 500m
+      memory: 1Gi
+    limits:
+      memory: 2Gi
+
+postgres:
+  enabled: true
+  # One shared Postgres cluster, one schema per service. Deployed via the
+  # CloudNativePG operator (operator install instructions in §17 r21 prose).
+  instances: 1
+  storage:
+    size: 20Gi
+
+observability:
+  enabled: true
+  otelCollector:
+    enabled: true
+    deploymentType: Deployment   # not DaemonSet; one collector per cluster
+    replicas: 1
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        memory: 512Mi
+  prometheus:
+    enabled: true
+    retention: 15d
+    storage:
+      size: 5Gi
+  tempo:
+    enabled: true
+    storage:
+      size: 5Gi
+  grafana:
+    enabled: true
+    adminPassword: capstone-demo   # demo only; rotate for any real use
+    persistence:
+      size: 1Gi
+
+prefect:
+  enabled: true
+  # Self-hosted Prefect 3.x OSS server. Stores flow state in Postgres
+  # (shares the capstone-postgres cluster, separate database).
+  server:
+    replicas: 1
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        memory: 512Mi
+  agent:
+    enabled: true
+    replicas: 1
+
+kedaScaling:
+  enabled: true
+  # KEDA itself is installed separately (per §12 pattern). This subchart
+  # only ships the ScaledObject CRs that target our five services.
+  httpAddon:
+    enabled: true   # required for order-service HTTP scaling
+  kafkaScalers:
+    enabled: true   # required for inventory/payment/shipping/notification
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Domain services (the data products themselves)
+# ─────────────────────────────────────────────────────────────────────────────
+orderService:
+  enabled: true
+  replicas: 1
+  image:
+    repository: order-service
+    tag: v1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+  # KEDA HTTP-add-on scaling parameters (applied by kedaScaling subchart)
+  scaling:
+    enabled: true
+    minReplicas: 0
+    maxReplicas: 5
+    targetConcurrency: 5
+
+inventoryService:
+  enabled: true
+  replicas: 1
+  image:
+    repository: inventory-service
+    tag: v1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+  scaling:
+    enabled: true
+    minReplicas: 0
+    maxReplicas: 3
+    kafkaLagThreshold: "10"
+
+paymentService:
+  enabled: true
+  replicas: 1
+  image:
+    repository: payment-service
+    tag: v1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+  scaling:
+    enabled: true
+    minReplicas: 0
+    maxReplicas: 3
+    kafkaLagThreshold: "10"
+
+shippingService:
+  enabled: true
+  replicas: 1
+  image:
+    repository: shipping-service
+    tag: v1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+  scaling:
+    enabled: true
+    minReplicas: 0
+    maxReplicas: 3
+    kafkaLagThreshold: "10"
+
+notificationService:
+  enabled: true
+  replicas: 1
+  image:
+    repository: notification-service
+    tag: v1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+  scaling:
+    enabled: true
+    minReplicas: 0
+    maxReplicas: 3
+    kafkaLagThreshold: "20"
+
+graphqlGateway:
+  enabled: true
+  replicas: 1
+  image:
+    repository: graphql-gateway
+    tag: v1
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+  # GraphQL gateway is REST-receiving (federated query endpoint),
+  # not KEDA-scaled — single replica is sufficient for the demos.
