@@ -1,0 +1,5 @@
+
+# Per-iteration apply/test/diagnose scaffolding (transient, not part of the tutorial)
+/apply-r*.sh
+/test-r*.sh
+/diagnose-*.sh

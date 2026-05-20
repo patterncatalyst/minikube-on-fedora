@@ -1,51 +1,54 @@
 # order-service Containerfile — UBI 9 multi-stage build (CAP-005).
 #
-# Builder stage: UBI 9 Python 3.12 with Poetry; resolves and installs
-# dependencies into a virtualenv.
-# Runtime stage: same UBI 9 Python 3.12 base, but only the venv + app code
-# (no Poetry, no build tooling). Same base both stages for reliability
-# (CAP-005); a true minimal runtime is a deferred optimization.
+# r21b fix: the UBI 9 python-312 image's default user is 1001, which cannot
+# write to /opt/venv (/opt is root-owned). The r21/r21a build failed with
+# "Permission denied: '/opt/venv'".
 #
-# Per CONTRIBUTING.md: UBI 9 base, USER 1001:0, no subscription-manager needed.
+# Fix (idiomatic multi-stage): the BUILDER stage runs as root — it's
+# discarded, so there's no security cost to writing /opt/venv there. Only the
+# RUNTIME stage enforces the non-root user (1001:0), and it merely reads and
+# executes the copied venv (with --chown to make ownership unambiguous).
+#
+# Per CONTRIBUTING.md: UBI 9 base, runtime as USER 1001:0, no
+# subscription-manager needed.
 
-# ─── Builder ─────────────────────────────────────────────────────────────────
+# ─── Builder (runs as root; image discarded) ─────────────────────────────────
 FROM registry.access.redhat.com/ubi9/python-312:latest AS builder
 
+USER 0
 WORKDIR /build
 
-# Install Poetry and the export plugin. Pin Poetry for reproducibility.
+# Install Poetry + export plugin. Pin both for reproducibility.
 RUN pip install --no-cache-dir "poetry==1.8.4" "poetry-plugin-export==1.8.0"
 
-# Copy only dependency manifests first for layer caching. poetry.lock* is a
-# glob so the build works whether or not the lock has been committed
-# (committing it is recommended — see CAP-001).
+# Dependency manifests first for layer caching. poetry.lock* glob works
+# whether or not the lock is committed (committing recommended — CAP-001).
 COPY pyproject.toml poetry.lock* ./
 
-# Export pinned requirements and install into an isolated venv.
+# Export pinned requirements and install into an isolated venv at /opt/venv.
+# Root can write /opt here; the runtime stage only reads the result.
 RUN poetry export --without-hashes --only main -f requirements.txt -o requirements.txt \
     && python -m venv /opt/venv \
     && /opt/venv/bin/pip install --no-cache-dir -r requirements.txt
 
-# ─── Runtime ─────────────────────────────────────────────────────────────────
+# ─── Runtime (non-root) ──────────────────────────────────────────────────────
 FROM registry.access.redhat.com/ubi9/python-312:latest AS runtime
 
-WORKDIR /app
+WORKDIR /opt/app-root/src
 
-# Copy the prebuilt venv and the application code.
-COPY --from=builder /opt/venv /opt/venv
-COPY app/ ./app/
+# Copy the prebuilt venv, chowned to the runtime user so ownership is
+# unambiguous. Then the application code.
+COPY --from=builder --chown=1001:0 /opt/venv /opt/venv
+COPY --chown=1001:0 app/ ./app/
 
-# Use the venv's interpreter.
 ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
 
-# Run as the UBI default non-root user (1001), group 0 (OpenShift-compatible
-# restricted SCC). CONTRIBUTING.md convention.
+# Run as the UBI default non-root user (1001), group 0 (OpenShift restricted
+# SCC compatible). CONTRIBUTING.md convention.
 USER 1001:0
 
 EXPOSE 8080
 
-# uvicorn serves the FastAPI app. Host 0.0.0.0 so the container is reachable;
-# port matches the Service targetPort.
 CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]

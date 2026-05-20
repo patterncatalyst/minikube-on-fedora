@@ -2220,3 +2220,156 @@ have to derive them.
            and wire the Kafka consumer in r25. Decide at r22 start.
 
          Verified row count holds at **107**.
+         # Reconciliation + decision-log addition — r21a
+
+         > Two merges: (1) append the r21a entry to Section D of
+         > `_plans/reconciliation-plan.md`; (2) add CAP-007 to
+         > `_plans/capstone-decisions.md`.
+
+         ---
+
+         ## For `_plans/capstone-decisions.md` — add CAP-007
+
+         ## CAP-007 — Build images on the host with podman, then `minikube image load`
+
+         - **Date:** r21a
+         - **Status:** accepted (supersedes the `minikube image build` approach used
+           in r21's first smoke test)
+         - **Context:** r21's smoke test built the service image with
+           `minikube image build -p capstone`. The command exited 0, but the image
+           never landed in the profile's containerd image store. The order-service
+           pod went `ErrImagePull` — the kubelet fell back to
+           `docker.io/library/order-service:v1`, which 404s. Confirmed via
+           `minikube image ls -p capstone` showing no order-service image.
+         - **Decision:** Build images **on the host with podman**, then load them
+           into the profile with **`minikube image load`**. Encapsulated in
+           `scripts/build-image.sh <context> <image:tag>`, which builds, loads, and
+           verifies the image is present before returning.
+         - **Consequences:**
+           - (+) Reliable image availability under the rootless-podman + containerd
+             combination
+           - (+) One helper reused by every service from r22 on
+           - (+) Verification step (`minikube image ls | grep`) catches a failed
+             load immediately instead of at pod-scheduling time
+           - (−) Slightly slower than an in-cluster build would be (image is
+             transferred host→profile), negligible for tutorial-sized images
+           - (−) Requires podman on the host (already a §1 prerequisite)
+
+         ## CAP-008 — Demo failure leaves resources in place and dumps diagnostics
+
+         - **Date:** r21a
+         - **Status:** accepted
+         - **Context:** r21's smoke test had `trap cleanup EXIT` that uninstalled
+           order-service on *any* exit, including failure. When the pod failed to
+           go Ready, the trap destroyed the evidence before it could be inspected,
+           forcing a separate diagnostic re-run.
+         - **Decision:** Demo scripts clean up **only on success**. On failure they
+           leave the resources in place and dump a diagnostic bundle inline (pod
+           status, describe events, current + previous logs, image presence) — the
+           pattern §11/§12 demos already use.
+         - **Consequences:**
+           - (+) A failed run hands you the evidence directly
+           - (+) Consistent with the established §11/§12 diagnostic-dump convention
+           - (−) Failed runs leave cluster state that must be cleaned up manually
+             (the dump prints the exact uninstall commands)
+
+         ---
+
+         ## For `_plans/reconciliation-plan.md` Section D — append after r21
+
+         - **r21a** (fix-up — image not landing in profile cache) — r21's smoke
+           test reached the deploy stage but order-service went `ErrImagePull`.
+           Diagnosis (via a one-off diagnostic script): `minikube image build`
+           under the rootless-podman + containerd driver combo exited successfully
+           but didn't place the image in the profile's containerd store, so the
+           kubelet fell back to Docker Hub and 404'd. Everything upstream worked —
+           CloudNativePG installed cleanly, provisioned a Ready Postgres primary in
+           ~35s, the CNPG `-app` secret had all expected keys (`dbname`, `username`,
+           `password`), and the env injection was correct.
+
+           **Fixes:**
+           - New `scripts/build-image.sh` — builds on the host with podman, loads
+             into the profile with `minikube image load`, verifies presence
+             (CAP-007)
+           - `demos/smoke-order.sh` rewritten to (a) build via `build-image.sh`
+             instead of `minikube image build`, and (b) leave failed resources in
+             place with an inline diagnostic dump rather than tearing down on
+             failure (CAP-008)
+
+           **Verification status:**
+           - Manual confirmation path provided to the user (host podman build +
+             `minikube image load` + `helm upgrade` + `kubectl rollout status`)
+             before the corrected smoke test ships
+           - Once the corrected `smoke-order.sh` passes end-to-end on Fedora 44,
+             these rows promote to `verified (Fedora 44)`:
+             - order-service image builds with Poetry on UBI 9
+             - image loads into the capstone profile and is pullable
+             - CloudNativePG provisions a working cluster on rootless-podman
+               minikube  ← the r19-flagged risk, now effectively confirmed
+               (primary went Ready in 35s)
+             - order-service connects to Postgres and serves REST
+             - a row POSTed via REST persists in `orders.orders`
+
+           **What this confirms about the r19 risk register:** the flagged
+           "CloudNativePG on rootless-podman minikube" risk did NOT materialize —
+           the operator installed and provisioned cleanly. The actual failure was
+           an unrelated, well-known minikube image-build quirk. Good outcome: the
+           scary risk was a non-issue; the real issue was mundane and has a clean
+           fix that benefits every subsequent service.
+
+           Verified row count holds at **107** pending the corrected smoke run.
+           # Reconciliation + decision note — r21b
+
+           > Two small merges: (1) append the r21b entry to Section D of
+           > `_plans/reconciliation-plan.md`; (2) append the note below to CAP-005 in
+           > `_plans/capstone-decisions.md`.
+
+           ---
+
+           ## For `_plans/capstone-decisions.md` — append to CAP-005's consequences
+
+           - **r21b amendment:** the UBI 9 python-312 image's default user (1001)
+             cannot write to `/opt/venv` (`/opt` is root-owned), which broke the build
+             with `Permission denied: '/opt/venv'`. Fix: the **builder stage runs as
+             root** (`USER 0`) — it's discarded in a multi-stage build, so there's no
+             security cost — while the **runtime stage** keeps `USER 1001:0` and only
+             reads/executes the copied venv (`COPY --chown=1001:0`). This is the
+             idiomatic multi-stage pattern: relax the build stage, lock down the
+             runtime stage. The non-root *runtime* guarantee (the thing
+             CONTRIBUTING.md actually requires) is preserved.
+
+           ---
+
+           ## For `_plans/reconciliation-plan.md` Section D — append after r21a
+
+           - **r21b** (fix-up — venv permission denied during image build) — with the
+             r21a image-load fix in place, the build itself failed:
+             `Permission denied: '/opt/venv'`. Root cause: the UBI 9 python-312 image
+             runs as user 1001, which can't create `/opt/venv` under root-owned
+             `/opt`. The build never produced an image, so the subsequent
+             `helm upgrade` deployed stale state and the rollout timed out.
+
+             **Fix:** `services/order-service/Containerfile` — the builder stage now
+             runs as `USER 0` (root); the runtime stage keeps `USER 1001:0` and copies
+             the venv with `--chown=1001:0`. Idiomatic multi-stage: permissive build
+             stage (discarded), locked-down runtime stage (shipped). Documented as an
+             amendment to CAP-005.
+
+             **What the build output confirmed works** (everything up to the venv
+             step): UBI 9 python-312 pulls fine, Poetry 1.8.4 + the export plugin
+             install, `poetry export` resolves dependencies and writes a lockfile, and
+             the requirements export succeeds. Only the venv *location* was wrong.
+
+             **Note for the user:** the build logged "The lock file does not exist.
+             Locking" — `poetry.lock` wasn't committed, so Poetry resolved at build
+             time. That works but is slower and less reproducible. Running
+             `poetry lock` once in `services/order-service/` and committing the result
+             pins versions (CAP-001); the Containerfile picks it up via the
+             `poetry.lock*` glob.
+
+             **Verification:** once `build-image.sh` produces an image and
+             `smoke-order.sh` passes end-to-end on Fedora 44, the r21 rows promote to
+             `verified (Fedora 44)`. This is the last expected blocker before the
+             walking skeleton is green.
+
+             Verified row count holds at **107** pending the smoke run.
