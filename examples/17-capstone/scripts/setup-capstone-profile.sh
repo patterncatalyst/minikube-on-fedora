@@ -12,6 +12,8 @@
 #   ./setup-capstone-profile.sh --replace   # delete first, then start fresh
 
 set -euo pipefail
+export MINIKUBE_ROOTLESS=true   # CAP-010: required so minikube uses rootless podman
+                                # for host ops (status/ssh/registry), not sudo podman
 
 PROFILE_NAME="capstone"
 MEMORY="24g"
@@ -111,6 +113,14 @@ kubectl create namespace capstone --dry-run=client -o yaml | kubectl apply -f -
 printf '==> Verifying cluster health\n'
 kubectl get nodes
 kubectl get pods -n kube-system
+
+printf '==> Persisting rootless mode in minikube config (CAP-010)\n'
+minikube config set rootless true >/dev/null 2>&1 || true
+
+printf '==> Enabling the in-cluster registry addon (CAP-009)\n'
+minikube addons enable registry -p "$PROFILE_NAME"
+printf '    Host pushes to 127.0.0.1:<port> (see: podman port %s | grep 5000)\n' "$PROFILE_NAME"
+printf '    Cluster pulls from localhost:5000 — build-image.sh handles both.\n'
 
 printf '\n'
 printf '==> Capstone profile is ready.\n'

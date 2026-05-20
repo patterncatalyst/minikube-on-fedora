@@ -3,7 +3,10 @@
 replicas: 1
 
 image:
-  repository: order-service
+  # In-cluster registry address (CAP-009). The host pushes to 127.0.0.1:<port>
+  # via build-image.sh; the kubelet pulls from localhost:5000. These are the
+  # same registry at two addresses — see scripts/build-image.sh for why.
+  repository: localhost:5000/order-service
   tag: v1
   pullPolicy: IfNotPresent
 

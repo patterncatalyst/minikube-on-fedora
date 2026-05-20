@@ -473,3 +473,65 @@ r22 adds the other four services as parallel repetitions of
 this template; later iterations layer on gRPC, GraphQL, Kafka,
 KEDA scaling, the observability stack, OpenMetadata, and
 Prefect.
+# §17 friction callout — r21c
+
+> Merge instructions: insert the section below into `_docs/17-capstone.md`,
+> inside the "## Implementation: order-service (the template)" section,
+> immediately after the "### Postgres via an operator — and why that's
+> cluster-wide" subsection (or wherever the image-build workflow is first
+> discussed). Once merged, delete this file.
+
+---
+
+### Known friction: getting images to the kubelet on this driver
+
+A candid heads-up, because this is the one part of the capstone that fights
+back. The tutorial deliberately uses the **rootless-podman driver with the
+containerd runtime** (§3) — it's the most realistic local mirror of how
+Kubernetes runs in production, and it's the right pedagogical choice. But
+that combination has a genuinely awkward sharp edge: **getting a
+locally-built image to the kubelet is not straightforward.**
+
+The intuitive approaches don't work reliably here:
+
+- `minikube image build` may exit successfully without the image actually
+  landing in the profile's containerd store — the pod then fails with
+  `ErrImagePull` as the kubelet falls back to Docker Hub.
+- `minikube image load <name>` can report "image not found" even for an
+  image that `podman images` clearly shows, because the lookup goes through
+  the rootless podman socket in a way that doesn't resolve.
+
+The reliable answer — and the one this tutorial standardizes on — is
+**minikube's built-in registry addon**. You build on the host with podman,
+push to the registry, and your deployments pull from it like any normal
+image. `setup-capstone-profile.sh` enables the registry; `build-image.sh`
+handles build-tag-push; the charts pull from the in-cluster address.
+
+> **The one detail that trips everyone up: the registry has two addresses.**
+> With the podman driver, the host-side port is *not* 5000 — minikube
+> assigns one (you'll see something like `127.0.0.1:41685`) and will tell
+> you so when you enable the addon. But *inside* the cluster, the kubelet
+> reaches the same registry at `localhost:5000`. So:
+>
+> - **You push** (from the host) to `127.0.0.1:<assigned-port>`
+> - **The cluster pulls** from `localhost:5000`
+>
+> `build-image.sh` discovers the host port automatically and pushes there;
+> the charts set `image.repository: localhost:5000/<service>`. If you ever
+> push by hand, run `podman port capstone | grep 5000/tcp` to find the host
+> port.
+
+> **One environment variable makes or breaks all of this:**
+> `MINIKUBE_ROOTLESS=true`. If it isn't set in your shell, minikube routes
+> host operations (status, ssh, image and registry access) through
+> `sudo podman`, which cannot see your rootless container — producing a
+> baffling spread of failures that look like a broken cluster but aren't.
+> The capstone scripts both persist it (`minikube config set rootless true`)
+> and export it at the top of every script. If you run minikube commands by
+> hand, `export MINIKUBE_ROOTLESS=true` first.
+
+None of this is unique to the capstone — it's inherent to the rootless
+driver — but the capstone is where it bites, because it's the first section
+that builds and deploys your *own* images at scale (six of them across the
+five services and the gateway). Get the registry workflow right once here,
+and every service afterward is the same three commands.

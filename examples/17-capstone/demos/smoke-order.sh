@@ -8,9 +8,9 @@
 #   data round-trips through Postgres → assertions pass
 #
 # r21a changes:
-#   - builds via scripts/build-image.sh (host podman + minikube image load),
-#     fixing the ErrImagePull seen with `minikube image build` under the
-#     rootless-podman + containerd combo
+#   - builds + pushes via scripts/build-image.sh (host podman build →
+#     in-cluster registry), the proven path under rootless-podman +
+#     containerd (CAP-007/009). No more `minikube image load`.
 #   - on failure, LEAVES the failed resources in place and dumps a
 #     diagnostic bundle inline (pod status, describe events, logs) instead
 #     of tearing everything down — so a failed run hands you the evidence
@@ -25,6 +25,7 @@
 #   - kubectl context = capstone
 
 set -uo pipefail   # NOT -e: we manage failures explicitly so we can diagnose
+export MINIKUBE_ROOTLESS=true   # CAP-010: mandatory for rootless-podman host ops
 
 NS="capstone"
 PROFILE="capstone"
@@ -33,7 +34,8 @@ RELEASE_ORDER="order-service"
 PG_CHART="charts/capstone/charts/postgres"
 ORDER_CHART="charts/capstone/charts/order-service"
 SERVICE_DIR="services/order-service"
-IMAGE="order-service:v1"
+IMAGE_NAME="order-service"
+IMAGE_TAG="v1"
 PORT_FORWARD_PID=""
 SUCCESS=0
 
@@ -54,8 +56,8 @@ dump_diagnostics() {
         printf '\n--- logs (previous, if crash-looped) ---\n'
         kubectl logs -n "$NS" "$pod" --previous --tail=60 2>&1 || true
     fi
-    printf '\n--- images in profile ---\n'
-    minikube image ls -p "$PROFILE" 2>&1 | grep -i order-service || echo "(order-service image NOT in profile)"
+    printf '\n--- registry catalog ---\n'
+    curl -fsS "http://$(podman port "$PROFILE" | awk -F: '/5000\/tcp/{print $NF; exit}')/v2/_catalog" 2>&1 || echo "(could not query registry catalog)"
     printf '\nResources left running. To clean up manually:\n'
     printf '  helm uninstall %s -n %s\n' "$RELEASE_ORDER" "$NS"
     printf '  helm uninstall %s -n %s   # also removes Postgres\n' "$RELEASE_PG" "$NS"
@@ -98,10 +100,10 @@ kubectl get crd clusters.postgresql.cnpg.io >/dev/null 2>&1 \
     || fail "CloudNativePG CRDs not found — run scripts/setup-postgres-operator.sh first"
 command -v helm >/dev/null || fail "helm not in PATH"
 
-# ─── Build + load the image (r21a: host podman + minikube image load) ────────
+# ─── Build + push the image (r21c: host podman build → in-cluster registry) ──
 
-step "Building and loading $IMAGE into the $PROFILE profile"
-./scripts/build-image.sh "$SERVICE_DIR" "$IMAGE" || fail "image build/load failed"
+step "Building and pushing ${IMAGE_NAME}:${IMAGE_TAG} to the in-cluster registry"
+./scripts/build-image.sh "$SERVICE_DIR" "$IMAGE_NAME" "$IMAGE_TAG" || fail "image build/push failed"
 
 # ─── Deploy Postgres (Cluster CR; operator provisions it) ────────────────────
 

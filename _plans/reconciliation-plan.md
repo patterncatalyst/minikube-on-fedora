@@ -2373,3 +2373,151 @@ have to derive them.
              walking skeleton is green.
 
              Verified row count holds at **107** pending the smoke run.
+
+             # Decision log + reconciliation additions — r21c
+
+             > Three merges:
+             > 1. Revise CAP-007 and add CAP-009, CAP-010 in `_plans/capstone-decisions.md`
+             > 2. Append the r21c entry to Section D of `_plans/reconciliation-plan.md`
+             >    and promote the r21 rows to `verified (Fedora 44)`
+             > 3. Splice the §17 friction callout into `_docs/17-capstone.md`
+             >    (see the separate file `17-capstone-r21c-friction-callout.md`)
+
+             ---
+
+             ## For `_plans/capstone-decisions.md`
+
+             ### CAP-007 (revised in r21c) — image distribution via the in-cluster registry
+
+             - **Date:** r21a (original), revised r21c
+             - **Status:** accepted (the r21a/r21b `minikube image load` approach is
+               **superseded**)
+             - **Context:** Getting a locally-built image to the kubelet under the
+               rootless-podman + containerd driver combo proved unexpectedly hard. In
+               sequence we hit: (1) `minikube image build` exited 0 but the image never
+               entered the profile's containerd store; (2) `minikube image load <name>`
+               reported "image not found" even with the fully-qualified `localhost/`
+               name, because the lookup goes through the rootless podman socket and
+               fails; (3) `podman save | ctr import` didn't read stdin as expected and
+               dumped the image to the terminal. Each was a distinct facet of the same
+               problem: there is no reliable *push-free* path into containerd on this
+               driver.
+             - **Decision:** Use **minikube's built-in registry addon**. Build on the
+               host with podman, push to the registry, and have deployments pull from
+               it as normal images. Encapsulated in `scripts/build-image.sh`.
+             - **Consequences:**
+               - (+) Reliable and **proven** end-to-end on Fedora 44 (r21c verification)
+               - (+) Scales cleanly to all six capstone images — same one command each
+               - (+) Standard `podman push` / kubelet pull; no containerd-internals
+                 plumbing
+               - (−) Requires the registry addon enabled (now done in
+                 `setup-capstone-profile.sh`)
+               - (−) Introduces the host/cluster port asymmetry — see CAP-009
+
+             ### CAP-009 — the registry port asymmetry (host vs cluster)
+
+             - **Date:** r21c
+             - **Status:** accepted
+             - **Context:** minikube's registry is reachable at two *different* addresses
+               depending on where you are. With the podman driver, the host-side port is
+               NOT 5000 — minikube assigns one (we observed 41685) and explicitly warns
+               to use it. Inside the cluster the kubelet reaches the registry at
+               `localhost:5000`.
+             - **Decision:** `build-image.sh` discovers the host port dynamically
+               (`podman port capstone | grep 5000/tcp`) and pushes to
+               `127.0.0.1:<port>`. Charts reference the in-cluster address
+               `localhost:5000/<service>` in `image.repository`.
+             - **Consequences:**
+               - (+) No hardcoded port that drifts between machines
+               - (−) Genuinely confusing the first time; must be documented prominently
+                 (done in the §17 friction callout) because every reader on this driver
+                 will hit it
+
+             ### CAP-010 — MINIKUBE_ROOTLESS=true is mandatory
+
+             - **Date:** r21c
+             - **Status:** accepted
+             - **Context:** Several baffling failures (status reporting "unknown state",
+               `minikube ssh` aborting, `image load` failing) all traced to one cause:
+               when `MINIKUBE_ROOTLESS` is unset in the current shell, minikube routes
+               host operations through `sudo podman`, which cannot see the rootless
+               user's `capstone` container. The variable was set in the shell that
+               *created* the profile but not in later shells, so the breakage appeared
+               intermittently.
+             - **Decision:** Set rootless mode two ways for defence in depth:
+               (1) persist it in minikube config (`minikube config set rootless true`,
+               done in `setup-capstone-profile.sh`), and (2) `export MINIKUBE_ROOTLESS=true`
+               at the top of every capstone script (`build-image.sh`,
+               `setup-capstone-profile.sh`, `smoke-order.sh`, and the apply/test
+               scaffolding).
+             - **Consequences:**
+               - (+) Eliminates an entire class of intermittent, hard-to-diagnose failures
+               - (+) Config covers ad-hoc `minikube` commands; export covers scripts run
+                 in a bare shell
+               - (−) Readers must understand this is load-bearing — covered in the §17
+                 friction callout
+
+             ---
+
+             ## For `_plans/reconciliation-plan.md` Section D — append after r21b
+
+             - **r21c** (consolidation — registry-based image distribution; walking
+               skeleton VERIFIED) — replaces the unreliable `minikube image load` path
+               with minikube's in-cluster registry, after a long live-debugging session
+               established that the registry is the only robust way to get a built image
+               to the kubelet under the rootless-podman + containerd driver.
+
+               **What r21c ships:**
+               - `scripts/build-image.sh` rewritten: host `podman build` → tag for the
+                 dynamically-discovered host registry port → `podman push
+                 --tls-verify=false` → verify via `/v2/_catalog` (CAP-007 revised,
+                 CAP-009)
+               - `scripts/setup-capstone-profile.sh`: persists `minikube config set
+                 rootless true` and enables the registry addon as part of profile setup
+                 (CAP-010, CAP-009)
+               - `charts/capstone/charts/order-service/values.yaml`: `image.repository`
+                 → `localhost:5000/order-service`
+               - `demos/smoke-order.sh`: builds+pushes via the new `build-image.sh`;
+                 diagnostic dump now queries the registry catalog; exports
+                 `MINIKUBE_ROOTLESS=true`
+               - decision log: CAP-007 revised, CAP-009 and CAP-010 added
+               - §17 prose: a "known friction" callout documenting the driver's image
+                 distribution sharp edges and the registry workflow that resolves them
+
+               **VERIFICATION — confirmed end-to-end on Fedora 44 (the live run):**
+               - CloudNativePG operator installed; provisioned a Ready Postgres primary
+                 in ~35s → **verified** (the r19-flagged risk did NOT materialize)
+               - order-service image: UBI 9 multi-stage build with Poetry succeeded
+                 (after the r21b root-builder venv fix) → **verified**
+               - image pushed to the in-cluster registry and pulled by the kubelet;
+                 deployment rolled out successfully → **verified**
+               - `GET /healthz` returned `{"status":"ready"}` (Postgres reachable) →
+                 **verified**
+               - `POST /orders` returned a complete order with server-generated UUID,
+                 status `placed`, and timestamp — i.e. a row written to and read back
+                 from `orders.orders` → **verified**
+
+               **Reconciliation status changes:** the following r21 rows move from
+               `unverified` to `verified (Fedora 44)`:
+               - order-service image builds with Poetry on UBI 9
+               - image reaches the kubelet (now via registry) and the pod runs
+               - CloudNativePG provisions a working cluster on rootless-podman minikube
+               - order-service connects to Postgres and serves REST
+               - a row POSTed via REST persists in `orders.orders`
+
+               This is the **first verified vertical slice** of the capstone. Verified
+               fact count rises from **107** to **112** (the five rows above).
+
+               **What this cost and what it taught:** six iterations (r21→r21c) to get
+               one service standing, almost entirely due to image-distribution friction
+               on the rootless-podman + containerd driver — none of it the application
+               code, the helm charts, or the operator, all of which worked. The lasting
+               value: r22's four services reuse a now-proven path, and §17 warns readers
+               about the friction instead of letting them rediscover it.
+
+               **Notes for r22:** inventory, payment, shipping, notification follow
+               order-service's exact shape, each built+pushed with the same
+               `build-image.sh <context> <name> <tag>`. Strongly consider
+               `scripts/scaffold-service.sh` to stamp out the per-service skeleton.
+               notification-service is Kafka-consumer-only — decide at r22 start whether
+               to give it a minimal `/health` HTTP surface now or defer to r25 (Kafka).
