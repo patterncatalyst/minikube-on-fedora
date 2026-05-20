@@ -1,0 +1,22 @@
+# Postgres subchart values — the CloudNativePG Cluster CR configuration.
+# The operator (installed separately) reconciles this into actual Postgres
+# pods, services, and secrets.
+
+cluster:
+  name: capstone-postgres
+  instances: 1                # single-instance dev cluster (NOT production-shaped)
+  imageName: ""               # empty → operator default (a UBI-based Postgres image
+                              # is used by CloudNativePG's defaults; override here to pin)
+  storage:
+    size: 5Gi                 # r21 skeleton; bump for sustained multi-service use
+  # The application database the operator bootstraps. Each service uses its
+  # own SCHEMA within this database (CAP-003), not its own database.
+  database: capstone
+  owner: capstone_app
+  # Resource requests/limits for the Postgres pod itself.
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      memory: 512Mi

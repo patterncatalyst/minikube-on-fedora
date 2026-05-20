@@ -1,0 +1,6 @@
+apiVersion: v2
+name: order-service
+description: order-service data product — FastAPI REST service backed by the capstone Postgres (orders schema). r21 ships REST + Postgres; gRPC/GraphQL/Kafka added later.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

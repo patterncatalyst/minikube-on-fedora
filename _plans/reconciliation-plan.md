@@ -2021,3 +2021,202 @@ have to derive them.
        before assuming a layout name, OR add an explicit
        `defaults:` rule for the new collection so the binding is
        visible in one place. Don't guess.
+
+       # Reconciliation plan addition — r19 (capstone planning)
+
+       > Merge instructions: append to Section D of
+       > `_plans/reconciliation-plan.md`, after the r18b entry. Update
+       > the "Project state (post-r18): closed" language to
+       > "Project state (post-r19): capstone planning underway".
+
+       ---
+
+       - **r19** (capstone planning — §17 PRD addition only, no
+         implementation) — formally re-opens the project for the
+         capstone iteration. The post-r18b "closed" state captured a
+         natural completion of the original PRD scope; r19 begins the
+         significant capstone extension that demonstrates everything
+         §1–§12 introduced, in one coherent system.
+
+         **What r19 ships:**
+         - `_plans/PRD-r19-capstone-section.md` — the new §17
+           section of the PRD, comprehensive scoping for the capstone:
+           one-paragraph summary, what it teaches, why it's the
+           capstone (table mapping each prior section to its
+           contribution), audience details, goals + non-goals,
+           architecture overview with service-by-service protocol
+           matrix, platform component list, implementation
+           constraints, testing approach, ten open decisions awaiting
+           user resolution, references (Dehghani's *Data Mesh* and
+           Ibryam & Huss's *Kubernetes Patterns*, plus the user's two
+           prior repos with Grafana-stack work on podman), risks +
+           mitigations table, iteration plan (r19 → ~r30), and
+           success criteria
+         - `_plans/reconciliation-plan-r19-addition.md` — this entry
+
+         **What r19 deliberately does NOT include:**
+         - Any code, manifests, helm charts, or proto definitions
+         - The architecture diagram (waits for decisions to be
+           resolved; pre-drafting now would just produce throwaway
+           work)
+         - Implementation of any of the five services
+         - Updates to `_docs/16-examples.md` (the §17 example listing
+           waits for the actual `examples/17-capstone/` directory
+           to exist)
+
+         **Ten open decisions awaiting user input** (full rationale
+         in the PRD addition; summary here for tracking):
+          1. Metadata catalog: DataHub vs OpenMetadata — recommended OpenMetadata
+          2. Postgres topology: one cluster + per-service schemas — recommended
+          3. Prefect: OSS self-hosted — recommended
+          4. gRPC codegen: protobuf-first with `buf` — recommended
+          5. GraphQL: federated gateway with Strawberry — recommended
+          6. Per-service protocol choice (not all-services-all-protocols) — recommended
+          7. helm umbrella chart structure — recommended
+          8. UBI base for services; accept upstream for operators (documented) — recommended
+          9. Capstone profile sized 24GB/16CPU — recommended
+          10. OTEL Collector as Deployment with OTLP receiver — recommended
+
+         Once the user resolves these (or accepts all recommendations
+         as-is), r20 ships the skeleton: example directory structure,
+         helm umbrella chart skeleton, capstone profile recipe, and
+         the architecture diagram. Implementation iterations r21–r30
+         follow.
+
+         **Estimated effort**: ~10 iterations (r20 through r30),
+         spanning the full capstone implementation. Approximately
+         three to four times the effort that r1–r18 collectively
+         represented, given the integration complexity of running
+         this many components on a single workstation.
+
+         **Risk surfaced during planning**: the user's stated
+         "1GB HD" target spec is almost certainly a typo for 1TB
+         (a capstone of this size requires 30–50 GB just for image
+         cache and persistent volumes). r20 will not proceed until
+         this is confirmed; if 1GB is literal, the capstone needs to
+         be descoped substantially or moved off the target machine.
+
+         Verified row count unchanged at **107**. Capstone-specific
+         verification rows begin appearing in Section B starting with
+         r21 (first deployable service).
+
+       ---
+
+       **Replace** "Project state (post-r18): closed" **with:**
+
+       **Project state (post-r19): capstone planning underway**
+
+       The original PRD scope (§1–§16) shipped through r18 and is
+       considered complete. §17 (the capstone) was added as an
+       extension in r19 and is currently in the planning phase.
+       Implementation begins at r20 once the ten open decisions in
+       the §17 PRD addition are resolved.
+       # Reconciliation plan addition — r21 (order-service walking skeleton)
+
+       > Merge instructions: append the entry below to Section D of
+       > `_plans/reconciliation-plan.md`, after the r20 entry.
+
+       ---
+
+       - **r21** (capstone walking skeleton — order-service end-to-end +
+         CloudNativePG operator + Postgres Cluster CR) — first
+         *runnable* capstone iteration. Proves the full vertical spine
+         (CAP-006): image build → minikube cache → helm deploy →
+         operator-managed Postgres → service connects → REST works →
+         data persists → smoke test asserts. Establishes the template
+         every other service follows.
+
+         **Decisions captured this iteration** (in the new
+         `_plans/capstone-decisions.md`):
+         - CAP-001 Poetry for Python dependency management
+         - CAP-002 CloudNativePG operator, installed separately
+           (cluster-wide install called out as a teaching point)
+         - CAP-003 one Postgres cluster, schema per service (restated
+           from r19)
+         - CAP-004 `create_all` for r21; Alembic migrations deferred
+         - CAP-005 UBI 9 python-312 for both build + runtime stages
+         - CAP-006 walking-skeleton-first (vertical slice over
+           horizontal layers)
+         - plus the ten r19 decisions back-filled as CAP-R19-1..10
+
+         **What r21 ships:**
+         - `_plans/capstone-decisions.md` — ADR-lite decision log,
+           single source of truth for capstone choices
+         - `examples/17-capstone/scripts/setup-postgres-operator.sh` —
+           installs CloudNativePG via helm; prints the cluster-wide
+           effects (CRDs registered, controller watching all
+           namespaces)
+         - `examples/17-capstone/charts/capstone/charts/postgres/` —
+           CloudNativePG `Cluster` CR subchart (Chart.yaml,
+           values.yaml, templates/cluster.yaml)
+         - `examples/17-capstone/services/order-service/` — the
+           service: Poetry pyproject.toml, UBI 9 multi-stage
+           Containerfile, FastAPI app (config/db/models/schemas/main),
+           pytest unit tests (SQLite-backed), README
+         - `examples/17-capstone/charts/capstone/charts/order-service/`
+           — helm subchart (Deployment with CNPG-secret-sourced
+           Postgres env + Health Probes; Service)
+         - `examples/17-capstone/demos/smoke-order.sh` — the
+           walking-skeleton verification (build, deploy, exercise
+           REST, query Postgres directly to confirm persistence,
+           cleanup trap)
+         - `_docs/17-capstone-r21-prose-insert.md` — §17 prose
+           addition documenting order-service + the
+           operator-is-cluster-wide teaching point (splice into
+           `_docs/17-capstone.md`)
+
+         **Patterns from *Kubernetes Patterns* (Ibryam & Huss)
+         referenced in this iteration:**
+         - Health Probe (liveness `/health`, readiness `/healthz`)
+         - Predictable Demands (resource requests/limits; declared
+           Postgres dependency)
+         - Configuration Resource (Postgres creds from CNPG Secret
+           via secretKeyRef)
+         - Managed Lifecycle (clean connection-pool disposal on
+           shutdown via FastAPI lifespan)
+
+         **Validation performed in the build environment** (no
+         minikube available there, so these are static checks):
+         - All Python modules compile (`py_compile`)
+         - All non-template YAML parses (pyyaml)
+         - All helm templates have balanced `{{ }}` delimiters
+         - deployment.yaml, service.yaml, cluster.yaml render to
+           valid Kubernetes resources under placeholder substitution
+         - All shell scripts pass `bash -n`
+
+         **Verification status — UNVERIFIED pending real Fedora 44 run:**
+         - `setup-postgres-operator.sh` installs the operator → unverified
+         - `smoke-order.sh` passes end-to-end → unverified
+         - order-service image builds with Poetry on UBI 9 → unverified
+         - CloudNativePG provisions a working cluster on rootless
+           podman minikube → unverified (flagged as a risk in r19 —
+           this iteration is where we find out)
+         - `poetry run pytest` passes locally → unverified
+
+         These rows enter Section B as `unverified` and promote to
+         `verified (Fedora 44)` only after the user runs the smoke
+         test and reports the result. Verified count stays at **107**
+         until then.
+
+         **Known risk being tested in r21:** CloudNativePG's behavior
+         on rootless-podman minikube specifically. The operator
+         assumes a working default StorageClass; minikube provides
+         `standard` via its storage-provisioner addon, which should
+         satisfy the `Cluster` CR's PVC. If the PVC doesn't bind, the
+         fix is likely a `storageClass:` override in the postgres
+         subchart values — a quick r21a if needed.
+
+         **Notes for r22:**
+         - The four remaining services (inventory, payment, shipping,
+           notification) follow order-service's exact shape. Strongly
+           consider a `scripts/scaffold-service.sh` that stamps out
+           the per-service skeleton (pyproject, Containerfile, app/*,
+           subchart) from order-service as a template, to make r22
+           mechanical
+         - notification-service is the odd one — Kafka-consumer-only,
+           no REST surface — so its skeleton differs. Hold it for r25
+           (Kafka) rather than forcing a REST shape on it in r22,
+           OR ship it in r22 with a minimal /health-only HTTP surface
+           and wire the Kafka consumer in r25. Decide at r22 start.
+
+         Verified row count holds at **107**.

@@ -1,0 +1,40 @@
+# order-service subchart values.
+
+replicas: 1
+
+image:
+  repository: order-service
+  tag: v1
+  pullPolicy: IfNotPresent
+
+service:
+  port: 80
+  targetPort: 8080
+
+# Postgres connection. The CloudNativePG operator generates a Secret named
+# "<cluster>-app" holding the app user's credentials. We reference it by
+# key so we never hardcode the password.
+postgres:
+  clusterName: capstone-postgres
+  # CNPG's "<cluster>-app" secret contains: username, password, dbname,
+  # host, port, uri, jdbc-uri. We map the ones order-service needs.
+  appSecret: capstone-postgres-app
+  schema: orders
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 256Mi
+
+# Probe tuning. /health is liveness, /healthz is readiness (checks Postgres).
+probes:
+  liveness:
+    path: /health
+    initialDelaySeconds: 5
+    periodSeconds: 10
+  readiness:
+    path: /healthz
+    initialDelaySeconds: 5
+    periodSeconds: 5

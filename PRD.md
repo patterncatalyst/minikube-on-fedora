@@ -502,3 +502,410 @@ own payoff.
 When the project ships, this PRD becomes the record of "what we
 intended" against the reconciliation plan's "what we shipped."
 The gap between them is usually instructive.
+
+# PRD addition — §17 Capstone: a data mesh on minikube
+
+> Merge instructions: this is a substantial new section to be
+> appended to `PRD.md` as the §17 entry, following §16. Treat
+> this as a mini-PRD nested inside the main PRD — it has its
+> own goals, non-goals, audience, scope, deliverables, risks,
+> and iteration plan because the capstone is large enough to
+> warrant that structure.
+>
+> Once merged, delete this file. The reconciliation plan
+> entry for r19 covers the planning iteration itself.
+
+---
+
+## §17 Capstone: a data mesh on minikube
+
+### One-sentence summary
+
+A working data-mesh implementation on minikube that demonstrates
+*when, how, and why* to use each Kubernetes pattern the tutorial
+introduced (in §3–§12), through a five-service domain
+(order/inventory/payment/shipping/notification) exposing REST,
+gRPC, GraphQL, and Kafka interfaces with full observability,
+metadata cataloging, and orchestration.
+
+### What this section teaches
+
+By the end of §17, the reader has seen — and run — a coherent
+end-to-end system that integrates everything from earlier
+sections plus several capstone-only additions:
+
+- The concept of a **data mesh** (per Zhamak Dehghani's *Data
+  Mesh: Delivering Data-Driven Value at Scale*, O'Reilly 2022)
+  and why it maps naturally onto Kubernetes
+- **Domain-oriented service design**: each of the five services
+  owns its data, its API surface, and its operational lifecycle
+  — i.e. each is a "data product" in the data-mesh sense
+- **Multi-protocol communication**: REST (external clients),
+  gRPC (synchronous internal), GraphQL (federated query),
+  Kafka (asynchronous events) — and the reasoning for choosing
+  each protocol in each context
+- **Self-serve data infrastructure**: shared platform pieces
+  (Kafka, observability stack, metadata catalog) that data
+  products consume but don't own
+- **Federated computational governance**: API registry
+  (Apicurio), schema registry, metadata catalog
+  (OpenMetadata), Istio policy enforcement — all serving as
+  the "control plane" for the mesh
+- **Patterns from *Kubernetes Patterns* by Ibryam & Huss**
+  (O'Reilly, 2nd ed. 2023) applied in context — referenced
+  explicitly each time one shows up in the implementation
+
+The reader doesn't read about data mesh — they deploy one.
+
+### Why this is the capstone
+
+§17 is intentionally where everything converges. It uses:
+
+| Earlier section | What it contributes to §17 |
+|---|---|
+| §1 Prerequisites | Same Fedora 44 baseline + inotify limits |
+| §2 Tooling install | kubectl, helm, hey, yq + new: `buf`, `grpcurl`, `ghz` |
+| §3 Starting minikube | Dedicated `capstone` profile, sized for the workload |
+| §4 Profiles | Profile isolation — §17 doesn't touch §6–§12 profile state |
+| §5 Addons | metrics-server (required for autoscaling) |
+| §6 Deploy via kubectl | Imperative deploys for ad-hoc troubleshooting |
+| §7 NodePort | Same slirp4netns tunnel pattern for external access |
+| §8 Persistent Volumes | Each service's Postgres uses PVs (per-domain ownership) |
+| §9 helm | Every deployable is a helm chart (or umbrella chart) |
+| §10 Editor/shell | k9s, kubectx for navigating the larger cluster state |
+| §11 Istio | mTLS between services, traffic shifting, fault injection |
+| §12 KEDA + Strimzi | Kafka consumer-lag scaling, HTTP add-on for API tiers |
+
+Capstone-only additions: Apicurio (API + schema registry),
+OpenMetadata (metadata catalog), Prometheus + Grafana + Tempo
++ OTEL Collector (observability), Prefect (orchestration),
+PostgreSQL (per-service data stores), application code in
+Python/FastAPI.
+
+### Audience details
+
+**Primary**: a reader who has worked through §1–§16 and wants
+to see the patterns applied in a coherent system. They're
+comfortable with the individual sections in isolation and want
+to know how the pieces fit together at scale.
+
+**Secondary**: an architect or tech lead evaluating "would
+this approach work for my team?" The capstone is the answer
+to "show me, don't tell me."
+
+**Not for**: anyone trying to learn Kubernetes basics from
+the capstone alone. §17 assumes everything in §1–§12 was
+read and at least skimmed. The capstone explains *how* the
+pieces combine; it doesn't re-explain what the pieces are.
+
+### Goals
+
+- Build a working multi-service application that demonstrates
+  REST + gRPC + GraphQL + Kafka communication patterns in
+  one coherent system
+- Show each communication choice's *reasoning* — not just
+  "we used gRPC here" but "gRPC because (a) internal-only,
+  (b) low-latency required, (c) typed contracts useful, (d) no
+  browser clients"
+- Deploy the full stack to a single dedicated `capstone`
+  minikube profile, with the entire stack manageable via
+  helm umbrella chart
+- Demonstrate observability that's *actually useful* — golden
+  signals visible per-service in Grafana, distributed traces
+  in Tempo, mesh-level observability in Kiali
+- Demonstrate KEDA scale-to-zero and scale-up behavior for
+  both HTTP traffic and Kafka consumer lag, in the same
+  cluster as the rest of the system
+- Provide test artifacts (curl + hey + ghz + Postman
+  collections) that a presenter can run live to demonstrate
+  the system to an audience
+- Reference *Kubernetes Patterns* (Ibryam & Huss) by name
+  whenever a relevant pattern is applied (Health Probe,
+  Sidecar, Stateful Service, Service Discovery, etc.)
+
+### Non-goals
+
+- **Production readiness.** The capstone runs on one
+  workstation. Multi-region, HA, certificate rotation,
+  disaster recovery, secrets management at scale — all
+  explicitly out of scope
+- **Authentication / authorization beyond mTLS.** Istio's
+  mTLS-between-pods is the entire security model. No OAuth,
+  no JWT, no per-user authorization. Demonstrating a real
+  auth flow is a separate project
+- **Performance benchmarking.** We'll use hey/ghz to
+  generate load for demos, but the goal is *visible behavior*
+  (KEDA scaling, traces appearing in Tempo) not benchmarking
+- **Comprehensive test coverage.** We're showing test
+  *patterns* (one Postman collection per service, one ghz
+  script per gRPC endpoint, one curl-based REST smoke test)
+  — not 95% line coverage
+- **Real metadata-mesh governance.** OpenMetadata runs, holds
+  the five services' schemas, and is browsable. We don't
+  implement data-quality rules, lineage tracking beyond what
+  OpenMetadata infers automatically, or governance workflows
+- **Frontend / UI.** Postman and a browser pointed at
+  Apicurio / OpenMetadata / Kiali / Grafana are the entire
+  "UI." No custom dashboards built for this project
+- **Cross-platform support.** Fedora 44 only, same as the
+  rest of the tutorial
+
+### Architecture overview
+
+Five domain services, each a "data product":
+
+| Service | Owns | REST | gRPC | GraphQL | Kafka (produces) | Kafka (consumes) |
+|---|---|:-:|:-:|:-:|:-:|:-:|
+| order-service | Orders | ✓ (clients) | ✓ (called by frontend gw) | ✓ (federated) | `orders.placed` | — |
+| inventory-service | Stock levels | ✓ (admin) | ✓ (called by order) | ✓ (federated) | `inventory.updated` | `orders.placed` |
+| payment-service | Payments | — | ✓ (called by order) | ✓ (federated) | `payments.processed` | `orders.placed` |
+| shipping-service | Shipments | — | ✓ (called by order) | ✓ (federated) | `shipments.dispatched` | `payments.processed` |
+| notification-service | Notifications | — | — | — | — | `orders.placed`, `payments.processed`, `shipments.dispatched` |
+
+Each service has its own Postgres schema (or its own database
+within a shared cluster — TBD per resource budget).
+
+**Communication patterns demonstrated:**
+
+- **REST (external)**: order-service exposes `/orders` for
+  external clients. Goes through Istio ingress gateway
+- **gRPC (internal)**: order-service calls
+  inventory-service / payment-service / shipping-service via
+  gRPC for synchronous coordination. Demonstrates protobuf-first
+  contracts and `buf` codegen
+- **GraphQL (federated query)**: a small federated gateway
+  (Strawberry-based, Python) stitches subgraphs from
+  order/inventory/payment/shipping. Demonstrates GraphQL as a
+  query layer over polyglot backends
+- **Kafka (events)**: notification-service consumes the entire
+  event stream. inventory-service, payment-service,
+  shipping-service consume their relevant upstream events.
+  Demonstrates event-driven coordination + KEDA scaling on
+  consumer lag
+
+**Platform components:**
+
+| Component | Why |
+|---|---|
+| Strimzi + Kafka | Async event backbone; KEDA consumer-lag scaling target |
+| Apicurio Registry | OpenAPI specs (REST), proto descriptors (gRPC), Avro/JSON schemas (Kafka) |
+| OpenMetadata | Catalog of all services' APIs, schemas, lineage |
+| Istio + Kiali | mTLS, traffic shifting, fault injection, mesh visualization |
+| KEDA + HTTP add-on | Scale order-service on HTTP request rate; scale Kafka consumers on lag |
+| Prometheus + Grafana + Tempo + OTEL Collector | Metrics + traces; per-service golden signals; distributed-trace correlation |
+| Prefect | Orchestration of cross-service flows (nightly inventory reconciliation, scheduled metadata sync to OpenMetadata) |
+| PostgreSQL | Per-service data stores; backing store for Apicurio and OpenMetadata |
+| helm umbrella chart | Single `helm install capstone` deploys everything |
+
+### Architecture diagram (to be drafted)
+
+A new diagram pair `assets/diagrams/17-capstone-data-mesh.svg`
++ `.excalidraw` in the established style (920×500 viewBox,
+#fdfbf7 background, blue/tan/neutral palette, sans for prose,
+mono for CRDs). The diagram will show:
+
+- Three horizontal layers: **clients** (top), **mesh** (middle,
+  the five services + Istio sidecars), **platform** (bottom:
+  Kafka, observability, registries, Postgres)
+- Lines indicating protocol: solid blue for REST, dashed green
+  for gRPC, dotted orange for GraphQL, double red for Kafka
+- Istio sidecars rendered as small adjacent boxes on each
+  service (consistent with §11's mesh diagram)
+- Observability arrows going *out of* each service to the OTEL
+  Collector, then fanning out to Prometheus / Grafana / Tempo
+- Kafka topic arrows showing publish/consume relationships
+  between services
+
+Diagram lands in r20a (after architectural decisions are
+confirmed); we draft in prose now to avoid premature
+commitment.
+
+### Implementation constraints
+
+- **UBI base images preferred.** Where a UBI variant of a
+  required image doesn't exist or is significantly behind
+  (e.g. Strimzi, KEDA, Apicurio, OpenMetadata operator
+  images), use the upstream image and **explicitly note it
+  in the chart values and in the §17 prose**. Maintain a
+  "UBI vs upstream" table in the §17 narrative
+- **Single `capstone` minikube profile.** Sized at 24GB RAM /
+  16 CPU. Reader stops the `minikube` / `istio` profiles
+  before running the capstone (documented in §17's
+  Prerequisites subsection)
+- **helm umbrella chart** structure: one top-level chart
+  (`charts/capstone/`) with subcharts for each service +
+  platform component. Single `helm install` brings up the
+  whole stack
+- **Python 3.12 + FastAPI** for all services. Pinned versions
+  in `pyproject.toml` per service, no pip-on-the-fly
+- **`buf` for protobuf** management; generated Python code
+  checked into the service repo (not generated at build time)
+- **Postman collection per service**; presenter-friendly
+  with environment variables for hostnames
+
+### Testing approach
+
+Each service ships with three layers of tests:
+
+1. **Service-local unit + integration** (Python pytest) — runs
+   in CI on every PR
+2. **Demo scripts** — `examples/17-capstone/demos/*.sh`,
+   one per scenario:
+   - `demo-rest.sh` — curl the REST surface, watch KEDA scale
+     order-service up under hey load
+   - `demo-grpc.sh` — ghz against the inventory gRPC service,
+     watch Istio mTLS in Kiali
+   - `demo-graphql.sh` — federated query showing data from
+     multiple services in one response
+   - `demo-kafka.sh` — produce orders, watch notifications
+     fire via the consumer chain, watch KEDA scale Kafka
+     consumers based on lag
+   - `demo-orchestration.sh` — trigger a Prefect flow,
+     watch it in Prefect UI
+3. **Postman collection** (`postman/capstone.postman_collection.json`)
+   — one collection with folders for REST, GraphQL, and
+   Apicurio Registry endpoints. Each request has an example
+   response and pre-request scripts where needed. Goal:
+   presenter can demo live to an audience without typing curl
+
+Performance testing tools mentioned but not the focus:
+- `hey` for REST load generation
+- `ghz` for gRPC load generation
+- `jq` for response parsing in demo scripts
+- `curl` for one-off REST calls
+- GraphQL queries via curl or a small client tool
+
+### Open decisions (resolve before r20)
+
+| # | Decision | Options | Recommendation |
+|---|---|---|---|
+| 1 | Metadata catalog | DataHub or OpenMetadata | **OpenMetadata** (lighter, Postgres-backed, cleaner Apicurio integration) |
+| 2 | Postgres topology | One per service or shared cluster | **One cluster, one schema per service** (resource budget) |
+| 3 | Prefect deployment | OSS server self-hosted or Prefect Cloud | **OSS self-hosted** (consistency with rest of tutorial) |
+| 4 | gRPC codegen | protobuf-first with `buf` or code-first | **protobuf-first with `buf`** (industry standard, gives us a clean Apicurio registration story) |
+| 5 | GraphQL implementation | Federated gateway or schema stitching | **Federated gateway** with Strawberry (Python) — simpler than Apollo Federation, FastAPI-native |
+| 6 | Multi-protocol per service | All services expose all 4 protocols, or per-service appropriate protocols | **Per-service appropriate** (table above) — realistic, demonstrates *choice* not *uniformity* |
+| 7 | helm chart structure | Umbrella chart or `helmfile` | **Umbrella chart** (subcharts for each service + each platform component, no extra tooling) |
+| 8 | UBI vs upstream operator images | Try UBI everywhere, or accept upstream for operators | **Accept upstream for Strimzi/KEDA/Istio/Apicurio/OpenMetadata operators; UBI for our 5 services + custom workloads** (documented per-image) |
+| 9 | Capstone profile resource sizing | 24GB / 16 CPU, or smaller | **24GB / 16 CPU** with reader-stopped `minikube`/`istio` profiles (documented prerequisite) |
+| 10 | OpenTelemetry collector | DaemonSet, Deployment, or sidecar | **Deployment** with OTLP receiver; services push via OTLP gRPC |
+
+### References
+
+- **Zhamak Dehghani, *Data Mesh: Delivering Data-Driven Value
+  at Scale*** (O'Reilly, 2022) — the canonical text. Cited
+  explicitly when introducing the four principles
+  (domain ownership, data as product, self-serve data
+  platform, federated computational governance)
+- **Bilgin Ibryam & Roland Huss, *Kubernetes Patterns***
+  (O'Reilly, 2nd ed. 2023) — referenced inline when each
+  pattern shows up. Likely patterns in scope:
+   - *Foundational*: Predictable Demands, Declarative
+     Deployment, Health Probe, Automated Placement,
+     Image Builder
+   - *Behavioral*: Batch Job (Prefect flows),
+     Periodic Job, Stateful Service (Kafka, Postgres),
+     Service Discovery, Managed Lifecycle
+   - *Structural*: Sidecar (Istio proxy, OTEL collector
+     sidecar where applicable), Adapter (Prometheus
+     exporter sidecars)
+   - *Configuration*: EnvVar Configuration, Configuration
+     Resource (ConfigMaps + Secrets), Immutable Configuration
+  Examples repo: <https://github.com/k8spatterns/examples>
+- **`patterncatalyst/cpp-container-optimization-tutorial`**
+  and **`patterncatalyst/otel-observability-demos`** — your
+  prior work on the Grafana stack running on podman. The
+  capstone reuses the OTEL collector + Prometheus + Grafana
+  + Tempo configuration patterns from these repos, adapted
+  for Kubernetes deployment via helm
+
+### Risks and mitigations
+
+| Risk | Impact | Likelihood | Mitigation |
+|---|---|---|---|
+| Resource exhaustion under full stack | High | Medium | Profile sized 24GB/16CPU; reader stops other profiles; helm subcharts can be disabled for partial-stack demos |
+| OpenMetadata-Apicurio integration friction | Medium | Medium | Use OpenMetadata's REST API for ingestion rather than the official Apicurio connector if it's not mature; document workaround |
+| OTEL Collector + Istio sidecar interaction | Medium | Low | Disable Istio injection in observability namespace; explicit non-mesh route for OTLP traffic |
+| Helm umbrella chart complexity | Medium | High | Subchart per component; values.yaml organized by component; `helm template` smoke test in CI |
+| `buf` codegen drift between services | Low | Medium | Single `proto/` directory at repo root; all services generate from same source |
+| Kafka topic schema evolution | Medium | Medium | Use Apicurio's schema registry for Avro/JSON schemas; document the "old + new version" pattern |
+| GraphQL federated gateway adds debug complexity | Medium | Medium | Show single-service GraphQL queries first (without gateway), then introduce gateway in a later subsection |
+| Prefect server adds another control plane | Medium | Low | Keep Prefect flows minimal — one scheduled flow for metadata sync, one for nightly inventory reconciliation. Don't expand scope |
+| Documentation outpaces implementation | High | High | Write each demo's prose *after* the demo runs; reconciliation plan tracks `verified` rows |
+
+### Iteration plan (rough, ~8-12 iterations)
+
+| r## | Phase | Deliverables |
+|---|---|---|
+| **r19** | Planning | This PRD addition (current iteration) |
+| r20 | Skeleton | `examples/17-capstone/` dir structure; helm umbrella chart skeleton; capstone minikube profile recipe; architecture diagram (svg + excalidraw) |
+| r21 | First service | order-service: FastAPI + REST + Postgres schema + helm subchart + smoke test |
+| r22 | Remaining services | inventory, payment, shipping, notification — REST first, identical pattern to order |
+| r23 | gRPC layer | proto definitions, `buf` codegen, gRPC clients/servers, ghz test scripts |
+| r24 | GraphQL layer | Per-service GraphQL endpoints + federated gateway |
+| r25 | Kafka integration | Topic definitions, schema registry via Apicurio, producers + consumers in services, demo flows |
+| r26 | KEDA + Istio wiring | Apply Istio sidecars, KEDA ScaledObjects (HTTP + Kafka), traffic-shifting demo, Kiali walkthrough |
+| r27 | Observability | OTEL collector deployment, Prometheus scrape config, Grafana dashboards (per-service golden signals), Tempo tracing setup, OpenMetadata install + auto-ingestion |
+| r28 | Prefect orchestration | Prefect server install, flows for metadata sync + nightly reconciliation |
+| r29 | Tests + Postman | Postman collection, demo scripts polished, walkthrough prose |
+| r30 | Editorial pass + verification | §17 narrative complete, all examples promoted to `verified (Fedora 44)`, audit scripts pass, reconciliation plan close-out |
+
+The numbers above are estimates. Some phases will likely take
+two iterations (e.g. r23a / r23b) because integrating a new
+protocol always surfaces unanticipated friction.
+
+### Success criteria
+
+§17 ships when:
+
+1. `helm install capstone` brings up the entire stack on the
+   `capstone` profile in under 10 minutes
+2. All five demo scripts (`demo-rest.sh`, `demo-grpc.sh`,
+   `demo-graphql.sh`, `demo-kafka.sh`,
+   `demo-orchestration.sh`) pass on Fedora 44
+3. Postman collection imports cleanly and every request returns
+   a successful response on a freshly-deployed stack
+4. Kiali shows the mesh with all five services and observable
+   traffic between them
+5. Grafana shows per-service request rate, error rate, and
+   latency dashboards populated with real data
+6. Tempo shows distributed traces spanning at least three
+   services (an order placed → inventory checked → payment
+   processed flow)
+7. OpenMetadata browser shows the five services as data
+   products with their schemas auto-ingested from Apicurio
+8. KEDA visibly scales order-service from 0 to N when hey
+   generates load, and back to 0 after the load stops; same
+   for Kafka consumer scaling
+9. Cross-references audit script and editorial audit script
+   both pass
+10. PRD reconciliation document updated with what shipped vs.
+    what was planned for the capstone (some divergence is
+    expected; record it)
+
+### What "victory" looks like for the capstone
+
+A presenter can sit down at a fresh Fedora 44 machine, run
+the §17 setup script, get the stack up in ~10 minutes, and
+walk an audience through:
+
+> "Here's an order coming in via REST. Watch the order-service
+> scale up under load. Here's it calling inventory and payment
+> via gRPC — see them in Kiali. Here's the order-placed event
+> firing on Kafka — watch the consumers light up. Here's
+> Tempo showing the full distributed trace. Here's
+> OpenMetadata showing the schemas. Here's Prefect running
+> the nightly reconciliation. Every piece you saw earlier in
+> the tutorial — it's all working here, together."
+
+That demo, working start-to-finish, is the victory condition.
+
+---
+
+## Reconciliation-plan note
+
+This r19 iteration ships PRD additions only — no code, no
+diagrams yet. The architecture diagram lands in r20 after the
+ten open decisions in the table above are resolved. Pre-committing
+to architectural detail before those decisions are settled
+would just produce work we'd throw away.

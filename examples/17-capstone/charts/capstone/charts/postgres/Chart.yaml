@@ -1,0 +1,6 @@
+apiVersion: v2
+name: postgres
+description: CloudNativePG Cluster CR for the capstone shared Postgres. One cluster, one application database (`capstone`), with a schema per service (CAP-003). The CloudNativePG operator must already be installed (scripts/setup-postgres-operator.sh).
+type: application
+version: 0.1.0
+appVersion: "r21"
