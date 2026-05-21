@@ -212,3 +212,49 @@ The detailed iteration-by-iteration history is in
 When new contributors arrive: read the PRD first (intent), then this
 document (intent vs shipped), then the reconciliation plan (every
 specific decision and why). That's the recommended order.
+
+---
+
+## Addendum: project reopened (§16 examples hub + §17 capstone)
+
+The summary above describes the original 15-section project at its
+first close (**107 verified facts**). The project subsequently
+reopened to add two things, so this document's "shipped" picture has
+moved on:
+
+- **§16 — Examples hub** (r18 family): a generated index of the
+  per-example pages, with a `sync-example-pages.sh` script that
+  renders `examples/*/README.md` into browsable pages. Onboarding
+  docs moved under `onboarding/`.
+- **§17 — Capstone: a data mesh on minikube** (r19 onward, in
+  progress): a five-service data mesh (order / inventory / payment /
+  shipping / notification) demonstrating REST + gRPC + GraphQL +
+  Kafka, deployed via a helm umbrella chart to a dedicated `capstone`
+  profile, with Postgres (CloudNativePG), Apicurio, OpenMetadata,
+  observability, and Prefect. Architectural choices are tracked
+  separately in `_plans/capstone-decisions.md` (CAP-001 … CAP-010).
+
+**Current verified count: 112** (was 107). The five new facts come
+from r21c — the order-service walking skeleton, verified end-to-end
+on Fedora 44 (image build → in-cluster registry → operator-managed
+Postgres → REST round-trip → row persisted).
+
+**A divergence worth recording, in the spirit of this document:** the
+capstone took six iterations (r21 → r21c) to stand up its *first*
+service, almost entirely due to image-distribution friction on the
+rootless-podman + containerd driver — not the application code, the
+helm charts, or the operators, all of which worked on first or second
+try. The lasting fix (minikube's in-cluster registry, plus
+`MINIKUBE_ROOTLESS=true` as mandatory) is documented as CAP-007/009/010
+and called out for readers in §17's "known friction" section. The
+genuinely scary pre-identified risk — CloudNativePG on rootless-podman
+minikube — did **not** materialize; the operator provisioned a Ready
+primary in seconds. A reminder that the risks you plan for and the
+risks that bite are often different ones.
+
+The §13 vendor-neutrality divergence noted above also deepened in the
+capstone: §17 names specific tools throughout (Strimzi, KEDA, Istio,
+CloudNativePG, Apicurio, OpenMetadata, Prefect, Strawberry) because a
+working data mesh requires concrete choices. These are presented as
+"a defensible set of choices for this stack," not endorsements, with
+rationale in the decision log.

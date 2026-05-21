@@ -182,6 +182,7 @@ are still aspirational.
 | **verified (Fedora 44)** | `examples/11-istio`                   | §11     | r12e user run: full §11 happy path passed — 13 phases from pre-flight through routing assertions. v1-pin proven by 1/10 distinct hashes, 50/50 split proven by 2/20 with 55/45 distribution. SUCCESS banner with verified counts; cleanup trap restored kubectl context |
 | **verified (Fedora 44)** | `examples/12-keda-kafka`              | §12     | r13b user run: full demo passed end-to-end. 0→3→0 replica lifecycle with 200 messages produced and drained. See `_plans/reconciliation-plan.md` Section B for individual claim promotions |
 | **verified (Fedora 44)** | `examples/12-keda-http`               | §12     | r13f user run: full demo passed end-to-end after r13c (tightened assertions) + r13d (`-host` fix) + r13e (parsing fix). Cold-start 3s/200/nginx content; hey 500/500 at 4500 req/s with all 200s; scale-up to 1 replica then back to 0 after 37s. See `_plans/reconciliation-plan.md` Section B for individual claim promotions |
+| **verified (Fedora 44)** | `examples/17-capstone` (order-service walking skeleton) | §17 | r21c user run (`demos/smoke-order.sh`): image built (UBI 9 + Poetry, root-builder venv fix) → pushed to in-cluster registry → CloudNativePG primary Ready in ~5–35s → order-service rolled out → `GET /healthz` ready → `POST /orders` returned a UUID order → direct `psql` confirmed 1 row in `orders.orders`. Six iterations (r21→r21c) to get here, almost all image-distribution friction on rootless-podman+containerd; resolved via the registry (CAP-007/009) + `MINIKUBE_ROOTLESS` (CAP-010) |
 
 **Aggregator status:** `scripts/test-all-examples.sh` does not
 yet exist; will be added once the first two examples' `demo.sh`
@@ -1697,16 +1698,6 @@ have to derive them.
    when convenient; paste any findings and I'll ship r17a if
    meaningful fixes are needed
 
-   # Reconciliation plan addition — r18
-
-   > Merge instructions: append the entry below to Section D of
-   > `_plans/reconciliation-plan.md`, right after the r17 entry
-   > and just before the `**Open priorities (after r17):**`
-   > section. Then update the "Open priorities" section to
-   > reflect r18 close-out.
-
-   ---
-
    - **r18** (project close-out — examples-as-pages, onboarding
      folder, top-level README rewrite) — landed the last cluster
      of changes before declaring victory. Six deliverables:
@@ -1873,15 +1864,6 @@ have to derive them.
    Not on the victory list: "every section reads perfectly" (that's
    infinite work). Knowing when to ship is the discipline.
 
-   # Reconciliation plan addition — r18a
-
-   > Merge instructions: append the entry below to Section D of
-   > `_plans/reconciliation-plan.md`, after the r18 entry. The
-   > "Project state (post-r18): closed" section below it stays as
-   > the close-out marker.
-
-   ---
-
    - **r18a** (2026-05-17, follow-up fix for §16 hub rendering and
      example page titles) — r18 shipped §16 with an HTML list
      (`<ul class="example-list">`) that kramdown rendered as raw
@@ -1938,13 +1920,6 @@ have to derive them.
      closed; r18a was the first "small fix from continued use"
      iteration anticipated by the close-out language in the r18
      entry.
-
-     # Reconciliation plan addition — r18b
-
-     > Merge instructions: append the entry below to Section D of
-     > `_plans/reconciliation-plan.md`, after the r18a entry.
-
-     ---
 
      - **r18b** (2026-05-17, second follow-up for example pages
        rendering with no site chrome) — r18a fixed the §16 hub
@@ -2021,15 +1996,6 @@ have to derive them.
        before assuming a layout name, OR add an explicit
        `defaults:` rule for the new collection so the binding is
        visible in one place. Don't guess.
-
-       # Reconciliation plan addition — r19 (capstone planning)
-
-       > Merge instructions: append to Section D of
-       > `_plans/reconciliation-plan.md`, after the r18b entry. Update
-       > the "Project state (post-r18): closed" language to
-       > "Project state (post-r19): capstone planning underway".
-
-       ---
 
        - **r19** (capstone planning — §17 PRD addition only, no
          implementation) — formally re-opens the project for the
@@ -2111,13 +2077,6 @@ have to derive them.
        extension in r19 and is currently in the planning phase.
        Implementation begins at r20 once the ten open decisions in
        the §17 PRD addition are resolved.
-       # Reconciliation plan addition — r21 (order-service walking skeleton)
-
-       > Merge instructions: append the entry below to Section D of
-       > `_plans/reconciliation-plan.md`, after the r20 entry.
-
-       ---
-
        - **r21** (capstone walking skeleton — order-service end-to-end +
          CloudNativePG operator + Postgres Cluster CR) — first
          *runnable* capstone iteration. Proves the full vertical spine

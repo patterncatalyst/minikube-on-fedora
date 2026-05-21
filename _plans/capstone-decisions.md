@@ -140,6 +140,16 @@ Status values: **accepted**, **superseded by CAP-NNN**,
     python install, or `ubi9/python-312-minimal` if confirmed
     available) deferred as a possible later enhancement; noted
     in §17 prose
+  - **r21b amendment:** the UBI 9 python-312 image's default user
+    (1001) cannot write to `/opt/venv` (`/opt` is root-owned),
+    which broke the build with `Permission denied: '/opt/venv'`.
+    Fix: the **builder stage runs as root** (`USER 0`) — it's
+    discarded in a multi-stage build, so there's no security cost —
+    while the **runtime stage** keeps `USER 1001:0` and copies the
+    venv with `COPY --chown=1001:0`. Idiomatic multi-stage: relax
+    the build stage, lock down the runtime stage. The non-root
+    *runtime* guarantee CONTRIBUTING.md requires is preserved.
+    Verified working on Fedora 44 (r21c).
 
 ## CAP-006 — Walking-skeleton-first, vertical slice over horizontal layers
 
@@ -164,6 +174,96 @@ Status values: **accepted**, **superseded by CAP-NNN**,
     verifiable
   - (−) r21 is a larger single iteration than a pure
     "scaffold only" one — but the payoff is a proven spine
+
+## CAP-007 — Image distribution via the in-cluster registry
+
+- **Date:** r21a (original), revised r21c
+- **Status:** accepted (the r21a/r21b `minikube image load` approach
+  is **superseded**)
+- **Context:** Getting a locally-built image to the kubelet under the
+  rootless-podman + containerd driver combo proved unexpectedly hard.
+  In sequence we hit: (1) `minikube image build` exited 0 but the
+  image never entered the profile's containerd store; (2) `minikube
+  image load <name>` reported "image not found" even with the
+  fully-qualified `localhost/` name, because the lookup goes through
+  the rootless podman socket and fails; (3) `podman save | ctr import`
+  didn't read stdin as expected and dumped the image to the terminal.
+  Each was a distinct facet of the same problem: there is no reliable
+  *push-free* path into containerd on this driver.
+- **Decision:** Use **minikube's built-in registry addon**. Build on
+  the host with podman, push to the registry, and have deployments
+  pull from it as normal images. Encapsulated in
+  `scripts/build-image.sh <context> <name> <tag>`.
+- **Consequences:**
+  - (+) Reliable and **proven** end-to-end on Fedora 44 (r21c)
+  - (+) Scales cleanly to all six capstone images — same one command
+    each
+  - (+) Standard `podman push` / kubelet pull; no containerd-internals
+    plumbing
+  - (−) Requires the registry addon enabled (now done in
+    `setup-capstone-profile.sh`)
+  - (−) Introduces the host/cluster port asymmetry — see CAP-009
+
+## CAP-008 — Demo failure leaves resources in place and dumps diagnostics
+
+- **Date:** r21a
+- **Status:** accepted
+- **Context:** r21's smoke test had `trap cleanup EXIT` that
+  uninstalled order-service on *any* exit, including failure. When the
+  pod failed to go Ready, the trap destroyed the evidence before it
+  could be inspected, forcing a separate diagnostic re-run.
+- **Decision:** Demo scripts clean up **only on success**. On failure
+  they leave the resources in place and dump a diagnostic bundle
+  inline (pod status, describe events, current + previous logs,
+  registry catalog) — the pattern §11/§12 demos already use.
+- **Consequences:**
+  - (+) A failed run hands you the evidence directly
+  - (+) Consistent with the established §11/§12 diagnostic-dump
+    convention
+  - (−) Failed runs leave cluster state that must be cleaned up
+    manually (the dump prints the exact uninstall commands)
+
+## CAP-009 — The registry port asymmetry (host vs cluster)
+
+- **Date:** r21c
+- **Status:** accepted
+- **Context:** minikube's registry is reachable at two *different*
+  addresses depending on where you are. With the podman driver, the
+  host-side port is NOT 5000 — minikube assigns one (we observed
+  41685) and explicitly warns to use it. Inside the cluster the
+  kubelet reaches the registry at `localhost:5000`.
+- **Decision:** `build-image.sh` discovers the host port dynamically
+  (`podman port capstone | grep 5000/tcp`) and pushes to
+  `127.0.0.1:<port>`. Charts reference the in-cluster address
+  `localhost:5000/<service>` in `image.repository`.
+- **Consequences:**
+  - (+) No hardcoded port that drifts between machines
+  - (−) Genuinely confusing the first time; documented prominently in
+    the §17 "known friction" callout because every reader on this
+    driver will hit it
+
+## CAP-010 — MINIKUBE_ROOTLESS=true is mandatory
+
+- **Date:** r21c
+- **Status:** accepted
+- **Context:** Several baffling failures (status reporting "unknown
+  state", `minikube ssh` aborting, `image load` failing) all traced to
+  one cause: when `MINIKUBE_ROOTLESS` is unset in the current shell,
+  minikube routes host operations through `sudo podman`, which cannot
+  see the rootless user's `capstone` container. The variable was set
+  in the shell that *created* the profile but not in later shells, so
+  the breakage appeared intermittently.
+- **Decision:** Set rootless mode two ways for defence in depth:
+  (1) persist it in minikube config (`minikube config set rootless
+  true`, done in `setup-capstone-profile.sh`), and (2) `export
+  MINIKUBE_ROOTLESS=true` at the top of every capstone script.
+- **Consequences:**
+  - (+) Eliminates an entire class of intermittent, hard-to-diagnose
+    failures
+  - (+) Config covers ad-hoc `minikube` commands; export covers
+    scripts run in a bare shell
+  - (−) Readers must understand this is load-bearing — covered in the
+    §17 friction callout
 
 ---
 
