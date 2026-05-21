@@ -1,0 +1,35 @@
+# graphql-gateway subchart values. Stateless — no Postgres.
+
+replicas: 1
+
+image:
+  repository: localhost:5000/graphql-gateway
+  tag: v1
+  # Always: mutable :v1 tag during the dev loop (CAP-015).
+  pullPolicy: Always
+
+service:
+  port: 80
+  targetPort: 8080
+
+# Downstream endpoints the gateway federates over.
+downstream:
+  orderRestUrl: http://order-service
+  inventoryGrpcAddr: inventory-service:50051
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 256Mi
+
+probes:
+  liveness:
+    path: /health
+    initialDelaySeconds: 5
+    periodSeconds: 10
+  readiness:
+    path: /healthz
+    initialDelaySeconds: 5
+    periodSeconds: 5

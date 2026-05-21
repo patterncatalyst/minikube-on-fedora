@@ -469,6 +469,54 @@ Status values: **accepted**, **superseded by CAP-NNN**,
   was prompted by a separate r23 regression where order-service's
   `values.yaml` had reverted to a bare `order-service`.
 
+## CAP-016 — GraphQL via a gateway that orchestrates, not true subgraph federation
+
+- **Date:** r24
+- **Status:** accepted (for the tutorial; true federation noted as the
+  production pattern)
+- **Context:** CAP-R19-5 chose "a federated gateway with Strawberry." There
+  are two ways to deliver a unified GraphQL graph across services:
+  - **(A) True subgraph federation** — each service exposes its *own*
+    GraphQL subgraph (with `@key` entity directives), and a gateway composes
+    them into a supergraph, planning queries across subgraphs. This is the
+    production-scale pattern (Apollo Federation / the GraphQL composite
+    spec): each domain owns and evolves its slice of the graph independently.
+  - **(B) Gateway orchestration** — one stateless gateway exposes the unified
+    graph, and its resolvers fetch from the services over their existing
+    interfaces (order via REST, inventory via gRPC). The services are
+    unchanged.
+- **Decision:** Use **(B)** for the capstone. A single `graphql-gateway`
+  service resolves `order(id)` from order-service (REST) and the nested
+  `Order.stock` field from inventory-service (gRPC). No GraphQL is added to
+  the existing services.
+- **Rationale:**
+  - This is an example, not a production deployment — (B) demonstrates the
+    *value* GraphQL adds (one client query, multiple backends, response
+    shaped by the client) with one new service and zero changes to the five
+    existing ones, fitting the incremental rhythm and minimal-dependency rule.
+  - It makes the protocol comparison (CAP-012) concrete in one place: the
+    gateway's resolvers literally call REST and gRPC side by side, and
+    GraphQL stitches the result — the reader sees all three protocols
+    cooperating.
+  - The gateway's readiness probe deliberately does **not** check downstreams
+    (readiness = "can I serve", not "are my dependencies up"), so a
+    downstream outage surfaces per-field at query time rather than as
+    cascading unavailability.
+- **Consequences:**
+  - (+) Small, self-contained, demonstrably valuable; one vertical slice
+    (`order → stock`) proven, widened later
+  - (+) Reuses the already-verified REST and gRPC surfaces
+  - (−) Not how you'd federate at scale: a single gateway is a development
+    and scaling bottleneck, and the schema isn't owned by the domains
+  - **When you'd use (A) in production (documented in §17 prose):** when
+    each domain team must own and evolve its part of the graph
+    independently; when you want the supergraph composed and validated in
+    CI (breaking-change detection across subgraphs); when query planning,
+    entity resolution across subgraphs, and per-subgraph scaling matter.
+    (A) trades the gateway bottleneck and central schema for real domain
+    autonomy — the same data-mesh principle the capstone teaches, applied
+    to the graph itself.
+
 ---
 
 ## Decisions inherited from r19 (PRD planning)

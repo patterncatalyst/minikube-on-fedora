@@ -1,0 +1,6 @@
+apiVersion: v2
+name: graphql-gateway
+description: Federated GraphQL read layer — orchestrates order-service (REST) and inventory-service (gRPC). Stateless.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

@@ -1,0 +1,25 @@
+# graphql-gateway Containerfile — UBI 9 multi-stage build (CAP-005).
+# Builder runs as root (writes /opt/venv); runtime is non-root USER 1001:0.
+# Copies the committed gRPC client stubs (gen/) for the inventory call (CAP-013).
+
+FROM registry.access.redhat.com/ubi9/python-312:latest AS builder
+USER 0
+WORKDIR /build
+RUN pip install --no-cache-dir "poetry==1.8.4" "poetry-plugin-export==1.8.0"
+COPY pyproject.toml poetry.lock* ./
+RUN poetry export --without-hashes --only main -f requirements.txt -o requirements.txt \
+    && python -m venv /opt/venv \
+    && /opt/venv/bin/pip install --no-cache-dir -r requirements.txt
+
+FROM registry.access.redhat.com/ubi9/python-312:latest AS runtime
+WORKDIR /opt/app-root/src
+COPY --from=builder --chown=1001:0 /opt/venv /opt/venv
+COPY --chown=1001:0 app/ ./app/
+# Committed gRPC client stubs (capstone.inventory.v1). app/ adds gen/ to sys.path.
+COPY --chown=1001:0 gen/ ./gen/
+ENV PATH="/opt/venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+USER 1001:0
+EXPOSE 8080
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]

@@ -2545,3 +2545,37 @@ have to derive them.
   excess-quantity order 409 — all decided by the gRPC round-trip. Verified
   count holds at **116** until that run passes; then the order→inventory
   call is the 117th fact.
+
+- ✅ **r23** verified (Fedora 44) — `smoke-grpc.sh` green: in-stock order
+  201, out-of-stock 409, excess-quantity 409, all decided by the
+  order→inventory `CheckStock` gRPC round-trip. Two infra issues surfaced
+  and were fixed en route (both unrelated to the gRPC code): a regressed
+  bare image name in order-service `values.yaml`, and the mutable-`:v1` +
+  `IfNotPresent` stale-image trap (→ CAP-015, `imagePullPolicy: Always`
+  across all charts + a registry-prefix guard in the smoke tests). **Count:
+  116 → 117.**
+
+- 🔲 **r24** (2026-05-21) — GraphQL federation (read layer), first
+  cross-service query. Ships a new stateless **`graphql-gateway`** service
+  (Strawberry + FastAPI) that federates by *orchestration* (CAP-016): the
+  `order(id)` query resolves the order from order-service (REST) and the
+  nested `Order.stock` field from inventory-service (gRPC), stitching two
+  services and two protocols into one response. No GraphQL added to the
+  existing services. Includes the gateway chart (stateless — no Postgres),
+  `gen-protos.sh` updated to distribute the inventory client stubs to the
+  gateway too, and `smoke-graphql.sh` (places an in-stock order via REST,
+  then queries the gateway and asserts the response carries both the order
+  fields and nested `stock { quantityOnHand available }`). Decision
+  **CAP-016** recorded (gateway orchestration vs true subgraph federation);
+  §17 prose gains a "read layer: GraphQL federation" section explaining the
+  gateway approach and when you'd use true subgraph federation in production.
+
+  **Validated statically** (Claude env — no strawberry/grpc/cluster): the
+  gateway's app modules compile (`py_compile`), `Chart.yaml`/`values.yaml`
+  parse, the Deployment/Service render to valid Kubernetes YAML
+  (`image: localhost:5000/graphql-gateway:v1`, `ORDER_REST_URL` +
+  `INVENTORY_GRPC_ADDR` env), and `smoke-graphql.sh` passes `bash -n`.
+  **Cluster verification pending** on Fedora 44 via `gen-protos.sh` →
+  `poetry lock`/`install` (gateway) → `smoke-graphql.sh`. Verified count
+  holds at **117** until that run passes; then the federated query is the
+  118th fact.

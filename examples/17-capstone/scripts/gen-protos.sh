@@ -24,7 +24,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT"
 
 STAGING=".gen-staging"
-SERVICES=(inventory-service order-service)
+SERVICES=(inventory-service order-service graphql-gateway)
 
 step() { printf '\n==> %s\n' "$1"; }
 fail() { printf 'ERROR: %s\n' "$1" >&2; exit 1; }

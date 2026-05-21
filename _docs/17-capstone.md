@@ -492,7 +492,53 @@ this template; later iterations layer on gRPC, GraphQL, Kafka,
 KEDA scaling, the observability stack, OpenMetadata, and
 Prefect.
 
-## What §17 delivers vs what's coming
+## The read layer: GraphQL federation (gateway vs subgraphs)
+
+REST and gRPC each answer questions about *one* service's data. The moment a
+client needs a single answer that spans services — "give me this order, and
+the current stock for its SKU" — it has to make two calls and stitch the
+results itself. GraphQL federation moves that stitching to the server: the
+client sends one query, and a gateway assembles the response from multiple
+backends, returning exactly the fields the query asked for.
+
+The capstone ships a **`graphql-gateway`** service that does this by
+*orchestration*: it's a stateless Strawberry GraphQL server whose resolvers
+call the existing services — `order(id)` fetches from order-service over
+REST, and the nested `Order.stock` field fetches from inventory-service over
+gRPC. One query, two services, two protocols, one stitched response. This is
+deliberately the place where all three protocols cooperate in view of each
+other, which makes the "right protocol for the interaction" idea concrete:
+REST at the edge, gRPC for the tight internal call, GraphQL composing reads.
+
+This is **not** how you would federate GraphQL at production scale, and the
+difference is worth understanding:
+
+- **What we do here — gateway orchestration.** A single gateway owns the
+  unified schema and calls services under the hood. It's simple, it reuses
+  interfaces the services already expose, and it's perfect for demonstrating
+  the value. But the schema lives in one place (no domain owns its slice),
+  and that one gateway is a scaling and deployment bottleneck.
+
+- **True subgraph federation (the production pattern).** Each service
+  exposes its *own* GraphQL subgraph — order-service publishes the `Order`
+  type, inventory-service publishes a `Stock` type with an entity key — and
+  a federation gateway composes these subgraphs into a single *supergraph*,
+  planning each query across the subgraphs that can resolve its fields. You
+  reach for this when domain teams must own and evolve their part of the
+  graph independently, when you want the supergraph composed and
+  breaking-change-checked in CI, and when entity resolution across subgraphs
+  and per-subgraph scaling actually matter. It applies the same data-mesh
+  principle the capstone teaches — domain ownership — to the graph itself,
+  trading the single-gateway bottleneck for real domain autonomy at the cost
+  of more moving parts (a subgraph server per service, a composition step,
+  query planning).
+
+For a tutorial whose subject is services on Kubernetes, orchestration shows
+the idea with one new service and no changes to the existing five. In a real
+data mesh, you'd graduate to subgraph federation so each data product owns
+its slice of the graph end to end. (See CAP-016 in the decision log.)
+
+
 
 The skeleton (r20) — the directory structure under
 `examples/17-capstone/`, the helm umbrella chart's `Chart.yaml`
