@@ -1,0 +1,40 @@
+# shipping-service Containerfile — UBI 9 multi-stage build (CAP-005).
+#
+# The BUILDER stage runs as root so it can write /opt/venv (the UBI default
+# user 1001 cannot — /opt is root-owned). The builder image is discarded, so
+# there's no security cost. The RUNTIME stage enforces the non-root user
+# (1001:0) and only reads/executes the copied venv. (CAP-005 r21b amendment.)
+#
+# Per CONTRIBUTING.md: UBI 9 base, runtime as USER 1001:0.
+
+# ─── Builder (runs as root; image discarded) ─────────────────────────────────
+FROM registry.access.redhat.com/ubi9/python-312:latest AS builder
+
+USER 0
+WORKDIR /build
+
+RUN pip install --no-cache-dir "poetry==1.8.4" "poetry-plugin-export==1.8.0"
+
+COPY pyproject.toml poetry.lock* ./
+
+RUN poetry export --without-hashes --only main -f requirements.txt -o requirements.txt \
+    && python -m venv /opt/venv \
+    && /opt/venv/bin/pip install --no-cache-dir -r requirements.txt
+
+# ─── Runtime (non-root) ──────────────────────────────────────────────────────
+FROM registry.access.redhat.com/ubi9/python-312:latest AS runtime
+
+WORKDIR /opt/app-root/src
+
+COPY --from=builder --chown=1001:0 /opt/venv /opt/venv
+COPY --chown=1001:0 app/ ./app/
+
+ENV PATH="/opt/venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+USER 1001:0
+
+EXPOSE 8080
+
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]

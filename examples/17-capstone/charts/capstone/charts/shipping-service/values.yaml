@@ -1,0 +1,39 @@
+# shipping-service subchart values.
+
+replicas: 1
+
+image:
+  # In-cluster registry address (CAP-009). build-image.sh pushes to
+  # 127.0.0.1:<port>; the kubelet pulls from localhost:5000.
+  repository: localhost:5000/shipping-service
+  tag: v1
+  pullPolicy: IfNotPresent
+
+service:
+  port: 80
+  targetPort: 8080
+
+# Postgres connection. The CloudNativePG operator generates a Secret named
+# "<cluster>-app" holding the app user's credentials; we reference it by key.
+postgres:
+  clusterName: capstone-postgres
+  appSecret: capstone-postgres-app
+  schema: shipping
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 256Mi
+
+# /health is liveness; /healthz is readiness (checks Postgres).
+probes:
+  liveness:
+    path: /health
+    initialDelaySeconds: 5
+    periodSeconds: 10
+  readiness:
+    path: /healthz
+    initialDelaySeconds: 5
+    periodSeconds: 5
