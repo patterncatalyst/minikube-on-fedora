@@ -29,6 +29,8 @@ spec:
             # Service identity
             - name: SERVICE_SCHEMA
               value: {{ .Values.postgres.schema | quote }}
+            - name: INVENTORY_GRPC_ADDR
+              value: {{ .Values.inventory.grpcAddr | quote }}
             # Postgres connection — pulled from the CloudNativePG app Secret.
             # Predictable Demands pattern: declare exactly what we need.
             - name: PG_HOST

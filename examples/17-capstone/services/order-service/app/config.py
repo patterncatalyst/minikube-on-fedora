@@ -27,6 +27,11 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8080
 
+    # inventory-service gRPC endpoint (r23). In-cluster, the Service DNS name;
+    # locally, a port-forward target. order-service calls CheckStock here
+    # before persisting an order.
+    inventory_grpc_addr: str = "inventory-service:50051"
+
     @property
     def database_url(self) -> str:
         """Async SQLAlchemy URL using the asyncpg driver."""

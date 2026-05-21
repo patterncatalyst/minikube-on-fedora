@@ -1,0 +1,10 @@
+version: v2
+# Generates Python message stubs (_pb2.py) and gRPC service stubs
+# (_pb2_grpc.py) from the protos. Output goes to a staging dir that
+# gen-protos.sh then copies into each service that needs the stubs
+# (option b: per-service committed copies, no buf in the image).
+plugins:
+  - remote: buf.build/protocolbuffers/python
+    out: .gen-staging
+  - remote: buf.build/grpc/python
+    out: .gen-staging

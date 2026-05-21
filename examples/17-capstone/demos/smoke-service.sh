@@ -61,6 +61,13 @@ diagnostics() {
 [[ -d "$SVC_DIR" ]] || fail "service dir $SVC_DIR not found — scaffold it first: ./scripts/scaffold-service.sh $BASE <schema>"
 [[ -d "$CHART"   ]] || fail "chart dir $CHART not found"
 
+step "Sanity: chart image.repository points at the registry"
+repo="$(awk '/^  repository:/{print $2; exit}' "$CHART/values.yaml")"
+case "$repo" in
+    localhost:5000/*) printf '    \xe2\x9c\x93 %s -> %s\n' "$SERVICE" "$repo" ;;
+    *) fail "$SERVICE image.repository is '$repo' - must start with localhost:5000/ (a bare name pulls from Docker Hub and ErrImagePulls)" ;;
+esac
+
 step "Pre-flight: profile + context"
 minikube status -p "$PROFILE" >/dev/null 2>&1 || fail "profile '$PROFILE' not running — ./scripts/setup-capstone-profile.sh"
 kubectl config use-context "$PROFILE" >/dev/null

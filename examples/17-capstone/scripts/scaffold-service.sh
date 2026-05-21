@@ -390,7 +390,11 @@ image:
   # 127.0.0.1:<port>; the kubelet pulls from localhost:5000.
   repository: localhost:5000/__SERVICE__
   tag: v1
-  pullPolicy: IfNotPresent
+  # Always: the :v1 tag is mutable during the dev loop, and the node caches
+  # images by tag — IfNotPresent would serve a stale cached :v1 after a
+  # rebuild. Local-registry pulls are cheap, so Always guarantees the pod
+  # runs what was just pushed (CAP-015).
+  pullPolicy: Always
 
 service:
   port: 80

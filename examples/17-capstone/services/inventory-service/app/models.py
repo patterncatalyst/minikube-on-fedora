@@ -1,21 +1,26 @@
-"""SQLAlchemy declarative base for inventory-service.
+"""SQLAlchemy models for inventory-service.
 
-r22 skeleton: no tables yet. The service's schema (`inventory`) is created
-at startup (see db.init_schema), ready for domain tables in a later
-iteration. When this service's domain model lands, add table classes here
-bound to `settings.service_schema` to keep the per-service ownership boundary
-(CAP-003) explicit, e.g.:
-
-    class Widget(Base):
-        __tablename__ = "widgets"
-        __table_args__ = {"schema": settings.service_schema}
-        ...
+r23: the inventory domain gets its first real table — `stock` — so the
+gRPC CheckStock call has something to check against. The table lives in the
+service's own schema (`inventory`), enforcing per-service ownership (CAP-003).
+inventory-service is the only service that writes this schema.
 """
 
 from __future__ import annotations
 
-from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy import String, Integer
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
+
+from app.config import settings
 
 
 class Base(DeclarativeBase):
     pass
+
+
+class Stock(Base):
+    __tablename__ = "stock"
+    __table_args__ = {"schema": settings.service_schema}
+
+    sku: Mapped[str] = mapped_column(String(64), primary_key=True)
+    quantity_on_hand: Mapped[int] = mapped_column(Integer, default=0)

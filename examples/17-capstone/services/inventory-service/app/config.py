@@ -26,6 +26,10 @@ class Settings(BaseSettings):
     host: str = "0.0.0.0"
     port: int = 8080
 
+    # gRPC server port (r23). The InventoryService listens here; order-service
+    # dials inventory-service:<grpc_port>.
+    grpc_port: int = 50051
+
     @property
     def database_url(self) -> str:
         """Async SQLAlchemy URL using the asyncpg driver."""

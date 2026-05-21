@@ -3,16 +3,17 @@
 replicas: 1
 
 image:
-  # In-cluster registry address (CAP-009). The host pushes to 127.0.0.1:<port>
-  # via build-image.sh; the kubelet pulls from localhost:5000. These are the
-  # same registry at two addresses — see scripts/build-image.sh for why.
   repository: localhost:5000/order-service
   tag: v1
-  pullPolicy: IfNotPresent
+  pullPolicy: Always
 
 service:
   port: 80
   targetPort: 8080
+
+# inventory-service gRPC endpoint (r23) — order-service calls CheckStock here.
+inventory:
+  grpcAddr: inventory-service:50051
 
 # Postgres connection. The CloudNativePG operator generates a Secret named
 # "<cluster>-app" holding the app user's credentials. We reference it by

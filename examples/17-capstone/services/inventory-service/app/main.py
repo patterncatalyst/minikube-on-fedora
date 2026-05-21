@@ -1,12 +1,16 @@
-"""inventory-service — a §17 capstone data product (r22 skeleton).
+"""inventory-service — a §17 capstone data product.
 
-r22 scope: the service stands up, connects to its Postgres schema
-(`inventory`), and serves health probes. Its domain surface (REST/gRPC/
-GraphQL/Kafka, as appropriate to this service) is added in later iterations.
+r23 scope: REST health surface + a gRPC server implementing
+InventoryService.CheckStock, backed by the `stock` table in the service's
+`inventory` schema. The gRPC server runs in the same asyncio loop as
+FastAPI, started/stopped by the lifespan — one process, two ports.
 
 Endpoints:
-  GET /health   — liveness (process is up)
-  GET /healthz  — readiness (can reach Postgres)
+  GET /health        — liveness (process is up)
+  GET /healthz       — readiness (can reach Postgres)
+  GET /stock         — list current stock (read-only convenience for demos)
+gRPC:
+  InventoryService/CheckStock  (port from settings.grpc_port, default 50051)
 """
 
 from __future__ import annotations
@@ -14,25 +18,31 @@ from __future__ import annotations
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, status
+from sqlalchemy import select
 
 from app.config import settings
-from app.db import check_db, dispose, init_schema
+from app.db import SessionLocal, check_db, dispose, init_schema, seed_demo_stock
+from app.grpc_server import start_grpc_server
+from app.models import Stock
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: ensure the service's schema (and any tables) exist.
+    # Startup: schema + tables + demo stock, then the gRPC server.
     await init_schema()
+    await seed_demo_stock()
+    grpc_server = await start_grpc_server()
+    app.state.grpc_server = grpc_server
     yield
-    # Shutdown: dispose the connection pool cleanly (Managed Lifecycle
-    # pattern — Kubernetes Patterns, Ibryam & Huss).
+    # Shutdown: stop gRPC first (drain in-flight calls), then the DB pool.
+    await grpc_server.stop(grace=5)
     await dispose()
 
 
 app = FastAPI(
     title="inventory-service",
-    version="0.1.0",
-    description="inventory-service data product for the §17 capstone data mesh (skeleton).",
+    version="0.2.0",
+    description="inventory-service data product for the §17 capstone — REST health + gRPC CheckStock.",
     lifespan=lifespan,
 )
 
@@ -52,3 +62,11 @@ async def healthz() -> dict[str, str]:
             detail="database unreachable",
         )
     return {"status": "ready", "service": settings.service_name}
+
+
+@app.get("/stock", tags=["inventory"])
+async def list_stock() -> list[dict]:
+    """List current stock levels — a read-only convenience for demos/debugging."""
+    async with SessionLocal() as session:
+        rows = (await session.execute(select(Stock))).scalars().all()
+    return [{"sku": r.sku, "quantity_on_hand": r.quantity_on_hand} for r in rows]

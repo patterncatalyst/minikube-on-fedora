@@ -1,14 +1,15 @@
 """order-service — the §17 capstone's first data product.
 
-r21 scope: REST + Postgres only. gRPC (r23), GraphQL (r24), and Kafka
-event publication (r25) are added in later iterations. This service is
-the template every other service follows.
+r21: REST + Postgres. r23: before persisting an order, order-service calls
+inventory-service over gRPC (InventoryService.CheckStock) to confirm the SKU
+is available — the mesh's first synchronous cross-service call. GraphQL (r24)
+and Kafka event publication (r25) come later.
 
 Endpoints:
-  GET  /health    — liveness (process is up)
-  GET  /healthz   — readiness (can reach Postgres)
-  POST /orders    — place an order
-  GET  /orders    — list orders
+  GET  /health      — liveness (process is up)
+  GET  /healthz     — readiness (can reach Postgres)
+  POST /orders      — place an order (checks inventory first)
+  GET  /orders      — list orders
   GET  /orders/{id} — fetch one order
 """
 
@@ -22,23 +23,25 @@ from sqlalchemy import select
 
 from app.config import settings
 from app.db import SessionLocal, check_db, dispose, init_schema
+from app.inventory_client import (
+    InventoryUnreachable,
+    StockUnavailable,
+    check_stock,
+)
 from app.models import Order
 from app.schemas import OrderCreate, OrderResponse
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Startup: ensure schema + tables exist.
     await init_schema()
     yield
-    # Shutdown: dispose the connection pool cleanly (Managed Lifecycle
-    # pattern — Kubernetes Patterns, Ibryam & Huss).
     await dispose()
 
 
 app = FastAPI(
     title="order-service",
-    version="0.1.0",
+    version="0.2.0",
     description="Order data product for the §17 capstone data mesh.",
     lifespan=lifespan,
 )
@@ -63,6 +66,21 @@ async def healthz() -> dict[str, str]:
 
 @app.post("/orders", response_model=OrderResponse, status_code=status.HTTP_201_CREATED, tags=["orders"])
 async def place_order(payload: OrderCreate) -> Order:
+    # r23: validate stock with inventory-service over gRPC before persisting.
+    # Fail closed — if inventory can't be reached, we don't place the order.
+    try:
+        await check_stock(payload.item_sku, payload.quantity)
+    except StockUnavailable as exc:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail=f"insufficient stock for {exc.sku} ({exc.quantity_on_hand} on hand)",
+        )
+    except InventoryUnreachable as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=f"inventory-service unreachable: {exc}",
+        )
+
     order = Order(
         id=str(uuid.uuid4()),
         customer_id=payload.customer_id,

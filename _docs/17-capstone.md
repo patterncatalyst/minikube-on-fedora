@@ -191,6 +191,59 @@ starting, confirm:
   capstone — the `minikube`, `istio`, and any §12 profiles
   should be `minikube stop -p <name>` to free their RAM
   allocation
+- **Poetry, with each service's dev environment installed.** The
+  services use Poetry (CAP-001). On the host you need Poetry plus
+  a per-service `poetry install`, which creates the dev venv used
+  for local tests and for gRPC codegen. Install the dev env for
+  each service you're working with, e.g.:
+
+  ```bash
+  cd examples/17-capstone/services/inventory-service
+  poetry install        # creates the venv, installs deps + dev deps
+  ```
+
+  Run this before `scripts/gen-protos.sh` — its Poetry-venv
+  fallback needs the venv to exist.
+- **Python 3.12 for the dev venv, to match the containers.** The
+  service images run UBI 9's `python-312` (Python **3.12** — the
+  newest Python with a supported UBI 9 image). Fedora 44, however,
+  defaults to Python **3.14**, so a bare `poetry install` builds
+  the dev venv with 3.14 — which drifts from the 3.12 runtime and
+  can hit wheel-availability gaps on a Python that new (notably
+  `grpcio`). Point the dev venv at 3.12 for parity:
+
+  ```bash
+  sudo dnf install python3.12          # Fedora ships non-default versions as separate packages
+  cd examples/17-capstone/services/inventory-service
+  poetry env use python3.12            # pin THIS service's venv to 3.12
+  poetry lock && poetry install
+  ```
+
+  Repeat `poetry env use python3.12 && poetry lock && poetry
+  install` for each service. This keeps your local environment on
+  the same Python the container runs (CAP-014).
+- **A protobuf/gRPC code generator**, needed once per protocol
+  iteration (from r23 on) to regenerate the gRPC stubs that
+  `scripts/gen-protos.sh` commits into each service. The script
+  tries several generators in order, so on a stock Fedora 44 you
+  can use whichever is easiest — no global install required:
+  - **`buf`** (preferred — also lints and checks breaking
+    changes): see <https://buf.build/docs/installation>; or
+  - **the service's Poetry venv** — `grpcio-tools` is already a
+    dev dependency, so running `poetry install` in
+    `services/inventory-service` makes the generator available
+    with nothing else to install; or
+  - **a throwaway venv** (Fedora's system Python is
+    externally-managed, so install into a venv, not system-wide):
+    `python3 -m venv /tmp/protogen && /tmp/protogen/bin/pip
+    install grpcio-tools && source /tmp/protogen/bin/activate`,
+    then run the script; or
+  - **dnf + pipx**: `sudo dnf install pipx && pipx install
+    grpcio-tools`.
+
+  This tool is only needed on the machine that *regenerates*
+  stubs; the committed stubs mean the service images build
+  without it.
 
 The §17 example pre-flight script
 (`examples/17-capstone/scripts/preflight.sh`, shipping in a

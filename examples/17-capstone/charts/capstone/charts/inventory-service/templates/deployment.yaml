@@ -25,9 +25,13 @@ spec:
           ports:
             - name: http
               containerPort: {{ .Values.service.targetPort }}
+            - name: grpc
+              containerPort: {{ .Values.service.grpcPort }}
           env:
             - name: SERVICE_SCHEMA
               value: {{ .Values.postgres.schema | quote }}
+            - name: GRPC_PORT
+              value: {{ .Values.service.grpcPort | quote }}
             # Predictable Demands pattern: declare exactly what we need.
             - name: PG_HOST
               value: "{{ .Values.postgres.clusterName }}-rw.{{ .Release.Namespace }}.svc.cluster.local"

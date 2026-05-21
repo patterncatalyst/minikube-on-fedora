@@ -183,6 +183,10 @@ are still aspirational.
 | **verified (Fedora 44)** | `examples/12-keda-kafka`              | §12     | r13b user run: full demo passed end-to-end. 0→3→0 replica lifecycle with 200 messages produced and drained. See `_plans/reconciliation-plan.md` Section B for individual claim promotions |
 | **verified (Fedora 44)** | `examples/12-keda-http`               | §12     | r13f user run: full demo passed end-to-end after r13c (tightened assertions) + r13d (`-host` fix) + r13e (parsing fix). Cold-start 3s/200/nginx content; hey 500/500 at 4500 req/s with all 200s; scale-up to 1 replica then back to 0 after 37s. See `_plans/reconciliation-plan.md` Section B for individual claim promotions |
 | **verified (Fedora 44)** | `examples/17-capstone` (order-service walking skeleton) | §17 | r21c user run (`demos/smoke-order.sh`): image built (UBI 9 + Poetry, root-builder venv fix) → pushed to in-cluster registry → CloudNativePG primary Ready in ~5–35s → order-service rolled out → `GET /healthz` ready → `POST /orders` returned a UUID order → direct `psql` confirmed 1 row in `orders.orders`. Six iterations (r21→r21c) to get here, almost all image-distribution friction on rootless-podman+containerd; resolved via the registry (CAP-007/009) + `MINIKUBE_ROOTLESS` (CAP-010) |
+| **verified (Fedora 44)** | `examples/17-capstone` (inventory-service health skeleton) | §17 | r22 user run (`demos/smoke-service.sh inventory`): scaffolded from the order-service template, built → registry → rolled out → `GET /health` ok → `GET /healthz` ready → `inventory` schema confirmed in Postgres. First scaffold-generated service; green on first run |
+| **verified (Fedora 44)** | `examples/17-capstone` (payment-service health skeleton) | §17 | r22 user run (`demos/smoke-service.sh payment`): scaffolded (schema `payments`), built → registry → rolled out → `/health` ok → `/healthz` ready → schema confirmed |
+| **verified (Fedora 44)** | `examples/17-capstone` (shipping-service health skeleton) | §17 | r22 user run (`demos/smoke-service.sh shipping`): scaffolded (schema `shipping`), built → registry → rolled out → `/health` ok → `/healthz` ready → schema confirmed |
+| **verified (Fedora 44)** | `examples/17-capstone` (notification-service health skeleton) | §17 | r22 user run (`demos/smoke-service.sh notification`): scaffolded (schema `notifications`), built → registry → rolled out → `/health` ok → `/healthz` ready → schema confirmed. Gets a `/health` surface despite being Kafka-consumer-only (CAP-011) |
 
 **Aggregator status:** `scripts/test-all-examples.sh` does not
 yet exist; will be added once the first two examples' `demo.sh`
@@ -2480,3 +2484,64 @@ have to derive them.
                `scripts/scaffold-service.sh` to stamp out the per-service skeleton.
                notification-service is Kafka-consumer-only — decide at r22 start whether
                to give it a minimal `/health` HTTP surface now or defer to r25 (Kafka).
+
+- ✅ **r22** (2026-05-20) — capstone widening: service scaffold tooling +
+  health skeletons for the remaining four services. Ships
+  `scripts/scaffold-service.sh` (stamps out a new service from the proven
+  order-service template, parameterised by `<name> <schema>`;
+  auto-generates `poetry.lock` per CAP-001 when poetry is present; refuses
+  to overwrite an existing service) and `demos/smoke-service.sh` (generic
+  health smoke test for any scaffolded service: build + push image to the
+  in-cluster registry, ensure the shared Postgres cluster is Ready, deploy
+  the subchart, assert `GET /health` and `GET /healthz`, confirm the
+  service's schema exists, clean up on success). Decision **CAP-011**
+  recorded: template-driven generation; r22 services are **health-only
+  skeletons** (no domain surface yet — that arrives per-protocol in r23+);
+  notification-service gets the same `/health` surface despite being
+  Kafka-consumer-only, for testability.
+
+  The four services — inventory, payment, shipping, notification — were
+  generated and verified **incrementally, one at a time**, each its own
+  commit. All four came back green on first run: `smoke-service.sh` built
+  each image → pushed to the registry → rolled out → asserted `/health`
+  and `/healthz` → confirmed the service's schema in Postgres. **Verified
+  count: 112 → 116** (one row per service in Section C). The scaffold
+  template needed no per-service hand-editing — the r21 investment paid
+  off exactly as intended.
+
+  **Scaffold validated statically** (Claude env, no cluster): a generated
+  inventory-service compiles (`py_compile`), its `Chart.yaml`/`values.yaml`
+  parse, its Deployment and Service templates render to valid Kubernetes
+  YAML (`image: localhost:5000/inventory-service:v1`, `/health` +
+  `/healthz` probes), and the overwrite + bad-name guards both fire.
+  Cluster verification (image build → registry → rollout → probes) is
+  per-service on Fedora 44 as each is scaffolded.
+
+- 🔲 **r23** (2026-05-20) — gRPC layer, first cross-service call:
+  order-service → inventory-service `InventoryService.CheckStock`. Ships
+  the proto (`proto/capstone/inventory/v1/inventory.proto`, package
+  `capstone.inventory.v1`, 1-1-1), `buf.yaml` + `buf.gen.yaml`, and
+  `scripts/gen-protos.sh` (buf primary, `grpc_tools` fallback; generates
+  per-service committed stubs into each service's `gen/` — option b, no
+  buf/protoc in images). inventory-service gains a `stock` table (its first
+  domain table), demo seed (`WIDGET-001`=50, `WIDGET-OOS`=0), and a
+  `grpc.aio` server for `CheckStock` running in the FastAPI lifespan (one
+  container, ports 8080 + 50051). order-service gains a gRPC client and
+  calls `CheckStock` before persisting an order (fails closed if inventory
+  is unreachable). Charts updated: inventory exposes the gRPC port, order
+  gets `INVENTORY_GRPC_ADDR`. Decision **CAP-013** recorded (codegen layout,
+  committed stubs, in-process server); **CAP-012** (media-type REST
+  versioning; protocol comparison by fitness) also recorded this round.
+
+  **Validated statically** (Claude env — no buf/grpc/cluster available):
+  all 8 changed Python modules compile (`py_compile`; imports not
+  executed), proto + buf configs parse, both charts render to valid
+  Kubernetes YAML with the gRPC port (inventory: containerPorts 8080+50051,
+  `GRPC_PORT` env, Service `grpc` port; order: `INVENTORY_GRPC_ADDR` env),
+  both Containerfiles copy `gen/`, and `smoke-grpc.sh` + `gen-protos.sh`
+  pass `bash -n`. **Cluster verification pending** on Fedora 44 via
+  `gen-protos.sh` → `poetry lock` (×2) → `smoke-grpc.sh`: the smoke test
+  asserts an in-stock order returns 201, an out-of-stock order 409, and an
+  excess-quantity order 409 — all decided by the gRPC round-trip. Verified
+  count holds at **116** until that run passes; then the order→inventory
+  call is the 117th fact.
