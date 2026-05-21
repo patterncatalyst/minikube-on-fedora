@@ -297,6 +297,70 @@ Status values: **accepted**, **superseded by CAP-NNN**,
   - (−) The scaffold script itself becomes a thing to maintain as the
     service shape evolves — but that's one place, not five
 
+## CAP-012 — Media-type versioning for REST; protocol comparison by fitness, not hierarchy
+
+- **Date:** r23 (recorded ahead of the REST/gRPC/GraphQL work)
+- **Status:** accepted
+- **Context:** The capstone runs four protocols deliberately (REST at the
+  edge, gRPC for synchronous internal calls, GraphQL for federated
+  cross-domain reads, Kafka for async events). At some point the prose has
+  to explain *why* each is used where it is, and the REST surfaces have to
+  make a versioning choice. The common default — URI versioning (`/v1/orders`)
+  — is convenient and familiar, but it is in genuine tension with REST's
+  hypermedia constraint, not merely inelegant with it.
+- **Decision (two coupled commitments):**
+
+  1. **Our REST surfaces version via media type / content negotiation**
+     (e.g. `Accept: application/vnd.capstone.order.v1+json`), **not** via
+     the URI. We want a genuinely *RESTful* implementation, and **URI
+     versioning precludes that**: baking `/v1/` into the path makes the
+     version out-of-band knowledge the client must hardcode, which is
+     exactly what HATEOAS exists to eliminate — a client can no longer
+     discover its way from resource to resource purely by following the
+     links the server hands back, because every link is pinned to a version
+     namespace decided off-band. Versioning in the media type keeps the
+     uniform-interface constraint intact and lets the hypermedia examples
+     (link relations for `next`/`prev` pagination, action discovery) stay
+     honest. The cost — content negotiation is fiddlier to operate than a
+     path segment — is acknowledged in the prose as part of the tradeoff,
+     not hidden.
+
+  2. **The protocol comparison is framed by "which constraint matters for
+     this interaction," never as a ranking.** It is not a hit piece on any
+     protocol, and not a one-size-fits-all verdict. Each is presented as
+     *differently shaped*, strongest for its own reasons:
+     - **REST** — uniquely strong at HTTP caching and at hypermedia
+       (HATEOAS, link-driven pagination). Can do paging and discovery well;
+       the usual URI-versioning habit is what quietly forecloses the
+       hypermedia half, which is why we version by media type.
+     - **gRPC** — the capabilities REST structurally lacks: bidirectional
+       and server/client **streaming**, and efficient multiplexed calls
+       over HTTP/2. Our order→inventory synchronous call uses it.
+     - **GraphQL** — client-specified response shape (no over-/under-fetch
+       across what would be multiple REST round-trips) and **federation**
+       for cross-domain queries, which neither REST nor gRPC addresses.
+     The capstone is positioned to *demonstrate* this rather than assert
+     it: by r25 all four are live, so the comparison can point at running
+     code. The URI-versioning-vs-HATEOAS tension is the concrete worked
+     example that keeps the discussion defensible instead of hand-wavy.
+
+- **Consequences:**
+  - (+) The tutorial *practices* what it argues — the REST surfaces model
+    the harder-but-correct hypermedia-compatible path
+  - (+) The eventual comparison prose has a clear, sourced editorial spine:
+    fitness-for-interaction, with a real example, not protocol tribalism
+  - (−) Media-type versioning is less conventional and more work to
+    implement and document than URI versioning; we take that on
+    deliberately and explain why
+- **References** (inform the REST patterns and the comparison stance):
+  - Amundsen, *RESTful Web API Patterns and Practices Cookbook* (O'Reilly)
+  - Gough, Bryant & Auburn, *Mastering API Architecture* (O'Reilly)
+  - Kleppmann & Riccomini, *Designing Data-Intensive Applications*, 2nd ed.
+    (O'Reilly)
+  - Higginbotham, *Principles of Web API Design* (Addison-Wesley)
+  - Zimmermann, Stocker, Lübke et al., *Patterns for API Design*
+    (Addison-Wesley)
+
 ---
 
 ## Decisions inherited from r19 (PRD planning)
