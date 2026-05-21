@@ -265,6 +265,38 @@ Status values: **accepted**, **superseded by CAP-NNN**,
   - (−) Readers must understand this is load-bearing — covered in the
     §17 friction callout
 
+## CAP-011 — Generate services from a template script; health-only skeletons in r22
+
+- **Date:** r22
+- **Status:** accepted
+- **Context:** Four services remain (inventory, payment, shipping,
+  notification), each following order-service's exact shape — same UBI 9
+  Containerfile, same async-SQLAlchemy + FastAPI wiring, same subchart.
+  Hand-writing each invites copy-paste drift, and a fix to the template
+  would have to be applied four times.
+- **Decision:** A **`scripts/scaffold-service.sh <name> <schema>`** stamps
+  out a new service from the proven order-service template, parameterised
+  by service name and Postgres schema. It auto-generates the `poetry.lock`
+  (CAP-001) when poetry is present and refuses to overwrite an existing
+  service. r22's generated services are **health-only skeletons**:
+  `/health` (liveness), `/healthz` (readiness, checks Postgres), and
+  startup schema creation — **no domain surface yet**. Domain endpoints
+  arrive per-protocol in later iterations (REST/gRPC r23, GraphQL r24,
+  Kafka r25). A generic **`demos/smoke-service.sh <name>`** builds, deploys,
+  and asserts the probes for any scaffolded service. **notification-service
+  gets the same `/health` surface** even though it will ultimately be
+  Kafka-consumer-only, because a probe-able surface is useful for testing
+  regardless (user decision, r22).
+- **Consequences:**
+  - (+) Uniform services with no drift; one template to maintain
+  - (+) Each service is generated and verified **incrementally** (one at a
+    time), so any wrinkle surfaces in isolation rather than as a pile
+  - (+) notification-service is testable from the start
+  - (−) Scaffolded services share identical dependencies, so their lock
+    files are near-duplicates (harmless)
+  - (−) The scaffold script itself becomes a thing to maintain as the
+    service shape evolves — but that's one place, not five
+
 ---
 
 ## Decisions inherited from r19 (PRD planning)
