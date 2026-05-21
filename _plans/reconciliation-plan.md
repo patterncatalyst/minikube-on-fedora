@@ -2480,32 +2480,3 @@ have to derive them.
                `scripts/scaffold-service.sh` to stamp out the per-service skeleton.
                notification-service is Kafka-consumer-only — decide at r22 start whether
                to give it a minimal `/health` HTTP surface now or defer to r25 (Kafka).
-
-- ✅ **r22** (2026-05-20) — capstone widening: service scaffold tooling +
-  health skeletons for the remaining four services. Ships
-  `scripts/scaffold-service.sh` (stamps out a new service from the proven
-  order-service template, parameterised by `<name> <schema>`;
-  auto-generates `poetry.lock` per CAP-001 when poetry is present; refuses
-  to overwrite an existing service) and `demos/smoke-service.sh` (generic
-  health smoke test for any scaffolded service: build + push image to the
-  in-cluster registry, ensure the shared Postgres cluster is Ready, deploy
-  the subchart, assert `GET /health` and `GET /healthz`, confirm the
-  service's schema exists, clean up on success). Decision **CAP-011**
-  recorded: template-driven generation; r22 services are **health-only
-  skeletons** (no domain surface yet — that arrives per-protocol in r23+);
-  notification-service gets the same `/health` surface despite being
-  Kafka-consumer-only, for testability.
-
-  The four services — inventory, payment, shipping, notification — are
-  generated and verified **incrementally, one at a time**, so any wrinkle
-  surfaces in isolation. Each is marked `unverified` until its
-  `smoke-service.sh` run passes on Fedora 44. **Verified count holds at
-  112** until the first service smoke passes, then +1 per verified service.
-
-  **Scaffold validated statically** (Claude env, no cluster): a generated
-  inventory-service compiles (`py_compile`), its `Chart.yaml`/`values.yaml`
-  parse, its Deployment and Service templates render to valid Kubernetes
-  YAML (`image: localhost:5000/inventory-service:v1`, `/health` +
-  `/healthz` probes), and the overwrite + bad-name guards both fire.
-  Cluster verification (image build → registry → rollout → probes) is
-  per-service on Fedora 44 as each is scaffolded.
