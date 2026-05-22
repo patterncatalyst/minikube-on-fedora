@@ -828,6 +828,69 @@ Status values: **accepted**, **superseded by CAP-NNN**,
   - (−) Highest cluster-only uncertainty in the project so far — expect one or
     two live fix cycles on the values files.
 
+### Outcome (verified on Fedora 44, r27)
+
+Deployed green. The server's `run-db-migrations` init container connected to
+CloudNativePG over **`sslmode=require`** (no fallback to `prefer` needed —
+`require` works against CNPG's self-signed server cert), ran its migrations,
+and populated **168 tables** in the `openmetadata` database. The version API
+(`/api/v1/system/version`) serves 1.12.8, proving the server booted and reached
+Postgres. OpenSearch came up single-node with no host-kernel change. The lean
+footprint fit the 24 GB / 16 CPU profile with no bump. All CAP-022 decisions
+held.
+
+### Lessons — chart secret wiring (the three live fix cycles)
+
+Every blocker on the way to green was a Helm *secret-wiring* issue, not a
+sizing, SSL, or Postgres-reuse problem. None were catchable by `helm template`
+inspection or YAML parsing alone — they only surfaced at install/admission
+time. Recorded so the next person deploying OpenMetadata (or any large
+third-party chart) doesn't rediscover them:
+
+1. **Don't name a user-supplied secret the same as one the chart generates.**
+   The chart *generates* a Helm-owned secret `openmetadata-db-secret` (holding
+   the assembled `DB_HOST`/`DB_PORT`/`DB_USER`/... connection fields) and reads
+   the DB password from a *separate* secret named by
+   `database.auth.password.secretRef`. Initially we created our password secret
+   as `openmetadata-db-secret` too — Helm refused to install because it won't
+   adopt a resource it didn't create (`invalid ownership metadata; missing
+   app.kubernetes.io/managed-by`). Fix: name the password secret something
+   distinct (`openmetadata-db-app-secret`). Lesson: before creating any secret
+   a chart references, `helm template | grep "kind: Secret"` to see which names
+   the chart *itself* owns, and stay clear of them.
+
+2. **"Feature disabled" ≠ "secret unreferenced."** Even with the pipeline
+   service client disabled (`pipelineServiceClientConfig.enabled: false`), the
+   chart still templates an `AIRFLOW_PASSWORD` env var on *every* container —
+   including the `run-db-migrations` init container — sourced via `secretKeyRef`
+   from a secret named `airflow-secrets`. Because we disabled the Airflow
+   dependency, that secret was never created, so the init container failed with
+   `CreateContainerConfigError: secret "airflow-secrets" not found` and never
+   started. Kubernetes validates *all* `secretKeyRef`s at container-create time
+   regardless of whether the value is ever used. Fix: create a placeholder
+   `airflow-secrets` (dummy value; nothing reads it). Lesson: disabling a
+   feature in values doesn't always remove its secret references from the
+   rendered manifests — grep the rendered output for `secretKeyRef`/`secretRef`
+   and ensure every referenced secret exists.
+
+3. **The error you see can be downstream of the real cause.** The first failures
+   presented as a DB-secret ownership error, which looked like a database-config
+   problem; the real issue was a naming collision. Later the init container's
+   `CreateContainerConfigError` looked like it might be the long-feared
+   `sslmode` connection failure; it was actually the missing `airflow-secrets`,
+   and the container hadn't even started — so no DB connection had been
+   attempted yet. Lesson: read pod *events* (`kubectl describe`) and container
+   *state*, not just logs, before theorising — `CreateContainerConfigError`
+   means the kubelet couldn't even build the container config, which is always a
+   missing/!malformed env/volume/secret reference, never an application error.
+
+These reinforce the project-wide pattern: a class of failures (image
+tool-presence, dropped config properties, and now chart secret wiring) is
+invisible to Claude's static checks and only appears in-cluster. A
+"render the chart, list every secret it owns and references, confirm each
+exists with the right shape" pre-flight would have caught all three before the
+first install.
+
 ---
 
 ## Decisions inherited from r19 (PRD planning)

@@ -816,6 +816,78 @@ queryable entity. Deploying it, pointing its ingestion at the mesh's sources,
 and declaring the cross-product lineage is the step that completes the
 architecture these two diagrams describe.
 
+## Deploying the catalog without it eating the cluster
+
+OpenMetadata is the heaviest component in the capstone, and its published
+production sizing is daunting: the backend database alone is speced at 4 vCPU
+and 16 GiB, the search tier at 2 vCPU and 8 GiB across three nodes, and the
+ingestion tier (historically Apache Airflow) at another 4 vCPU and 16 GiB.
+Summed, that's well over 40 GiB — more than the whole `capstone` profile. Those
+are figures for sustained enterprise ingestion load, not for a single-node demo
+that catalogs five services, but they make the point: a naïve install does not
+fit. Three deliberate choices bring it down to roughly four to five gigabytes
+on top of the existing stack, well inside the profile, with no resize:
+
+The largest saving is dropping **Airflow**. Through version 1.11 OpenMetadata
+ran ingestion through a full Airflow deployment — an API server, a scheduler, a
+DAG processor, a triggerer, and a metrics sidecar, several pods between them. As
+of 1.12 ingestion no longer requires it: a workflow is just the ingestion
+framework reading a YAML config and pushing metadata to the server's API, which
+can run as a one-off Kubernetes Job. The capstone disables the Airflow
+dependency entirely and will run ingestion that way, deleting the heaviest tier
+outright.
+
+The second choice is running **OpenSearch as a single node in development
+mode**. A search engine that memory-maps its index segments normally insists,
+at startup, that the host kernel allow at least 262,144 memory-map areas per
+process (`vm.max_map_count`) — and refuses to boot if it doesn't. On a
+single-machine cluster that would mean changing a host kernel parameter, which
+is both intrusive and, on a container-based node, fiddly and non-persistent. The
+escape is that this is a *bootstrap check*, and bootstrap checks are only
+enforced in production mode. Put the node in single-node discovery mode and it
+runs in development mode, where the same limit becomes a non-fatal warning. So
+the capstone runs OpenSearch single-node and **never touches the host kernel** —
+no `sysctl`, no privileged init container reaching out to the node. One trimmed
+search node, a one-gigabyte heap, plenty for a demo catalog.
+
+The third choice is **reusing the Postgres already in the cluster**.
+OpenMetadata needs an operational database for its own store — its 168-odd
+tables of entities, relationships, and lineage. Rather than stand up the chart's
+bundled MySQL (another stateful service, and a second database engine in an
+otherwise all-Postgres mesh), the capstone provisions a dedicated `openmetadata`
+database and role inside the same CloudNativePG cluster the services use, and
+points OpenMetadata's backend at it. This is the one place worth being careful
+about the distinction: the `openmetadata` database is OpenMetadata's *own*
+operational store, not a data product — the per-service product schemas stay in
+their own `capstone` database. Reuse here is a deployment convenience, not a
+blurring of ownership.
+
+The install itself is two Helm releases from the official charts — the trimmed
+dependencies (OpenSearch only) and the server — plus a small provisioning step
+that creates the `openmetadata` database and role in the existing cluster and
+the secret holding its password. A reader runs `scripts/setup-openmetadata.sh`
+and then `demos/smoke-openmetadata.sh`, which confirms the server is rolled out,
+that its version API answers (proving it booted *and* reached Postgres), and
+that the `openmetadata` database is populated — proving Postgres reuse, not a
+fallback, is the live backend.
+
+A candid note on what that took, because it's the kind of thing tutorials
+usually hide. Getting a large third-party chart to deploy against
+already-running infrastructure is rarely a clean first pass, and here the
+friction was entirely in *secret wiring*, not in any of the architectural
+choices above. The chart generates some secrets itself and expects you to supply
+others; naming a supplied secret the same as a generated one makes Helm refuse
+to proceed, because it won't take ownership of a resource it didn't create. And
+a chart can keep referencing a secret for a feature you've disabled — here the
+server's containers carried an `AIRFLOW_PASSWORD` reference even with the
+pipeline client switched off, and Kubernetes won't start a container whose
+secret reference points at nothing, even if the value is never read. Both are
+invisible until install time; both are one-line fixes once seen (use a distinct
+secret name; create a placeholder for the dangling reference). The lesson worth
+carrying to any chart of this size: before installing, render it and list every
+secret it both *creates* and *references*, and make sure each one exists with the
+shape the chart expects. The decision log records the specifics.
+
 ## What the capstone builds, and what's still ahead
 
 The capstone assembles a small but complete data mesh: five domain services

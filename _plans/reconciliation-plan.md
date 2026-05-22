@@ -2782,38 +2782,45 @@ final reader shouldn't see. Items:
   and the app can't disagree). r25c persistence + migration confirmed intact;
   count promotes to **125** once the fixed smoke is re-run green.
 
-- 🔲 **r27** (2026-05-22) — deploy OpenMetadata (the data catalog) into the
+- ✅ **r27** (2026-05-22) — deploy OpenMetadata (the data catalog) into the
   capstone, lean single-node shape (CAP-022). Ships, under
   `examples/17-capstone/`: `openmetadata/om-deps-values.yaml` (trimmed
   dependencies — MySQL **off**, Airflow **off**, OpenSearch single-node with
   the PVC shrunk to 10Gi), `openmetadata/om-app-values.yaml` (server pointed at
   the **capstone CloudNativePG Postgres** instead of bundled MySQL — `database`
   flipped to `dbScheme: postgresql`, `host: capstone-postgres-rw`, a dedicated
-  `openmetadata` db + role + secret — with `deployPipelinesConfig` and
+  `openmetadata` db + role, password from a distinctly-named
+  `openmetadata-db-app-secret` — with `deployPipelinesConfig` and
   `pipelineServiceClientConfig` **disabled** since ingestion runs as one-off
   Jobs, not Airflow), `scripts/setup-openmetadata.sh` (idempotently provisions
   the `openmetadata` database + role inside the existing cluster via
-  `kubectl exec` psql, creates the password Secret, then `helm upgrade
-  --install`s the deps + server from the official charts pinned to 1.12.8), and
-  `demos/smoke-openmetadata.sh` (waits for rollout, asserts the version API
-  reports 1.12.8 — proving the server booted AND reached Postgres — and
-  confirms the `openmetadata` db is populated with tables, proving Postgres
-  reuse is the live backend). The §17 catalog-as-mesh-requirement prose and
-  CAP-022 shipped separately in **r27-docs**.
+  `kubectl exec` psql, creates the password secret + a placeholder
+  `airflow-secrets`, then `helm upgrade --install`s deps + server from the
+  official charts pinned to 1.12.8), and `demos/smoke-openmetadata.sh` (waits
+  for rollout, asserts the version API reports 1.12.8, confirms the
+  `openmetadata` db is populated). The §17 catalog-as-mesh-requirement prose,
+  the deploy walkthrough, and CAP-022 (with the live-deploy lessons) shipped in
+  the **r27-docs** / r27 doc commits.
 
-  **Validated statically** (Claude env — no helm/cluster): both override files
-  parse and carry the exact key paths from the upstream chart's own
-  `values.yaml` (pipelines off, postgres reuse wired, image pinned; mysql off,
-  airflow off, opensearch on); both scripts pass `bash -n`; the provisioning
-  SQL heredoc expands to valid PostgreSQL DDL (`$$`-quoted role block + `\gexec`
-  conditional `CREATE DATABASE`). **Cluster verification pending** on Fedora 44
-  via `setup-openmetadata.sh` then `smoke-openmetadata.sh`. The cluster-only
-  unknowns — the highest-uncertainty deploy in the project so far — are:
-  (1) the `database` override merging cleanly onto the chart and the server's
-  migration job connecting over `sslmode=require` to CNPG (fallback:
-  `sslmode=prefer`); (2) the deps chart deploying OpenSearch alone with MySQL +
-  Airflow disabled; (3) whether the chart templates any
-  `elasticsearch`/`truststore` secret refs despite auth being disabled. Verified
-  count holds until the run passes; then "OpenMetadata deployed, Postgres-backed,
-  serving" is the next fact. **r27b** follows: register Postgres + Kafka, run
-  ingestion Jobs, declare cross-product lineage.
+  **Verified on Fedora 44** via `setup-openmetadata.sh` then
+  `smoke-openmetadata.sh`: server rolled out, the `run-db-migrations` init
+  container connected to CloudNativePG over `sslmode=require` (no `prefer`
+  fallback needed) and populated **168 tables** in the `openmetadata` database,
+  the version API serves 1.12.8, OpenSearch came up single-node with no
+  host-kernel change. Footprint fit the 24 GB / 16 CPU profile, no bump.
+
+  **Three live fix cycles, all Helm secret-wiring (none catchable by Claude's
+  static checks):** (1) the user-supplied DB-password secret initially collided
+  with the chart's own generated `openmetadata-db-secret` (Helm won't adopt a
+  resource it didn't create) — fixed by renaming to `openmetadata-db-app-secret`;
+  (2) the chart templates an `AIRFLOW_PASSWORD` `secretKeyRef` to `airflow-secrets`
+  on every container *even with the pipeline client disabled*, so the init
+  container failed `CreateContainerConfigError` until a placeholder
+  `airflow-secrets` was created; (3) the early ownership error looked like a
+  DB-config problem and the later `CreateContainerConfigError` looked like the
+  long-feared `sslmode` failure, but both were secret wiring — the migration's
+  DB connection (the real unknown) worked first try once the container could
+  start. Full write-up in CAP-022's "Lessons — chart secret wiring." Verified
+  count → **126** (r25c's 125 plus "OpenMetadata deployed, Postgres-backed,
+  serving"). **r27b** follows: register Postgres + Kafka, run ingestion Jobs,
+  declare cross-product lineage.
