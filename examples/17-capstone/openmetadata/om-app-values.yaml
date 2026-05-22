@@ -1,0 +1,70 @@
+# om-app-values.yaml — OpenMetadata *server* config for the capstone.
+#
+# OVERRIDE file, merged by Helm onto the upstream open-metadata/openmetadata
+# chart defaults (chart 1.12.8). Only the keys that differ from the chart
+# default are listed; the literal key paths below were taken from that chart's
+# own values.yaml, so they are real, not reconstructed.
+#
+# Decisions (CAP-022):
+#   * No Airflow: deployPipelinesConfig.enabled and
+#     pipelineServiceClientConfig.enabled both -> false. The server boots and
+#     serves the catalog/UI without any pipeline orchestrator; ingestion is run
+#     as one-off Jobs (r27b).
+#   * Backend = capstone CloudNativePG Postgres, NOT the bundled MySQL. The
+#     `database` block is flipped from the chart's MySQL defaults to Postgres
+#     and pointed at the existing cluster's read-write service. The
+#     `openmetadata` database + role and the referenced secret are provisioned
+#     by setup-openmetadata.sh before this chart is installed.
+#   * Search = the single-node OpenSearch from om-deps-values.yaml. The chart
+#     default elasticsearch block already targets host=opensearch, port 9200,
+#     scheme http, searchType opensearch, auth/trustStore disabled — which
+#     matches our deps deploy exactly — so it needs NO override here.
+
+# Pin the server image to the chart appVersion for reproducibility (the chart
+# default tag is "" which resolves to appVersion 1.12.8; pinning makes it
+# explicit and stable across chart patch bumps).
+image:
+  tag: "1.12.8"
+
+openmetadata:
+  config:
+    # ── No orchestrator ───────────────────────────────────────────────────
+    # Don't deploy ingestion pipelines from the server...
+    deployPipelinesConfig:
+      enabled: false
+    # ...and don't run a pipeline service client at all. Ingestion is external
+    # (one-off `metadata ingest` Jobs), so the server needs neither Airflow nor
+    # the k8s pipeline client.
+    pipelineServiceClientConfig:
+      enabled: false
+
+    # ── Backend database: reuse capstone Postgres ─────────────────────────
+    # Flipped from the chart's MySQL defaults to PostgreSQL. Points at the
+    # CloudNativePG read-write service. Credentials come from the
+    # `openmetadata-db-secret` that setup-openmetadata.sh creates; the matching
+    # role + database are provisioned in the capstone-postgres cluster.
+    database:
+      host: capstone-postgres-rw
+      port: 5432
+      driverClass: org.postgresql.Driver
+      dbScheme: postgresql
+      databaseName: openmetadata
+      auth:
+        username: openmetadata
+        password:
+          secretRef: openmetadata-db-secret
+          secretKey: openmetadata-db-password
+      # CloudNativePG presents a server certificate. sslmode=require uses TLS
+      # without client-certificate verification, which works against CNPG's
+      # self-signed server cert. VERIFY-POINT: if the connection is refused,
+      # switch this to "sslmode=prefer" (negotiate TLS, fall back to plaintext).
+      dbParams: "sslmode=require"
+
+# Modest resources for a single-node demo (chart default is `resources: {}`,
+# i.e. unbounded — give the JVM a sane envelope instead).
+resources:
+  requests:
+    cpu: "500m"
+    memory: "2Gi"
+  limits:
+    memory: "3Gi"

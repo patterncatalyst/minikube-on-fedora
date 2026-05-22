@@ -1,0 +1,46 @@
+# om-deps-values.yaml — trimmed OpenMetadata *dependencies* for the capstone.
+#
+# This is an OVERRIDE file, merged by Helm onto the upstream
+# open-metadata/openmetadata-dependencies chart defaults (chart 1.12.8). We
+# only change what the lean single-node demo needs; everything else stays at
+# the chart default.
+#
+# Decisions (CAP-022):
+#   * MySQL  -> DISABLED. OpenMetadata's backend is the capstone CloudNativePG
+#     Postgres instead (a dedicated `openmetadata` database in the existing
+#     `capstone-postgres` cluster). See setup-openmetadata.sh.
+#   * Airflow -> DISABLED. Ingestion runs as one-off Kubernetes Jobs
+#     (`metadata ingest -c <yaml>`), not via an orchestrator (r27b wires the
+#     first ingestion). This drops the entire Airflow tier (api-server,
+#     scheduler, dag-processor, triggerer, statsd) — the single biggest
+#     footprint saving.
+#   * OpenSearch -> single-node. The chart default already sets singleNode:
+#     true with a 1 GiB heap and the security plugin disabled. In single-node
+#     (development) mode OpenSearch does NOT enforce the vm.max_map_count
+#     bootstrap check — it's a non-fatal warning — so NO host-kernel change is
+#     needed on the minikube node. We only trim the persistent volume from the
+#     30 GiB default to 10 GiB for the demo.
+
+# Bitnami images now live under the bitnamilegacy repository; the chart's
+# global flag is required to permit them (left at the chart default, restated
+# here for clarity since disabling MySQL doesn't remove this requirement for
+# any other bitnami-derived dependency the chart may pull).
+global:
+  security:
+    allowInsecureImages: true
+
+# Replaced by reuse of the capstone Postgres (CloudNativePG).
+mysql:
+  enabled: false
+
+# Ingestion runs as one-off Jobs, not Airflow DAGs.
+airflow:
+  enabled: false
+
+# Single-node OpenSearch. The chart default (singleNode: true, -Xmx1g -Xms1g,
+# plugins.security.disabled: true, service name "opensearch", http, port 9200)
+# is exactly what we want; we only shrink the PVC.
+opensearch:
+  enabled: true
+  persistence:
+    size: 10Gi

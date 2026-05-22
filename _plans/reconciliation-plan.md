@@ -2764,3 +2764,56 @@ final reader shouldn't see. Items:
   don't assume a base image carries a tool because it carries another; the
   script now surfaces a probe's terminated reason + exitCode instead of hiding
   stderr, so a missing tool is never a silent blank again.
+
+  **r25c re-verification + smoke fix** (2026-05-22, post host-reboot rebuild):
+  after a host reboot destroyed the `capstone` node container, the profile was
+  recreated (rootless, via `setup-capstone-profile.sh`) and CNPG reinstalled.
+  Re-running `smoke-notifications.sh` showed the migration init container
+  succeed (`Running upgrade -> 0001_create_notifications`), the app reach
+  `/healthz` 200, and the table created — but the smoke's verification step
+  reported the table "not found". **Root cause: a smoke-script bug, not an r25c
+  regression.** The check ran `psql -tAqc "select to_regclass(...)"` with **no
+  `-d` flag**, so it connected to the default `postgres` database (where the
+  `notifications` schema doesn't exist) and `to_regclass` returned NULL → empty
+  string → failed assertion. Manual `psql -d capstone` confirmed both tables
+  (`notifications.notifications`, `notifications.alembic_version`) present and
+  owned by `capstone_app`. Fix: add `-d capstone` to the verification query
+  (robust form: read the database name from the CNPG app secret so the smoke
+  and the app can't disagree). r25c persistence + migration confirmed intact;
+  count promotes to **125** once the fixed smoke is re-run green.
+
+- 🔲 **r27** (2026-05-22) — deploy OpenMetadata (the data catalog) into the
+  capstone, lean single-node shape (CAP-022). Ships, under
+  `examples/17-capstone/`: `openmetadata/om-deps-values.yaml` (trimmed
+  dependencies — MySQL **off**, Airflow **off**, OpenSearch single-node with
+  the PVC shrunk to 10Gi), `openmetadata/om-app-values.yaml` (server pointed at
+  the **capstone CloudNativePG Postgres** instead of bundled MySQL — `database`
+  flipped to `dbScheme: postgresql`, `host: capstone-postgres-rw`, a dedicated
+  `openmetadata` db + role + secret — with `deployPipelinesConfig` and
+  `pipelineServiceClientConfig` **disabled** since ingestion runs as one-off
+  Jobs, not Airflow), `scripts/setup-openmetadata.sh` (idempotently provisions
+  the `openmetadata` database + role inside the existing cluster via
+  `kubectl exec` psql, creates the password Secret, then `helm upgrade
+  --install`s the deps + server from the official charts pinned to 1.12.8), and
+  `demos/smoke-openmetadata.sh` (waits for rollout, asserts the version API
+  reports 1.12.8 — proving the server booted AND reached Postgres — and
+  confirms the `openmetadata` db is populated with tables, proving Postgres
+  reuse is the live backend). The §17 catalog-as-mesh-requirement prose and
+  CAP-022 shipped separately in **r27-docs**.
+
+  **Validated statically** (Claude env — no helm/cluster): both override files
+  parse and carry the exact key paths from the upstream chart's own
+  `values.yaml` (pipelines off, postgres reuse wired, image pinned; mysql off,
+  airflow off, opensearch on); both scripts pass `bash -n`; the provisioning
+  SQL heredoc expands to valid PostgreSQL DDL (`$$`-quoted role block + `\gexec`
+  conditional `CREATE DATABASE`). **Cluster verification pending** on Fedora 44
+  via `setup-openmetadata.sh` then `smoke-openmetadata.sh`. The cluster-only
+  unknowns — the highest-uncertainty deploy in the project so far — are:
+  (1) the `database` override merging cleanly onto the chart and the server's
+  migration job connecting over `sslmode=require` to CNPG (fallback:
+  `sslmode=prefer`); (2) the deps chart deploying OpenSearch alone with MySQL +
+  Airflow disabled; (3) whether the chart templates any
+  `elasticsearch`/`truststore` secret refs despite auth being disabled. Verified
+  count holds until the run passes; then "OpenMetadata deployed, Postgres-backed,
+  serving" is the next fact. **r27b** follows: register Postgres + Kafka, run
+  ingestion Jobs, declare cross-product lineage.

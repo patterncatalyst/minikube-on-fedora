@@ -1,0 +1,158 @@
+#!/usr/bin/env bash
+#
+# setup-openmetadata.sh — deploy OpenMetadata (the data catalog) into the
+# capstone cluster, lean single-node shape (CAP-022).
+#
+# What this does, in order:
+#   1. Provisions a dedicated `openmetadata` database + login role inside the
+#      EXISTING capstone-postgres (CloudNativePG) cluster — OpenMetadata reuses
+#      our Postgres as its backend rather than standing up a separate MySQL.
+#   2. Creates the Kubernetes Secret holding that role's password, which the
+#      OpenMetadata server chart reads.
+#   3. Installs the trimmed dependencies (OpenSearch only — no MySQL, no
+#      Airflow) and then the OpenMetadata server, both via the official charts.
+#
+# Like the operator setups (§11 Istio, §12 Strimzi/KEDA, CNPG), this is a
+# run-once-per-cluster platform install, separate from the per-service app
+# releases. Idempotent — re-running upgrades in place and re-provisions safely.
+#
+# Prerequisites:
+#   * capstone profile running, kubectl context = capstone
+#   * CloudNativePG operator installed (./setup-postgres-operator.sh) AND the
+#     capstone-postgres Cluster already bootstrapped (the postgres subchart;
+#     e.g. after a smoke that deploys Postgres). This script provisions INTO
+#     that running cluster.
+#
+# Usage:
+#   ./setup-openmetadata.sh
+#
+# After it completes, reach the UI with:
+#   kubectl port-forward -n capstone svc/openmetadata 8585:8585
+#   # then open http://127.0.0.1:8585  (default login admin@open-metadata.org / admin)
+
+set -euo pipefail
+
+# ─── Configuration ───────────────────────────────────────────────────────────
+
+NS="capstone"
+OM_CHART_VERSION="1.12.8"          # pin both deps and server to this release
+PG_CLUSTER="capstone-postgres"     # the CloudNativePG Cluster name (postgres subchart)
+
+OM_DB="openmetadata"               # dedicated database for OpenMetadata's own store
+OM_ROLE="openmetadata"             # login role that owns it
+OM_PASSWORD="openmetadata"         # DEMO password — fine for a local tutorial, not prod
+OM_DB_SECRET="openmetadata-db-secret"
+OM_DB_SECRET_KEY="openmetadata-db-password"
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+VALUES_DIR="$SCRIPT_DIR/../openmetadata"
+DEPS_VALUES="$VALUES_DIR/om-deps-values.yaml"
+APP_VALUES="$VALUES_DIR/om-app-values.yaml"
+
+# ─── Pre-flight ──────────────────────────────────────────────────────────────
+
+for tool in helm kubectl; do
+    if ! command -v "$tool" >/dev/null 2>&1; then
+        printf 'ERROR: %s not in PATH. See §2 for installation.\n' "$tool" >&2
+        exit 1
+    fi
+done
+
+for f in "$DEPS_VALUES" "$APP_VALUES"; do
+    if [[ ! -f "$f" ]]; then
+        printf 'ERROR: values file not found: %s\n' "$f" >&2
+        exit 1
+    fi
+done
+
+current_context=$(kubectl config current-context 2>/dev/null || echo "")
+if [[ "$current_context" != "capstone" ]]; then
+    printf 'WARNING: current kubectl context is "%s", not "capstone".\n' "$current_context" >&2
+    printf 'Switch with: kubectl config use-context capstone\n' >&2
+    printf 'Continue anyway? [y/N] ' >&2
+    read -r answer
+    [[ "$answer" =~ ^[Yy] ]] || exit 1
+fi
+
+# Confirm the Postgres cluster is present and has a primary, since we provision
+# into it. The CNPG operator labels the primary pod role=primary.
+printf '==> Locating the capstone-postgres primary\n'
+PG_PRIMARY="$(kubectl get pods -n "$NS" \
+    -l "cnpg.io/cluster=${PG_CLUSTER},role=primary" \
+    -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")"
+if [[ -z "$PG_PRIMARY" ]]; then
+    printf 'ERROR: no primary pod for CloudNativePG cluster "%s" in namespace "%s".\n' \
+        "$PG_CLUSTER" "$NS" >&2
+    printf 'Install the operator (./setup-postgres-operator.sh) and bring up the\n' >&2
+    printf 'capstone-postgres Cluster (e.g. run a smoke that deploys Postgres) first.\n' >&2
+    exit 1
+fi
+printf '    primary: %s\n' "$PG_PRIMARY"
+
+# ─── 1. Provision the openmetadata database + role (idempotent) ──────────────
+# Run as the postgres superuser via the pod's local socket (peer auth inside
+# the container). CREATE DATABASE cannot run inside a transaction or take
+# IF NOT EXISTS, so it is generated conditionally and run with \gexec.
+
+printf '==> Provisioning database "%s" and role "%s" in %s\n' "$OM_DB" "$OM_ROLE" "$PG_CLUSTER"
+kubectl exec -i -n "$NS" "$PG_PRIMARY" -c postgres -- \
+    psql -U postgres -v ON_ERROR_STOP=1 <<SQL
+DO \$\$
+BEGIN
+  IF NOT EXISTS (SELECT FROM pg_roles WHERE rolname = '${OM_ROLE}') THEN
+    CREATE ROLE ${OM_ROLE} LOGIN PASSWORD '${OM_PASSWORD}';
+  ELSE
+    ALTER ROLE ${OM_ROLE} LOGIN PASSWORD '${OM_PASSWORD}';
+  END IF;
+END
+\$\$;
+SELECT 'CREATE DATABASE ${OM_DB} OWNER ${OM_ROLE}'
+  WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = '${OM_DB}')\gexec
+SQL
+printf '    ✓ database + role ready\n'
+
+# ─── 2. Create the password Secret the server chart reads ────────────────────
+
+printf '==> Creating secret %s/%s (key %s)\n' "$NS" "$OM_DB_SECRET" "$OM_DB_SECRET_KEY"
+kubectl create secret generic "$OM_DB_SECRET" \
+    --namespace "$NS" \
+    --from-literal="${OM_DB_SECRET_KEY}=${OM_PASSWORD}" \
+    --dry-run=client -o yaml | kubectl apply -f -
+
+# ─── 3. Install dependencies (OpenSearch only) then the server ───────────────
+
+printf '==> Adding the OpenMetadata helm repository\n'
+helm repo add open-metadata https://helm.open-metadata.org/ >/dev/null 2>&1 || true
+helm repo update open-metadata >/dev/null
+
+printf '==> Installing OpenMetadata dependencies (OpenSearch single-node; no MySQL/Airflow)\n'
+helm upgrade --install openmetadata-dependencies open-metadata/openmetadata-dependencies \
+    --namespace "$NS" \
+    --version "$OM_CHART_VERSION" \
+    --values "$DEPS_VALUES" \
+    --wait --timeout 10m
+
+printf '==> Installing the OpenMetadata server (backend = capstone Postgres)\n'
+helm upgrade --install openmetadata open-metadata/openmetadata \
+    --namespace "$NS" \
+    --version "$OM_CHART_VERSION" \
+    --values "$APP_VALUES" \
+    --wait --timeout 10m
+
+printf '==> Waiting for the OpenMetadata server rollout\n'
+kubectl rollout status deployment/openmetadata -n "$NS" --timeout=10m
+
+# ─── Done ────────────────────────────────────────────────────────────────────
+
+printf '\n'
+printf '==> OpenMetadata is up.\n'
+printf '\n'
+printf 'Reach the UI:\n'
+printf '  kubectl port-forward -n %s svc/openmetadata 8585:8585\n' "$NS"
+printf '  open http://127.0.0.1:8585   (login: admin@open-metadata.org / admin)\n'
+printf '\n'
+printf 'Verify end-to-end:\n'
+printf '  ./demos/smoke-openmetadata.sh\n'
+printf '\n'
+printf 'Next (r27b): register Postgres + Kafka as services, run ingestion Jobs,\n'
+printf 'and declare the cross-product lineage (orders -> order-placed -> notifications).\n'
