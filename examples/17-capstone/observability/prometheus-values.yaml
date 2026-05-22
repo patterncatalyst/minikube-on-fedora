@@ -1,0 +1,73 @@
+# prometheus-values.yaml — lean, single-node Prometheus for the capstone (r29,
+# CAP-027). This is NOT a production monitoring setup: short retention, no
+# persistence, and only the components we actually use. The point is to SEE the
+# cluster — workload replica counts (the KEDA scaling signal) and Istio request
+# metrics for the meshed order-service — not to run a long-lived TSDB.
+#
+# Used by scripts/setup-observability.sh:
+#   helm upgrade --install prometheus prometheus-community/prometheus \
+#       -n observability -f observability/prometheus-values.yaml
+
+server:
+  # 24h is plenty to watch a scaling demo; we are not keeping history.
+  retention: 24h
+  global:
+    scrape_interval: 30s
+    scrape_timeout: 10s
+  persistentVolume:
+    # emptyDir — no StorageClass dependency, nothing to clean up. Metrics are
+    # lost if the pod restarts, which is fine for a teaching cluster.
+    enabled: false
+  resources:
+    requests:
+      cpu: 250m
+      memory: 512Mi
+    limits:
+      memory: 1Gi
+
+# Trim everything we don't need for the demo — keeps the footprint near the
+# CAP-026 budget (~512Mi/1Gi for Prometheus itself).
+alertmanager:
+  enabled: false
+prometheus-pushgateway:
+  enabled: false
+prometheus-node-exporter:
+  # Node-level metrics (CPU/mem/disk of the host) are not what this demo is
+  # about, and node-exporter wants host mounts. Off.
+  enabled: false
+
+# kube-state-metrics IS the one we want: it exposes kube_deployment_* series, so
+# Prometheus can chart desired vs ready replicas over time. That is exactly the
+# signal that makes KEDA scaling (and its near-zero oscillation) visible.
+kube-state-metrics:
+  enabled: true
+  resources:
+    requests:
+      cpu: 20m
+      memory: 64Mi
+    limits:
+      memory: 128Mi
+
+# The chart's default scrape config already includes a 'kubernetes-pods' job that
+# honors prometheus.io/scrape annotations. Istio adds those annotations to meshed
+# pods (order-service), so the Envoy sidecar's merged metrics — including
+# istio_requests_total — are picked up automatically with no extra config.
+#
+# KEDA's components don't carry those annotations, so add an explicit job for the
+# keda namespace. This is best-effort: if a port name differs by version the job
+# simply finds nothing, which doesn't affect the rest of the stack.
+extraScrapeConfigs: |
+  - job_name: keda
+    kubernetes_sd_configs:
+      - role: pod
+        namespaces:
+          names:
+            - keda
+    relabel_configs:
+      - source_labels: [__meta_kubernetes_pod_container_port_name]
+        regex: metrics
+        action: keep
+      - source_labels: [__meta_kubernetes_namespace]
+        target_label: namespace
+      - source_labels: [__meta_kubernetes_pod_name]
+        target_label: pod

@@ -1041,6 +1041,52 @@ this: it verifies the wake-from-zero and stay-warm legs as hard assertions and
 reports the return-to-zero as an observation, since a stable non-flapping zero is
 the one thing that's awkward to assert deterministically on a single node.)
 
+## Seeing it: metrics with Prometheus and Grafana
+
+Everything so far has been verified by smoke scripts poking the cluster and
+reading back exit codes — which works, but it's debugging in the dark. The KEDA
+HTTP scaler made that vivid: half a dozen failures that each looked like a
+different problem from the outside, when a single graph of "how many gateway
+replicas are there, over time" would have shown the wake, the cold-start lag, and
+the near-zero oscillation at a glance. A data mesh needs to be observable for the
+same reason it needs a catalog: you can't operate what you can't see.
+
+The deliberate choice here is to stay lean and add nothing to the services. You
+already have two sources of real telemetry that cost nothing extra. The Istio
+sidecar on the meshed order-service exports `istio_requests_total` (request rate,
+response codes, latency) with no application code — the mesh measures the traffic
+for you. And `kube-state-metrics` turns the Kubernetes API itself into metrics,
+including `kube_deployment_spec_replicas` and `kube_deployment_status_replicas_ready`
+— desired and ready replica counts for every workload. That second pair is the
+one that matters most here: it's the direct, recorded signal of KEDA scaling.
+
+So the stack is just two things, installed by `scripts/setup-observability.sh`
+into an `observability` namespace: a single Prometheus (short 24h retention, no
+persistence, with `kube-state-metrics` enabled and alertmanager, pushgateway, and
+node-exporter all switched off) and a Grafana that comes up with the Prometheus
+datasource and one dashboard already provisioned. Prometheus's default pod-scrape
+job picks up the Istio sidecar automatically, because Istio annotates meshed pods
+with the `prometheus.io/scrape` markers it looks for. Sized to roughly 512Mi/1Gi
+for Prometheus and 128Mi/256Mi for Grafana, the whole thing fits inside the
+cluster's existing headroom — no profile bump.
+
+The provisioned dashboard, "Capstone — Scaling & Traffic," leads with the panel
+that pays off the whole KEDA chapter: desired versus ready replicas for
+`graphql-gateway` and `notification-service`, drawn step-style over time. Run
+`smoke-keda-http.sh` with the dashboard open and you watch the gateway's desired
+count step from 0 to 1 the moment a request arrives, hold while traffic flows,
+and fall back toward 0 when it stops — including the brief flapping near zero that
+the prose above describes, now something you can see rather than infer. The second
+panel charts order-service's request rate by response code straight from the mesh;
+drive it with `smoke-canary.sh` and the weighted v1/v2 split shows up as traffic.
+`scripts/setup-observability.sh` then `demos/smoke-observability.sh` install the
+stack and verify the data is actually flowing before you go looking for graphs.
+
+This is the metrics half of observability. The other half — distributed tracing,
+following a single GraphQL query as it fans out across services — needs either
+application instrumentation or meshing every service, both larger moves, and is
+the natural next step rather than something to bolt on here.
+
 ## What the capstone builds, and what's still ahead
 
 The capstone assembles a small but complete data mesh: five domain services
@@ -1052,13 +1098,15 @@ reads, and Kafka events for the asynchronous order→notification flow.
 Postgres is managed by the CloudNativePG operator and Kafka by the Strimzi
 operator, all running rootless on a dedicated minikube profile.
 
-Still ahead, layered on this foundation: an observability stack (OpenTelemetry,
-Prometheus, Grafana, Tempo) and scheduled cross-service orchestration (Prefect).
-The contract, catalog, traffic-management, and autoscaling layers are now in
+Still ahead, layered on this foundation: distributed tracing (Tempo and an
+OpenTelemetry Collector, following a query across services) to complete the
+observability picture, and scheduled cross-service orchestration (Prefect). The
+contract, catalog, traffic-management, autoscaling, and metrics layers are now in
 place — Apicurio versions every contract, OpenMetadata turns schemas and topics
 into browsable lineage, Istio shifts live traffic between contract versions as a
-controlled canary, and KEDA scales each product to the demand on it and back to
-zero when idle. Each increment lands the same way: focused and independently
+controlled canary, KEDA scales each product to the demand on it and back to zero
+when idle, and Prometheus plus Grafana make that scaling and the mesh traffic
+visible. Each increment lands the same way: focused and independently
 verifiable — the rhythm the protocol work has followed.
 
 ## References

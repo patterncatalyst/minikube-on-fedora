@@ -1,0 +1,131 @@
+# grafana-values.yaml — lean Grafana for the capstone (r29, CAP-027). Provisions
+# the Prometheus datasource and one dashboard whose top panel is the whole point
+# of this section: desired vs ready replicas over time, so the KEDA scaling you
+# triggered in the demos becomes something you can actually watch (including the
+# near-zero oscillation the HTTP add-on shows on a single node).
+#
+# Reach it after install with:
+#   kubectl port-forward -n observability svc/grafana 3000:80
+#   open http://localhost:3000  (admin / capstone)
+#
+# A Tempo datasource for traces is added in r29b.
+
+adminUser: admin
+adminPassword: capstone           # demo only — not a real secret
+
+persistence:
+  enabled: false                  # dashboards are provisioned from config, not saved state
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    memory: 256Mi
+
+service:
+  type: ClusterIP                 # access via port-forward (no ingress dependency)
+
+# Pin the datasource UID so the provisioned dashboard can reference it
+# deterministically (auto-assigned UIDs would break the panel datasource refs).
+datasources:
+  datasources.yaml:
+    apiVersion: 1
+    datasources:
+      - name: Prometheus
+        uid: prometheus
+        type: prometheus
+        access: proxy
+        url: http://prometheus-server.observability.svc.cluster.local
+        isDefault: true
+
+dashboardProviders:
+  dashboardproviders.yaml:
+    apiVersion: 1
+    providers:
+      - name: capstone
+        orgId: 1
+        folder: Capstone
+        type: file
+        disableDeletion: false
+        editable: true
+        options:
+          path: /var/lib/grafana/dashboards/capstone
+
+dashboards:
+  capstone:
+    scaling:
+      json: |
+        {
+          "uid": "capstone-scaling",
+          "title": "Capstone — Scaling & Traffic",
+          "schemaVersion": 39,
+          "version": 1,
+          "editable": true,
+          "refresh": "10s",
+          "time": { "from": "now-30m", "to": "now" },
+          "panels": [
+            {
+              "id": 1,
+              "type": "timeseries",
+              "title": "Workload replicas — desired vs ready (KEDA scaling)",
+              "description": "graphql-gateway and notification-service scale to and from zero. Watch desired step 0→1 on demand and back to 0 on idle; brief flapping near zero is the HTTP add-on settling.",
+              "gridPos": { "h": 10, "w": 24, "x": 0, "y": 0 },
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "fieldConfig": {
+                "defaults": {
+                  "custom": { "drawStyle": "line", "lineInterpolation": "stepAfter", "fillOpacity": 10, "pointSize": 5 },
+                  "min": 0,
+                  "unit": "short"
+                },
+                "overrides": []
+              },
+              "options": {
+                "legend": { "displayMode": "list", "placement": "bottom" },
+                "tooltip": { "mode": "multi", "sort": "none" }
+              },
+              "targets": [
+                {
+                  "refId": "A",
+                  "datasource": { "type": "prometheus", "uid": "prometheus" },
+                  "expr": "kube_deployment_spec_replicas{namespace=\"capstone\", deployment=~\"graphql-gateway|notification-service\"}",
+                  "legendFormat": "{{deployment}} desired"
+                },
+                {
+                  "refId": "B",
+                  "datasource": { "type": "prometheus", "uid": "prometheus" },
+                  "expr": "kube_deployment_status_replicas_ready{namespace=\"capstone\", deployment=~\"graphql-gateway|notification-service\"}",
+                  "legendFormat": "{{deployment}} ready"
+                }
+              ]
+            },
+            {
+              "id": 2,
+              "type": "timeseries",
+              "title": "order-service request rate by response code (Istio mesh)",
+              "description": "From the Envoy sidecar's istio_requests_total — no application instrumentation. Drive it with demos/smoke-canary.sh.",
+              "gridPos": { "h": 9, "w": 24, "x": 0, "y": 10 },
+              "datasource": { "type": "prometheus", "uid": "prometheus" },
+              "fieldConfig": {
+                "defaults": {
+                  "custom": { "drawStyle": "line", "fillOpacity": 10 },
+                  "min": 0,
+                  "unit": "reqps"
+                },
+                "overrides": []
+              },
+              "options": {
+                "legend": { "displayMode": "list", "placement": "bottom" },
+                "tooltip": { "mode": "multi", "sort": "none" }
+              },
+              "targets": [
+                {
+                  "refId": "A",
+                  "datasource": { "type": "prometheus", "uid": "prometheus" },
+                  "expr": "sum by (response_code) (rate(istio_requests_total{destination_workload=\"order-service\"}[1m]))",
+                  "legendFormat": "HTTP {{response_code}}"
+                }
+              ]
+            }
+          ]
+        }

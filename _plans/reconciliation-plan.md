@@ -3125,3 +3125,38 @@ final reader shouldn't see. Items:
   offline. This is the strongest argument yet for r29 (observability): a Grafana
   panel on the interceptor queue + gateway replicas would have surfaced most of
   these on sight.
+
+- 🔲 **r29** (2026-05-22) — Observability, metrics half (CAP-027): a lean
+  Prometheus + Grafana stack in an `observability` namespace, adding nothing to
+  the services. Prometheus (prometheus-community/prometheus) with alertmanager,
+  pushgateway, and node-exporter OFF, kube-state-metrics ON, 24h retention,
+  emptyDir; Grafana (grafana/grafana) with the Prometheus datasource (pinned
+  uid=`prometheus`) and a provisioned "Capstone — Scaling & Traffic" dashboard.
+  Two free telemetry sources: the Istio sidecar on order-service
+  (`istio_requests_total`, auto-scraped via Istio's prometheus.io annotations)
+  and kube-state-metrics (`kube_deployment_spec_replicas` /
+  `_status_replicas_ready` — the recorded KEDA-scaling signal). The lead
+  dashboard panel charts desired-vs-ready replicas for graphql-gateway +
+  notification-service, turning the KEDA scaling (and the CAP-026 near-zero
+  oscillation) into something visible. Sizing per CAP-026 (Prom 512Mi/1Gi,
+  Grafana 128Mi/256Mi, +kube-state-metrics ~64Mi) — fits existing headroom, no
+  profile bump. Files: observability/{prometheus,grafana}-values.yaml,
+  scripts/setup-observability.sh, demos/smoke-observability.sh, §17 new section.
+
+  **Validated statically** (Claude env): both values YAMLs parse; the inline
+  Grafana dashboard JSON is valid and its panel datasource refs match the
+  provisioned datasource uid (`prometheus`); both scripts pass `bash -n`; §17
+  passes the Liquid + cross-reference linters. Chart versions unpinned (latest)
+  — pin with `--version` for reproducibility.
+
+  **Cluster verification pending** (Fedora 44, user-run):
+  `./scripts/setup-observability.sh` (installs into `observability`), then
+  `./demos/smoke-observability.sh` — asserts Prometheus has capstone replica
+  metrics (kube-state-metrics scraping), notes the Istio series, and confirms
+  Grafana is healthy with the dashboard provisioned. Then port-forward Grafana
+  (`kubectl port-forward -n observability svc/grafana 3000:80`, admin/capstone)
+  and run `smoke-keda-http.sh` with the dashboard open to watch the gateway
+  replicas step 0→1→0 live. On green, promote to ✅ and bump the count → 131.
+  Next: **r29b** — traces (Tempo monolithic + OpenTelemetry Collector), which
+  needs instrumenting the gateway (or meshing services); the larger move
+  deliberately deferred from r29.

@@ -1190,6 +1190,59 @@ none visible offline.
 
 ---
 
+## CAP-027 — Observability, metrics half: a lean Prometheus + Grafana that adds nothing to the services
+
+- **Date:** r29
+- **Status:** accepted; cluster-verification pending (Fedora 44)
+- **Context:** The KEDA HTTP saga (~12 rounds, six independent runtime-only
+  failures) was the argument for observability making itself: a single graph of
+  gateway replicas over time would have shown the wake, the cold-start lag, and
+  the near-zero oscillation at a glance. The capstone services are NOT
+  instrumented (no app `/metrics`, no OTEL SDK — confirmed by grep), so the
+  question was how to observe without rebuilding six images.
+- **Decisions:**
+  - **Scope split: metrics now (r29), traces later (r29b).** Distributed tracing
+    needs either app instrumentation or meshing every service — both bigger moves
+    (and meshing all services conflicts with the KEDA-unmeshed decision in
+    CAP-025). Metrics deliver the high-value scaling visualization with zero app
+    changes, so they go first.
+  - **Leverage telemetry that already exists, add nothing to the services.** Two
+    free sources: the Istio sidecar on the meshed order-service exports
+    `istio_requests_total` (Prometheus's default pod-scrape job picks it up via
+    the `prometheus.io/scrape` annotations Istio injects), and `kube-state-metrics`
+    exposes `kube_deployment_spec_replicas` / `_status_replicas_ready` — the direct
+    recorded signal of KEDA scaling.
+  - **Lean standalone stack, not kube-prometheus-stack.** A single Prometheus
+    (prometheus-community/prometheus) with alertmanager, pushgateway, and
+    node-exporter OFF and kube-state-metrics ON; 24h retention; emptyDir (no
+    PVC/StorageClass dependency). Grafana (grafana/grafana) with the Prometheus
+    datasource and one dashboard provisioned (pinned datasource uid=`prometheus`
+    so the dashboard's panel refs resolve deterministically). Honors CAP-026's
+    sizing: Prometheus 512Mi/1Gi, Grafana 128Mi/256Mi, plus kube-state-metrics
+    ~64Mi/128Mi (the one addition beyond CAP-026's list). No profile bump.
+  - **Chart versions unpinned (latest from repo).** Pin with `--version` for a
+    reproducible build; left open here so the install keeps working as charts
+    move (and because exact current chart versions weren't verifiable offline).
+  - **The payoff dashboard ("Capstone — Scaling & Traffic")** leads with
+    desired-vs-ready replicas for graphql-gateway + notification-service
+    (step-style), which makes KEDA scaling — including the oscillation from
+    CAP-026 — something you watch rather than infer; second panel is order-service
+    request rate by response code from the mesh.
+- **Files:** `observability/prometheus-values.yaml`,
+  `observability/grafana-values.yaml` (inline dashboard JSON),
+  `scripts/setup-observability.sh`, `demos/smoke-observability.sh`, §17 new
+  section "Seeing it: metrics with Prometheus and Grafana".
+- **Consequences:**
+  - (+) The capstone is now observable for its scaling and mesh traffic without
+    touching service code.
+  - (+) Fits existing headroom (~1Gi req added; cluster was ~12–13Gi of 24Gi).
+  - (−) No traces yet — a GraphQL query's fan-out across services isn't visible
+    until r29b. Documented as the explicit next step.
+  - (−) Dashboard/scrape correctness is cluster-only (validated offline: YAML
+    parses, embedded dashboard JSON is valid, datasource uid matches panel refs).
+
+---
+
 ## Decisions inherited from r19 (PRD planning)
 
 These were resolved during r19 planning and accepted by the user.
