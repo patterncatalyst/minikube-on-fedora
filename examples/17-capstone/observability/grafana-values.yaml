@@ -19,9 +19,12 @@ persistence:
 resources:
   requests:
     cpu: 100m
-    memory: 128Mi
-  limits:
     memory: 256Mi
+  limits:
+    # r29c.1: was 256Mi — Grafana OOMKilled (exit 137) at 256Mi once it loads
+    # provisioned dashboards and serves datasource queries under a browser. 512Mi
+    # is the comfortable floor for Grafana.
+    memory: 512Mi
 
 service:
   type: ClusterIP                 # access via port-forward (no ingress dependency)

@@ -3268,3 +3268,16 @@ final reader shouldn't see. Items:
   **Observability arc status:** r29 (metrics) ✅, r29b (traces backend) ✅, r29.2
   (chart-repo deprecation) ✅, r29c (traces source) pending this rebuild. Optional
   follow-on: instrument the remaining services for full multi-service traces.
+
+- 🔲 **r29c.1** (2026-05-22) — Two issues from r29c's cluster run. (1) Grafana
+  OOMKilled (exit 137) at 256Mi → bumped limit to 512Mi / requests to 256Mi in
+  grafana-values.yaml (same too-tight-limit class as the r28 gateway OOM; apply
+  via re-run of setup-observability.sh — persistence off, no data loss). (2) The
+  gateway took the OTEL instrumentation cleanly (all instrumentations installed,
+  image built, redeploy REVISION 3, GraphQL query → HTTP 200), but Tempo search
+  `q={}` returns zero traces — spans are NOT reaching Tempo despite the OTLP
+  4317/4318 ports being exposed on the tempo Service. Root cause under
+  diagnosis (gateway export vs Tempo ingestion); the empty earlier gateway-log
+  grep was uninformative because the KEDA-scaled gateway had no running pod at
+  log-check time. Trace fix deferred to a follow-up once the gateway's
+  export-time logs are captured.
