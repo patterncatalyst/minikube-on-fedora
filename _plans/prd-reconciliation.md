@@ -1,4 +1,8 @@
-# PRD reconciliation — shipped vs planned
+---
+title: PRD reconciliation
+description: What we set out to build per the original PRD, what shipped, and where intent and delivery diverged.
+render_with_liquid: false
+---
 
 > Counterpart to `reconciliation-plan.md`, focused on the high-level
 > question: what did we set out to build (per the original PRD),

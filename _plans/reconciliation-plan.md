@@ -3296,3 +3296,35 @@ final reader shouldn't see. Items:
     helm upgrade --install graphql-gateway charts/capstone/charts/graphql-gateway -n capstone
     ./demos/smoke-trace-flow.sh
   On a found trace, r29c → ✅ (count 133) and the observability arc closes.
+
+- ✅ **r29c / r29c.1 / r29c.2 VERIFIED** (2026-05-22) — Distributed tracing is live.
+  `smoke-trace-flow.sh` green: GraphQL query → HTTP 200 → `✓ Tempo has a
+  graphql-gateway trace`. Running deployment confirmed on the http/protobuf fix
+  (`OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf`,
+  `OTEL_EXPORTER_OTLP_ENDPOINT=http://tempo.observability.svc.cluster.local:4318`).
+  The gRPC:4317→HTTP/protobuf:4318 switch was the operative fix; the otel-lgtm
+  reference confirmed it. r29c.1 Grafana 512Mi and the OTLP meta-exporter also
+  in the verified image. **Observability arc complete:** r29 metrics ✅, r29b
+  traces backend ✅, r29.2 chart-repo ✅, r29c traces source ✅. **Verified count → 133.**
+
+  **Two cluster-recovery findings surfaced during this verification (NOT caused by
+  the OTEL work — both are long-lived single-node minikube gotchas worth a §17
+  troubleshooting note):**
+  1. **Control plane wedged on `etcd: bind: address already in use` (:2380).** After
+     ~18h and many redeploys, a stuck prior etcd held the peer port, so the static
+     etcd pod crashlooped (Exit 1, NOT OOM) and took scheduler/controller-manager/
+     metrics-server/the KEDA interceptor down with it. Fix: `minikube stop -p
+     capstone && minikube start -p capstone` — clears the port, preserves the etcd
+     data-dir, no data loss. (Diagnosing: Exit 1 + "address already in use" in
+     `kubectl logs etcd-capstone --previous`, not code 137 — rules out resources.)
+  2. **The in-cluster registry does NOT persist images across `minikube stop/start`.**
+     Post-cycle, every `localhost:5000/*` image must be rebuilt+repushed via
+     `scripts/build-image.sh`, or pods sit in `ErrImagePull` with
+     `NotFound ... not found` (distinct from a "connection refused" registry-down
+     error). Recently-pushed images are the first casualties, so rebuild ALL
+     locally-built images after a node cycle, not just the ones that error first.
+
+  Optional follow-ons (offered, not built): r29b.1 (harden smoke-tracing.sh to POST
+  a synthetic span to Tempo :4318 and read it back — would have caught the export
+  gap at the backend stage); instrument the remaining services for full
+  multi-service traces (mechanical extension of the r29c gateway pattern).
