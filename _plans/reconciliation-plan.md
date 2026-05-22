@@ -3281,3 +3281,18 @@ final reader shouldn't see. Items:
   grep was uninformative because the KEDA-scaled gateway had no running pod at
   log-check time. Trace fix deferred to a follow-up once the gateway's
   export-time logs are captured.
+
+- 🔲 **r29c.2** (2026-05-22) — Trace-export fix (root cause of the r29c.1 trace gap).
+  The gateway instrumentation was fine; spans weren't reaching Tempo because the
+  export used OTLP gRPC :4317 with an http:// endpoint (silent TLS failure → spans
+  dropped, request still 200, Tempo `q={}` empty). Switched the gateway to OTLP
+  HTTP/protobuf :4318 (values otlpProtocol=http/protobuf; Containerfile installs
+  the opentelemetry-exporter-otlp meta-package). Confirmed against a user-supplied
+  working otel-lgtm reference using http/protobuf:4318. Hardened smoke-trace-flow.sh:
+  TraceQL `q=` search + post-query gateway-log capture. Validated offline: smoke
+  `bash -n`; values parse with http/protobuf:4318; deployment braces 26/26.
+  **Apply** (gateway image rebuild — Containerfile changed):
+    ./scripts/build-image.sh services/graphql-gateway graphql-gateway v1
+    helm upgrade --install graphql-gateway charts/capstone/charts/graphql-gateway -n capstone
+    ./demos/smoke-trace-flow.sh
+  On a found trace, r29c → ✅ (count 133) and the observability arc closes.

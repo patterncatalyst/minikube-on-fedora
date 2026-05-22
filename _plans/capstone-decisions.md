@@ -1334,6 +1334,19 @@ none visible offline.
     to the installed SDK); pin for a fully reproducible image. Instrumentation
     correctness and the Tempo search format are cluster-only — smoke-trace-flow's
     trace-found check is therefore best-effort (the HTTP 200 is the hard part).
+  - **Export-protocol addendum (r29c.2):** the first cluster run proved the
+    instrumentation (all instrumentations installed, gateway 200) but Tempo had
+    ZERO traces (`q={}` empty). Cause: OTLP **gRPC on :4317** with an
+    `http://...:4317` endpoint silently dropped spans (the grpc exporter attempts
+    TLS against a plaintext port; BatchSpanProcessor drops on failure → still 200).
+    Fixed by switching to **OTLP HTTP/protobuf on :4318** (`otlpProtocol:
+    http/protobuf`, endpoint :4318; Containerfile installs the
+    `opentelemetry-exporter-otlp` meta-package). Validated against a working
+    user-provided otel-lgtm reference (Java/Podman Compose) using exactly
+    `OTEL_EXPORTER_OTLP_ENDPOINT=http://lgtm:4318` + `PROTOCOL=http/protobuf`.
+    Also hardened smoke-trace-flow.sh: TraceQL (`q=`) search, not legacy `tags=`,
+    plus a gateway-log capture right after the query (before KEDA scale-to-zero).
+    Lesson: http/protobuf is the robust OTLP default; gRPC needs the insecure flag.
 
 ---
 

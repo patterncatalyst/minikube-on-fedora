@@ -19,11 +19,15 @@ downstream:
 
 # r29c: OpenTelemetry tracing. The image is instrumented (FastAPI server span +
 # httpx and gRPC client spans), so a GraphQL query becomes a fan-out trace —
-# order-service (REST) and inventory-service (gRPC) appear as child spans. Spans
-# export over OTLP/gRPC to the Tempo backend. Set enabled:false to run untraced.
+# order-service (REST) and inventory-service (gRPC) appear as child spans.
+# r29c.2: export over OTLP HTTP/protobuf to Tempo's :4318 receiver. (gRPC on 4317
+# silently dropped spans here — the http://...:4317 endpoint with protocol=grpc
+# attempts TLS against a plaintext port. A working otel-lgtm reference uses
+# http/protobuf:4318; it's the more robust default.) Set enabled:false to run untraced.
 tracing:
   enabled: true
-  otlpEndpoint: http://tempo.observability.svc.cluster.local:4317
+  otlpEndpoint: http://tempo.observability.svc.cluster.local:4318
+  otlpProtocol: http/protobuf
   serviceName: graphql-gateway
   sampleRatio: "1.0"   # demo: trace every request
 

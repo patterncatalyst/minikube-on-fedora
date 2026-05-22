@@ -20,7 +20,7 @@ RUN poetry export --without-hashes --only main -f requirements.txt -o requiremen
 # Deployment, so this image traces only when those are set.
 RUN /opt/venv/bin/pip install --no-cache-dir \
         "opentelemetry-distro" \
-        "opentelemetry-exporter-otlp-proto-grpc" \
+        "opentelemetry-exporter-otlp" \
     && /opt/venv/bin/opentelemetry-bootstrap -a install
 
 FROM registry.access.redhat.com/ubi9/python-312:latest AS runtime

@@ -75,6 +75,10 @@ CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 200 \
 [[ "$CODE" == "200" ]] \
     || fail "gateway did not return 200 for the GraphQL query (HTTP $CODE) — see dump"
 printf '    ✓ gateway processed the query (HTTP 200) — a trace should now be exporting\n'
+# Capture the gateway log NOW, while the pod is still up (it's KEDA-scaled and
+# will return to zero ~30s after this request) — so a "no trace" result below
+# isn't blind. OTEL export errors surface here.
+GW_LOG="$(kubectl logs -n "$NS" -l app.kubernetes.io/name=graphql-gateway --tail=120 2>/dev/null)"
 
 # ─── Confirm the trace landed in Tempo ───────────────────────────────────────
 step "Port-forwarding Tempo ($TEMPO_PORT → tempo:3200) and searching for the trace"
@@ -86,10 +90,11 @@ for _ in $(seq 1 15); do
 done
 
 # BatchSpanProcessor flushes on a ~5s schedule, then Tempo indexes — retry.
+# TraceQL via q= (the legacy tags= param doesn't match current Tempo search).
 found=""
 for _ in $(seq 1 12); do
     res="$(curl -sG "http://127.0.0.1:${TEMPO_PORT}/api/search" \
-        --data-urlencode 'tags=service.name=graphql-gateway' \
+        --data-urlencode 'q={ resource.service.name = "graphql-gateway" }' \
         --data-urlencode 'limit=20' 2>/dev/null)"
     if printf '%s' "$res" | grep -q '"traceID"'; then found=1; break; fi
     sleep 5
@@ -103,10 +108,11 @@ if [[ -n "$found" ]]; then
     printf 'via ./demos/smoke-graphql.sh to get the inventory (gRPC) hop in the trace too.\n'
 else
     step "DONE (trace not yet found in Tempo search — NOT a failure)"
-    printf '    ⚠ The gateway returned 200, so it ran and exported spans, but Tempo search\n'
-    printf '      did not surface a graphql-gateway trace within ~60s. Span export is\n'
-    printf '      fire-and-forget; indexing can lag, or OTEL_EXPORTER_OTLP_ENDPOINT may be\n'
-    printf '      wrong. Check directly in Grafana → Explore → Tempo, and verify:\n'
+    printf '    ⚠ The gateway returned 200 but no graphql-gateway trace surfaced in ~60s.\n'
+    printf '      Gateway log (OTEL/export lines) captured just after the query:\n'
+    printf '%s\n' "$GW_LOG" | grep -iE 'otel|export|span|tempo|error|exception|unavailable|refused|deadline' \
+        | sed 's/^/        /' | tail -15 \
+        || printf '        (no OTEL/export lines — instrumentation may not be active)\n'
+    printf '      Also check Grafana → Explore → Tempo directly, and:\n'
     printf '        kubectl get deploy graphql-gateway -n %s -o jsonpath="{.spec.template.spec.containers[0].env}"\n' "$NS"
-    printf '        kubectl logs -n %s deploy/graphql-gateway | grep -i otel\n' "$NS"
 fi
