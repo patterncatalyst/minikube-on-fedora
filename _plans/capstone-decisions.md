@@ -992,8 +992,7 @@ appropriate caution, not a deferred bug.
 ## CAP-024 — Istio canary: order-service v1→v2 contract evolution via weighted subset routing
 
 - **Date:** r26 (built after r27/r27b — see sequencing note)
-- **Status:** accepted (design + implementation); Istio API/install specifics
-  carry the usual cluster-only risk until the live run
+- **Status:** accepted (design + implementation); **verified on Fedora 44 (r26.2)**
 - **Context:** The r26 design intent framed Istio as "safe contract evolution +
   observable inter-product traffic," with the headline being a data product
   taking its REST API through a v1→v2 change and Istio splitting live traffic
@@ -1051,6 +1050,32 @@ appropriate caution, not a deferred bug.
     `VERIFY-POINT` in `istio/routing.yaml`.
   - (−) The env-toggle means "v2" is the same binary; honest about it, but a
     purist canary would use two image tags.
+
+### Outcome (verified on Fedora 44, r26.2)
+
+The mechanism worked on the first cluster apply; the two failures along the way
+were both in the scaffolding around it, not the canary:
+
+- **Install convention (r26.1).** The deliverable first told the operator to
+  `helm upgrade --install capstone ./charts/capstone`, but this project installs
+  each component as its own release (`scaffold-service.sh`:
+  `helm upgrade --install <svc> charts/capstone/charts/<svc>`), and the umbrella
+  declares no `dependencies:` — so that command would deploy nothing. Corrected
+  to the per-service release. A worthwhile reminder that the deploy convention is
+  a fact about the repo to look up, not assume.
+- **Native sidecars (r26.2).** The smoke asserted istio-proxy by scanning
+  `.spec.containers`, but Istio 1.29 on k8s ≥1.29 injects the proxy as a *native*
+  sidecar — an initContainer with `restartPolicy: Always`. Both pods were already
+  `2/2` (meshed); the assertion was a false negative. Fixed to check
+  initContainers too. This is the modern Istio default and worth remembering for
+  any future "is it meshed?" check in this project.
+
+Once past those, the canary measured cleanly: a 90/10 VirtualService produced
+v1=91/v2=9 of 100 requests through the ingress gateway, and shifting to 50/50
+produced v1=45/v2=55. Every Istio API VERIFY-POINT (the `networking.istio.io/v1`
+kinds, the `istio: ingressgateway` selector, subset-by-`version`-label routing)
+held as authored offline — the flags were appropriate caution, not deferred bugs.
+Reconciliation row r26 → ✅; verified count → 128.
 
 ## CAP-025 — KEDA as elastic data products: dual scalers (Kafka lag + HTTP add-on), placed to avoid the canary
 

@@ -2865,7 +2865,7 @@ final reader shouldn't see. Items:
   cycles) r27b needed no live fixes. Verified count → **127** ("catalog
   populated; cross-product lineage orders → order-placed → notifications
   browsable"). **r27c** follows: Apicurio ingestion + schema-registry linkage.
-- 🔲 **r26** (2026-05-22, built out of numeric order — after r27b) — Istio
+- ✅ **r26** (2026-05-22, built out of numeric order — after r27b) — Istio
   v1→v2 canary on order-service (CAP-024), the "safe contract evolution" half of
   the r26 design intent. (The KEDA half is CAP-025, deferred to r26b.) Ships:
   order-service gains a side-effect-free `GET /version` endpoint and an
@@ -2910,10 +2910,16 @@ final reader shouldn't see. Items:
   (initContainer, restartPolicy:Always) — so the check now inspects
   initContainers too. Both subsets came up 2/2 (meshed) on the first cluster run;
   this was a false-negative in the assertion, not a mesh failure.
-  **Expected cluster-only risk**: the Istio API/install
-  specifics (`networking.istio.io/v1` kinds, ingressgateway Service name,
-  subset-by-label routing, sidecar-injection timing), flagged `VERIFY-POINT` in
-  `istio/routing.yaml`. Promote to `verified (Fedora 44)` and bump the count to
-  **128** ("order-service v1→v2 canary: weighted Istio traffic split, observed and
-  shiftable") once the smoke passes. **r26b** follows: the KEDA dual-scaler
-  (Kafka-lag on notification, HTTP add-on on the gateway) per CAP-025.
+  **Verified on Fedora 44 (r26.2 smoke, 2026-05-22)** — green on the run after
+  the two corrections. order-service v1 installed as its own release; v1 + v2 both
+  came up `2/2` (native istio-proxy sidecars). The smoke applied a 90/10 split and
+  measured **v1=91, v2=9** of 100 requests through the istio-ingressgateway, then
+  shifted to 50/50 and measured **v1=45, v2=55** — both within band — and rendered
+  `/tmp/canary-split.svg`. Every Istio VERIFY-POINT held as written
+  (`networking.istio.io/v1` kinds, the `istio: ingressgateway` selector,
+  subset-by-`version`-label routing). The two issues hit were a wrong install
+  command (r26.1) and a false-negative sidecar assertion (r26.2) — neither a defect
+  in the canary mechanism itself, which worked on the first cluster apply. Verified
+  count → **128** ("order-service v1→v2 canary: weighted Istio traffic split,
+  observed and shiftable"). **r26b** follows: the KEDA dual-scaler (Kafka-lag on
+  notification, HTTP add-on on the gateway) per CAP-025.
