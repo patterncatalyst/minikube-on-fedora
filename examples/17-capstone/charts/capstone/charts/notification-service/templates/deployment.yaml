@@ -34,6 +34,8 @@ spec:
               value: {{ .Values.kafka.orderTopic | quote }}
             - name: KAFKA_GROUP
               value: {{ .Values.kafka.group | quote }}
+            - name: APICURIO_URL
+              value: {{ .Values.apicurio.url | quote }}
             # Predictable Demands pattern: declare exactly what we need.
             - name: PG_HOST
               value: "{{ .Values.postgres.clusterName }}-rw.{{ .Release.Namespace }}.svc.cluster.local"

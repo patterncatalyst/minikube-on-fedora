@@ -35,6 +35,10 @@ spec:
               value: {{ .Values.kafka.bootstrap | quote }}
             - name: KAFKA_ORDER_TOPIC
               value: {{ .Values.kafka.orderTopic | quote }}
+            - name: APICURIO_URL
+              value: {{ .Values.apicurio.url | quote }}
+            - name: KAFKA_ORDER_SUBJECT
+              value: {{ .Values.apicurio.orderSubject | quote }}
             # Postgres connection — pulled from the CloudNativePG app Secret.
             # Predictable Demands pattern: declare exactly what we need.
             - name: PG_HOST

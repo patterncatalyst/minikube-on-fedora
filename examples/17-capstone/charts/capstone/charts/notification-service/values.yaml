@@ -30,6 +30,10 @@ kafka:
   orderTopic: order-placed
   group: notification-service
 
+# Apicurio schema registry (r25b) — consumer fetches the Avro writer schema by id.
+apicurio:
+  url: http://apicurio:8080
+
 resources:
   requests:
     cpu: 100m

@@ -627,6 +627,56 @@ Status values: **accepted**, **superseded by CAP-NNN**,
     OpenAPI/SDL publish) — hence split across iterations rather than one big
     step
 
+## CAP-019 — order.placed as registered Avro: Apicurio + a transparent ccompat serde
+
+- **Date:** r25b
+- **Status:** accepted (first runtime contract; discovery contracts + the rest
+  of CAP-018 still follow)
+- **Context:** CAP-018 set the destination. r25b implements the first piece —
+  the runtime contract — by moving `order.placed` from ad-hoc JSON (r25) to a
+  registered Avro schema that producer and consumer validate against.
+- **Decisions:**
+  - **Apicurio Registry 3, in-memory, as a first-party subchart.** Deployed
+    via `charts/capstone/charts/apicurio` (Deployment + Service running the
+    official `quay.io/apicurio/apicurio-registry:3.2.4` image with
+    `APICURIO_STORAGE_KIND=mem`), rather than a community Helm chart whose
+    values schema we can't fully verify — consistent with how Postgres and
+    Kafka are wrapped. In-memory loses schemas on restart, which is harmless:
+    the producer re-registers on startup. Production uses SQL (CloudNativePG)
+    or kafkasql; the storage kind is a single values key.
+  - **Confluent-compatible API (`/apis/ccompat/v7`).** Apicurio implements the
+    Confluent Schema Registry API, the standard way to reach it from any
+    language. Register: `POST /subjects/{subject}/versions`; fetch by id:
+    `GET /schemas/ids/{id}`. Subject follows TopicNameStrategy:
+    `order-placed-value`.
+  - **Transparent serde (Option A), not a library.** A small shared
+    `avro_serde.py` (`fastavro` + `httpx`) implements the Confluent Wire
+    Format ourselves — magic byte `0x00`, 4-byte big-endian schema id, then
+    the Avro payload. Chosen over a serde library (e.g. Kafkit) for minimal
+    dependencies and legibility: the reader sees the schema registered, the id
+    stamped into the bytes, and the consumer fetch the schema by id to decode.
+    confluent-kafka's own serde doesn't fit anyway (librdkafka-based, sync;
+    we're on aiokafka).
+  - **order-service owns the contract.** The canonical `order-placed.avsc`
+    lives inside order-service (`services/order-service/schemas/`), since the
+    producer owns the event it emits. The consumer holds **no** local copy —
+    it fetches the writer schema from the registry by the id in each message,
+    which is the essence of a runtime contract.
+  - **`amount` as a string** in the Avro schema (matches the JSON it
+    replaces); Avro `decimal` logical type is the noted refinement.
+- **Consequences:**
+  - (+) The event now has a real, versioned, compatibility-checkable
+    contract; the registry is genuinely in the runtime path (the consumer
+    can't decode without it)
+  - (+) The wire format is visible and teachable; only `fastavro` + `httpx`
+    added
+  - (−) In-memory registry isn't durable (acceptable; producer re-registers)
+  - (−) Manual wire framing is our code to maintain — but it's ~25 lines and
+    matches the documented Confluent format exactly
+- **Follow-ons (unchanged from CAP-018):** publish the discovery contracts
+  (OpenAPI/Protobuf/SDL) into Apicurio; then OpenMetadata (r27) ingests
+  everything into lineage.
+
 ---
 
 ## Decisions inherited from r19 (PRD planning)

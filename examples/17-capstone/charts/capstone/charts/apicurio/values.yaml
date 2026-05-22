@@ -1,0 +1,23 @@
+# Apicurio Registry 3 — schema registry.
+# Dev-scale: in-memory storage — the DEFAULT for the 3.x image when no storage
+# env is set (data is not persisted across restarts; the producer re-registers
+# on startup, so this is harmless for the demo). Production sets a real backend
+# (SQL on CloudNativePG, or kafkasql) via APICURIO_STORAGE_KIND + datasource env.
+
+replicas: 1
+
+image:
+  repository: quay.io/apicurio/apicurio-registry
+  tag: "3.2.4"
+  pullPolicy: IfNotPresent
+
+service:
+  port: 8080
+  targetPort: 8080
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 512Mi
+  limits:
+    memory: 1Gi

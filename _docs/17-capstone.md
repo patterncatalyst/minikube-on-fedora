@@ -589,12 +589,13 @@ worth knowing:
   `min.insync.replicas` 2.
 
 For now the consumer keeps received events in memory and exposes them at
-`/received` so the flow is observable. The next iterations make this real: a
-**schema registry (Apicurio)** so the event has a registered, versioned
-contract that producers and consumers validate against (and the move from
-JSON to a binary schema), and notification-service's own **`notifications`
-table with Alembic migrations**, finally retiring the startup `create_all`
-for schema evolution.
+`/received` so the flow is observable. The event itself is now a **registered
+Avro contract** — order-service registers the `order.placed` schema with
+Apicurio and serializes against it, and notification-service fetches that
+schema by id to decode (the next section explains the registry in full). What
+remains to make notification a complete data product is its own
+**`notifications` table with Alembic migrations**, finally retiring the
+startup `create_all` for schema evolution.
 
 ## Contracts, the registry, and the catalog
 
@@ -660,16 +661,18 @@ This layering is also why the two arrive in that order. Apicurio is the
 derived from it. A catalog with nothing to catalog is empty, so the registry
 has to hold the contracts before the catalog has anything truthful to ingest.
 
-A note on honesty about the current state: as of the iteration you're reading,
-the `order.placed` event is still ad-hoc **JSON** with no registry behind it,
-and neither Apicurio nor OpenMetadata is deployed yet. This section describes
-the architecture the next iterations build toward, deliberately in small
-steps: first Apicurio with the Avro **runtime** contract for the event (the
-load-bearing path), then publishing the **discovery** contracts (OpenAPI,
-Protobuf, SDL) into the same registry, and finally OpenMetadata layered on top
-to ingest all of it into lineage. Writing the destination down first means the
-iterations can correct this explanation against what actually gets built —
-which is exactly how the rest of §17 has proceeded.
+A note on honesty about the current state: the `order.placed` event now has a
+real **runtime contract** — its Avro schema is registered in Apicurio, and the
+producer and consumer serialize and deserialize against it (the registry is
+deployed in-memory; the producer re-registers the schema on startup). What's
+*not* yet built is the rest of the picture: the **discovery contracts** (the
+REST OpenAPI documents, the gRPC Protobuf definitions, and the GraphQL SDL)
+aren't published into Apicurio yet, and **OpenMetadata** isn't deployed, so
+there's no lineage catalog on top. This section describes the whole
+destination; the next iterations fill in the discovery contracts and then the
+catalog, deliberately in small steps — writing the destination down first
+means the iterations can correct this explanation against what actually gets
+built, which is how the rest of §17 has proceeded.
 
 ## What the capstone builds, and what's still ahead
 

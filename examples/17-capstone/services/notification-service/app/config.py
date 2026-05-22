@@ -1,10 +1,4 @@
-"""Configuration for notification-service.
-
-notification-service is a Kafka-consumer-only data product: it reacts to
-events from other services rather than serving synchronous domain calls. It
-still owns the `notifications` Postgres schema (per-service ownership,
-CAP-003) and keeps its REST surface for health + observability.
-"""
+"""Configuration for notification-service."""
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -29,9 +23,13 @@ class Settings(BaseSettings):
     kafka_order_topic: str = "order-placed"
     kafka_group: str = "notification-service"
 
+    # Apicurio schema registry (r25b). The consumer decodes Avro by fetching
+    # the writer schema from this registry using the id embedded in each
+    # message — it needs no local copy of the schema.
+    apicurio_url: str = "http://apicurio:8080"
+
     @property
     def database_url(self) -> str:
-        """Async SQLAlchemy URL using the asyncpg driver."""
         return (
             f"postgresql+asyncpg://{self.pg_user}:{self.pg_password}"
             f"@{self.pg_host}:{self.pg_port}/{self.pg_database}"

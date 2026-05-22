@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: apicurio
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: apicurio
+    app.kubernetes.io/part-of: capstone
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: apicurio
+  ports:
+    - name: http
+      port: {{ .Values.service.port }}
+      targetPort: {{ .Values.service.targetPort }}

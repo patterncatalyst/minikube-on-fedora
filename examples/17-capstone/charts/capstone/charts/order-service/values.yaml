@@ -20,6 +20,11 @@ kafka:
   bootstrap: capstone-kafka-kafka-bootstrap:9092
   orderTopic: order-placed
 
+# Apicurio schema registry (r25b) — order.placed registered + serialized as Avro.
+apicurio:
+  url: http://apicurio:8080
+  orderSubject: order-placed-value
+
 # Postgres connection. The CloudNativePG operator generates a Secret named
 # "<cluster>-app" holding the app user's credentials. We reference it by
 # key so we never hardcode the password.

@@ -2665,3 +2665,29 @@ final reader shouldn't see. Items:
   `shipments.dispatched`, but the implemented topic is `order-placed`
   (single topic, single event). Reconcile the table with what's built (or
   frame it explicitly as the intended end-state) during the editorial pass.
+
+- 🔲 **r25b** (2026-05-22) — Apicurio + the Avro runtime contract. Ships the
+  `apicurio` subchart (Registry 3, `quay.io/apicurio/apicurio-registry:3.2.4`,
+  in-memory, TCP probes), the committed `order-placed.avsc` (owned by
+  order-service), a transparent `avro_serde.py` (`fastavro` + `httpx`,
+  Confluent Wire Format, shared by both services), order-service's producer
+  rewired to register the schema on startup and Avro-encode (replacing JSON),
+  notification-service's consumer rewired to fetch the writer schema by id and
+  decode, `fastavro`+`httpx` deps on both, `APICURIO_URL` chart env, and
+  `demos/smoke-avro.sh` (asserts the schema is registered in Apicurio **and**
+  the event is consumed/decoded end-to-end). Decision **CAP-019** recorded;
+  §17 prose updated — the async-spine and contracts sections now state the
+  event is registered Avro (runtime contract real), with discovery contracts
+  + OpenMetadata still the remaining work.
+
+  **Validated statically** (Claude env — no fastavro/cluster): all 6 changed
+  modules `py_compile`; the apicurio subchart and the order/notification
+  deployments render to valid YAML (`APICURIO_URL`, `KAFKA_ORDER_SUBJECT`);
+  pyprojects parse with `fastavro`+`httpx` (dev-group httpx de-duplicated);
+  `events.py` schema-path logic resolves to the shipped `.avsc`; the Confluent
+  wire-format round-trip is code-reviewed against the documented format
+  (fastavro not installable offline). **Cluster verification pending** on
+  Fedora 44 via `setup-kafka-operator.sh` (if needed) → `poetry lock`/`install`
+  (order + notification) → `gen-protos.sh` → `smoke-avro.sh`. Verified count
+  holds at **119** until that run passes; then the registered-Avro flow is the
+  120th fact.

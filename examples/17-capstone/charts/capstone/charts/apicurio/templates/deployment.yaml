@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: apicurio
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app.kubernetes.io/name: apicurio
+    app.kubernetes.io/part-of: capstone
+    app.kubernetes.io/component: schema-registry
+spec:
+  replicas: {{ .Values.replicas }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: apicurio
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: apicurio
+        app.kubernetes.io/part-of: capstone
+    spec:
+      containers:
+        - name: apicurio
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.targetPort }}
+          # No storage env: the apicurio-registry 3.x image defaults to the
+          # in-memory variant (matches Apicurio's documented quickstart, which
+          # runs the image with no env vars). Setting an unrecognized storage
+          # kind makes the storage producer fail to resolve a backend, which
+          # crash-loops at DynamicConfigStartup. Production sets a real backend.
+          resources:
+            requests:
+              cpu: {{ .Values.resources.requests.cpu }}
+              memory: {{ .Values.resources.requests.memory }}
+            limits:
+              memory: {{ .Values.resources.limits.memory }}
+          # startupProbe gives the Quarkus JVM ample time to boot (up to
+          # ~150s) before liveness/readiness begin, so a slow first start is
+          # never mistaken for a crash. TCP probe avoids guessing the health path.
+          startupProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 5
+            failureThreshold: 30
+          livenessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 10
+          readinessProbe:
+            tcpSocket:
+              port: http
+            periodSeconds: 5

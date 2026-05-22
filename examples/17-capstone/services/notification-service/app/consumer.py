@@ -1,29 +1,29 @@
 """Kafka consumer for notification-service.
 
-Consumes `order.placed` events and records them. Managed Lifecycle
-(Kubernetes Patterns): the consumer runs as a background asyncio task that the
-app lifespan starts and cancels.
+r25 consumed ad-hoc JSON. r25b consumes registered **Avro**: each message is
+in the Confluent Wire Format (magic + schema id + Avro bytes), and the
+consumer fetches the writer schema from Apicurio by that id to decode it (see
+`avro_serde.py`). The consumer holds no local copy of the schema — it learns
+it from the registry, which is the point of a runtime contract.
 
-At-least-once delivery (Kleppmann, *Designing Data-Intensive Applications*):
-Kafka can redeliver a message (e.g. after a rebalance or a crash before
-commit), so consumers must be **idempotent**. We key the store by `order_id`,
-so a redelivered event overwrites rather than duplicates.
+Managed Lifecycle: the consumer runs as a background asyncio task started and
+cancelled by the app lifespan.
 
-r25 keeps received events **in memory** — a deliberate stand-in so the async
-flow is observable via `GET /received` without yet introducing a table. The
-real `notifications` table (and Alembic migrations, finally retiring
-`create_all` for this service per CAP-004) arrive in a follow-on iteration.
+At-least-once delivery (Kleppmann, DDIA): Kafka can redeliver, so the consumer
+is idempotent — keyed by `order_id`, a redelivery overwrites rather than
+duplicates. (r25 keeps received events in memory — a deliberate stand-in; the
+real `notifications` table + Alembic arrive in a follow-on.)
 """
 
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 from collections import OrderedDict
 
 from aiokafka import AIOKafkaConsumer
 
+from app.avro_serde import AvroRegistrySerde
 from app.config import settings
 
 logger = logging.getLogger("notification-service.consumer")
@@ -32,9 +32,14 @@ _MAX_KEEP = 100
 _received: "OrderedDict[str, dict]" = OrderedDict()
 _task: asyncio.Task | None = None
 
+# Consumer-only serde: no local schema; decode() fetches writer schemas by id.
+_serde = AvroRegistrySerde(
+    registry_url=settings.apicurio_url,
+    subject=settings.kafka_order_topic,
+)
+
 
 def received_events() -> list[dict]:
-    """Most-recent-last list of consumed events (for GET /received)."""
     return list(_received.values())
 
 
@@ -48,26 +53,24 @@ async def _consume_loop() -> None:
     )
     await consumer.start()
     logger.info(
-        "kafka consumer started (topic=%s group=%s)",
+        "kafka consumer started (topic=%s group=%s, Avro via %s)",
         settings.kafka_order_topic,
         settings.kafka_group,
+        settings.apicurio_url,
     )
     try:
         async for msg in consumer:
             try:
-                event = json.loads(msg.value)
-            except (ValueError, TypeError):
-                logger.warning("skipping non-JSON message at offset %s", msg.offset)
+                event = await _serde.decode(msg.value)
+            except Exception as exc:  # noqa: BLE001 — bad/undecodable message
+                logger.warning("skipping undecodable message at offset %s: %s", msg.offset, exc)
                 continue
             order_id = event.get("order_id", f"offset-{msg.offset}")
-            # Idempotent by order_id: redelivery overwrites, never duplicates.
-            _received[order_id] = event
+            _received[order_id] = event  # idempotent by order_id
             _received.move_to_end(order_id)
             while len(_received) > _MAX_KEEP:
                 _received.popitem(last=False)
-            logger.info(
-                "received %s for order %s", event.get("event_type"), order_id
-            )
+            logger.info("received %s for order %s", event.get("event_type"), order_id)
     finally:
         await consumer.stop()
         logger.info("kafka consumer stopped")

@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "order-service"
-version = "0.3.0"
+version = "0.4.0"
 description = "Order-service data product for the §17 capstone — REST + Postgres + gRPC client to inventory (GraphQL, Kafka added later)"
 authors = ["patterncatalyst"]
 readme = "README.md"
@@ -17,11 +17,12 @@ pydantic-settings = "^2.6.0"
 grpcio = "^1.66.0"
 protobuf = ">=5.26,<6"
 aiokafka = ">=0.12,<1.0"
+fastavro = "^1.9.0"
+httpx = "^0.27.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^8.3.0"
 pytest-asyncio = "^0.24.0"
-httpx = "^0.27.0"
 grpcio-tools = "^1.66.0"
 
 [build-system]

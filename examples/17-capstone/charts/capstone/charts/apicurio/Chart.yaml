@@ -1,0 +1,6 @@
+apiVersion: v2
+name: apicurio
+description: Apicurio Registry 3 (schema registry) for the §17 capstone — in-memory storage (dev). Holds the order.placed Avro contract; multi-format home for all protocol contracts (CAP-018).
+type: application
+version: 0.1.0
+appVersion: "3.2.4"
