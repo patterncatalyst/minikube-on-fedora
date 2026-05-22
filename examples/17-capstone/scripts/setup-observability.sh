@@ -61,9 +61,15 @@ helm upgrade --install grafana grafana/grafana \
 
 # ─── Done ────────────────────────────────────────────────────────────────────
 printf '\n==> Prometheus + Grafana installed in the %s namespace.\n\n' "$NAMESPACE"
-printf 'Open Grafana (admin / capstone) and find the "Capstone — Scaling & Traffic" dashboard:\n'
-printf '  kubectl port-forward -n %s svc/grafana 3000:80\n' "$NAMESPACE"
-printf '  # http://localhost:3000\n\n'
+printf 'Open Grafana and find the "Capstone — Scaling & Traffic" dashboard:\n'
+printf '  kubectl port-forward -n %s svc/grafana 3000:80    # http://localhost:3000\n\n' "$NAMESPACE"
+# The grafana chart preserves an existing admin password on upgrade (it looks up
+# the secret), so the password is NOT reliably "capstone" if a grafana secret
+# already existed. Read the truth from the secret rather than assuming.
+printf 'Login (read the real credentials from the secret — the chart keeps an existing\n'
+printf 'password on upgrade, so do not assume it is the values default):\n'
+printf '  user: $(kubectl get secret grafana -n %s -o jsonpath="{.data.admin-user}" | base64 -d)\n' "$NAMESPACE"
+printf '  pass: $(kubectl get secret grafana -n %s -o jsonpath="{.data.admin-password}" | base64 -d)\n\n' "$NAMESPACE"
 printf 'Then make the graphs move:\n'
 printf '  ./demos/smoke-keda-http.sh    # watch graphql-gateway replicas go 0→1→0\n'
 printf '  ./demos/smoke-canary.sh       # watch order-service request rate by code\n'

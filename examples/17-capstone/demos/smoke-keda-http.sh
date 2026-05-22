@@ -75,11 +75,13 @@ kubectl apply -f "$KEDA_DIR/gateway-httpscaledobject.yaml" >/dev/null \
 printf '    ✓ applied — KEDA HTTP add-on now fronts graphql-gateway\n'
 
 # ─── 1. Scale to zero (no traffic) ───────────────────────────────────────────
-step "Waiting for scale-to-zero (KEDA HTTP cooldown ~300s + HPA settle; up to ~6 min if the gateway was just (re)deployed — instant if already at 0)"
-# See the note below on the HTTP add-on's ~300s default cooldown. On a re-run
-# where the gateway is already at zero this returns immediately.
+step "Waiting for scale-to-zero (~30s scaledownPeriod once idle; instant if already at 0, longer if the gateway was just (re)deployed)"
+# scaledownPeriod (30s) governs the HTTP add-on's scale-to-zero once in-flight
+# concurrency is genuinely 0. On a re-run where the gateway is already at zero
+# this returns immediately. Budget stays generous to cover a just-deployed pod
+# settling for the first time.
 wait_until "0 replicas" 600 is_zero \
-    || fail "graphql-gateway did not scale to zero — is the HTTPScaledObject Ready?"
+    || fail "graphql-gateway did not scale to zero — is the HTTPScaledObject Ready, and is anything holding a connection to the interceptor?"
 printf '    ✓ scaled to ZERO (no traffic, costing nothing)\n'
 
 # ─── 2. Wake from zero through the interceptor ───────────────────────────────
@@ -129,28 +131,20 @@ LOAD_PIDS=()
 printf '    ✓ stayed up under load (peak %s replica(s))\n' "$MAXSEEN"
 
 # ─── 3. Traffic stops → scale back to zero ───────────────────────────────────
-# Close the port-forward FIRST. The `concurrency` metric counts in-flight
-# connections, and a held port-forward (with keep-alive) can read as >=1, keeping
-# the metric active and continually resetting KEDA's cooldown — the gateway then
-# oscillates (scales down, gets re-woken) instead of settling at zero. Dropping
-# the connection lets the metric decay so the cooldown can actually elapse.
+# Close the port-forward FIRST — this is THE thing that makes scale-to-zero work.
+# The HTTP add-on scales on in-flight `concurrency`, and an open connection (a
+# held port-forward, keep-alive and all) reads as >=1. While anything is
+# connected the metric never reaches 0, so the scaledownPeriod timer never starts
+# and the gateway looks like it refuses to scale down. Drop the connection and it
+# stands down in ~30s (the HTTPScaledObject's scaledownPeriod) — same ballpark as
+# the Kafka ScaledObject's cooldownPeriod: 30.
 [[ -n "$PF_PID" ]] && kill "$PF_PID" 2>/dev/null; PF_PID=""
 
-step "Stopping traffic (and closing the interceptor connection); waiting for scale back to ZERO"
-# Scale-to-zero is already PROVEN by the opening check (the gateway started at
-# zero) and by waking from it above. Here we confirm the return trip. The HTTP
-# add-on uses KEDA's default ~300s cooldownPeriod for the 1→0 (the
-# HTTPScaledObject's 30s scaledownPeriod governs metric idle, not the cooldown),
-# so this lands at ~5 min — unlike the Kafka ScaledObject, whose own
-# cooldownPeriod: 30 scales down in well under a minute.
-#
-# We LATCH on KEDA's decision — any sighting of the Deployment's desired replicas
-# at 0 — rather than demanding a stable steady-state zero. On a single node the
-# add-on can oscillate near zero (scale down, briefly re-wake, scale down again),
-# so a point-in-time check can keep landing on the "1" side of the flap even
-# though the workload genuinely reaches zero. A miss past the window is reported,
-# not failed: the capability is demonstrated by the up-cycle and the desired=0
-# sighting, and the operator can watch the final settle directly.
+step "Stopping traffic (and closing the interceptor connection); waiting for scale back to ZERO (~30s once idle)"
+# We latch on KEDA's decision — the Deployment's desired replicas reaching 0 —
+# rather than waiting for the last pod to finish terminating, so graceful
+# shutdown lag doesn't read as a failure. With the connection closed this is
+# typically ~30s; the budget stays generous as a ceiling.
 desired() { kubectl get deploy graphql-gateway -n "$NS" -o jsonpath='{.spec.replicas}' 2>/dev/null; }
 START=$(date +%s); SAW_ZERO=""
 while (( $(date +%s) - START < 600 )); do
@@ -161,9 +155,9 @@ ELAPSED=$(( $(date +%s) - START ))
 if [[ -n "$SAW_ZERO" ]]; then
     printf '    ✓ scaled back to ZERO (KEDA set desired replicas to 0 after ~%ss)\n' "$ELAPSED"
 else
-    printf '    ⚠ still settling after %ss (desired=%s now) — NOT a failure.\n' "$ELAPSED" "$(desired)"
-    printf '      Scale-to-zero is working (the run woke FROM zero above); on a single node\n'
-    printf '      the HTTP add-on can oscillate near zero before it stays down. Watch it settle:\n'
+    printf '    ⚠ still >0 after %ss (desired=%s now) — NOT a failure.\n' "$ELAPSED" "$(desired)"
+    printf '      Usually means something still holds a connection to the interceptor\n'
+    printf '      (a browser tab, another port-forward) keeping concurrency >0. Watch it:\n'
     printf '        kubectl get deploy graphql-gateway -n %s -w\n' "$NS"
 fi
 

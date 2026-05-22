@@ -3160,3 +3160,30 @@ final reader shouldn't see. Items:
   Next: **r29b** — traces (Tempo monolithic + OpenTelemetry Collector), which
   needs instrumenting the gateway (or meshing services); the larger move
   deliberately deferred from r29.
+
+- ✅ **r26b — FULLY VERIFIED (clean smoke)** + **r29.1 corrections** (2026-05-22) —
+  smoke-keda-http.sh now passes end to end on Fedora 44: woke from zero (200 in
+  9s), stayed warm, and **scaled back to ZERO in ~29s**. That ~29s is the
+  important finding: it's the HTTPScaledObject's `scaledownPeriod: 30`, which
+  means scale-to-zero is FAST — and our earlier "~300s default cooldownPeriod /
+  ~5 min" explanation (in §17 and the r28.x notes) was **wrong**. The slow,
+  oscillating scale-down we chased was caused by the held `kubectl port-forward`
+  keeping the HTTP add-on's in-flight `concurrency` metric ≥1, so the 30s timer
+  never started. r28.4's port-forward close is what fixed it; this run confirms
+  the corrected model: **drop the connection → ~30s to zero, no flapping.**
+  - **r29.1 fixes the now-inaccurate material:** §17's scale-down paragraph
+    rewritten (both scalers return to zero in ~30s; the real gotcha is that an
+    open connection — browser tab or lingering port-forward — keeps concurrency
+    >0 and stalls scale-down); smoke-keda-http.sh step/comment text corrected to
+    ~30s + the connection cause.
+  - **Grafana login hardening (also r29.1):** the grafana chart preserves an
+    existing admin password on upgrade, so it isn't reliably the values default.
+    setup-observability.sh now prints the authoritative
+    `kubectl get secret grafana ... | base64 -d` read; smoke-observability.sh
+    reads the real password from the secret (was hardcoding admin:capstone); §17
+    flags the trap. (Surfaced by a real "can't login to grafana" report.)
+  - Validated offline: all three scripts `bash -n`; §17 clears both linters; no
+    stale 300s/5-min claims remain.
+  - r26b stands ✅ (count 130, unchanged — this upgrades it from
+    verified-by-evidence to verified-by-clean-smoke). r29 (observability) still
+    pending its own smoke-observability run + Grafana login confirmation.

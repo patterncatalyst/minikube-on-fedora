@@ -102,8 +102,12 @@ step "Checking Grafana health and the provisioned dashboard"
 health="$(curl -s --max-time 5 "http://127.0.0.1:${GRAF_PORT}/api/health" 2>/dev/null)"
 printf '%s' "$health" | grep -q '"database": *"ok"' \
     || fail "Grafana /api/health did not report database ok (got: $health)"
+# Read the real admin credentials from the secret — the chart preserves an
+# existing password on upgrade, so it isn't reliably the values default.
+GRAF_USER="$(kubectl get secret grafana -n "$NS" -o jsonpath='{.data.admin-user}' 2>/dev/null | base64 -d)"
+GRAF_PASS="$(kubectl get secret grafana -n "$NS" -o jsonpath='{.data.admin-password}' 2>/dev/null | base64 -d)"
 code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 \
-    -u admin:capstone "http://127.0.0.1:${GRAF_PORT}/api/dashboards/uid/capstone-scaling" 2>/dev/null)"
+    -u "${GRAF_USER}:${GRAF_PASS}" "http://127.0.0.1:${GRAF_PORT}/api/dashboards/uid/capstone-scaling" 2>/dev/null)"
 [[ "$code" == "200" ]] \
     || fail "Grafana dashboard 'capstone-scaling' not provisioned (HTTP $code from the dashboards API)"
 printf '    ✓ Grafana healthy and the "Capstone — Scaling & Traffic" dashboard is provisioned\n'

@@ -1022,24 +1022,22 @@ traffic burst for the gateway), and back to zero once the work is gone. The
 principle the two share: a data product's footprint should track its demand, and
 zero demand should mean zero footprint.
 
-One honest asymmetry worth knowing: the two scalers scale *down* at very
-different speeds. The Kafka `ScaledObject` carries its own `cooldownPeriod: 30`,
-so the consumer returns to zero within a minute of the backlog clearing. The HTTP
-add-on, by contrast, generates a ScaledObject under the hood that uses KEDA's
-default 300-second cooldown for the final 1→0 step — the HTTPScaledObject's
-`scaledownPeriod` governs when traffic is considered idle, not that cooldown — so
-the gateway can take around five minutes to fully stand down after traffic stops.
-It's tunable (hand-author the ScaledObject via the add-on's
-`skip-scaledobject-creation` annotation if you need a snappier scale-down), but
-the default is a reasonable anti-flap guard, and it's the kind of timing detail
-worth knowing before you wonder why a quiet service is still running. On a
-single node you may also see it *oscillate* briefly near zero — scale down, take
-one more request from a stray health check or the add-on's own bookkeeping, scale
-down again — before it stays put. The workload does reach zero; it just doesn't
-always get there in one clean step. (The bundled `smoke-keda-http.sh` accounts for
-this: it verifies the wake-from-zero and stay-warm legs as hard assertions and
-reports the return-to-zero as an observation, since a stable non-flapping zero is
-the one thing that's awkward to assert deterministically on a single node.)
+One subtlety worth knowing, because it's easy to misread: both scalers return to
+zero quickly. The Kafka `ScaledObject` carries `cooldownPeriod: 30` and the
+consumer scales down within a minute of the backlog clearing; the gateway's
+HTTPScaledObject carries `scaledownPeriod: 30` and behaves the same — once traffic
+genuinely stops it's back to zero in about half a minute. The catch is what
+"traffic genuinely stops" means. The HTTP add-on scales on in-flight
+*concurrency*, and an open connection counts — so a client that holds a
+connection to the interceptor (a browser tab, or a lingering `kubectl
+port-forward`) keeps the metric above zero and the scale-down timer never starts.
+Drop the connection and the gateway stands down in ~30 seconds; leave one hanging
+and it can look like the service refuses to scale to zero at all. That's a real
+operational gotcha, not a KEDA defect: the metric is faithfully reporting that
+something is still connected. The bundled `smoke-keda-http.sh` closes its
+port-forward before it expects scale-down for exactly this reason, and it asserts
+on KEDA's decision — the Deployment's desired replicas reaching zero — rather than
+waiting on the last pod to finish terminating.
 
 ## Seeing it: metrics with Prometheus and Grafana
 
@@ -1081,6 +1079,11 @@ panel charts order-service's request rate by response code straight from the mes
 drive it with `smoke-canary.sh` and the weighted v1/v2 split shows up as traffic.
 `scripts/setup-observability.sh` then `demos/smoke-observability.sh` install the
 stack and verify the data is actually flowing before you go looking for graphs.
+One login gotcha worth flagging: the Grafana chart preserves an existing admin
+password across upgrades, so don't assume the values default — read the real
+credentials from the secret with `kubectl get secret grafana -n observability -o
+jsonpath='{.data.admin-password}' | base64 -d`. The setup script prints this for
+you.
 
 This is the metrics half of observability. The other half — distributed tracing,
 following a single GraphQL query as it fans out across services — needs either
