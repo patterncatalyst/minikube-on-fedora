@@ -129,15 +129,25 @@ LOAD_PIDS=()
 printf '    ✓ stayed up under load (peak %s replica(s))\n' "$MAXSEEN"
 
 # ─── 3. Traffic stops → scale back to zero ───────────────────────────────────
-step "Stopping traffic; waiting for scale back to ZERO (~5 min — the HTTP add-on uses KEDA's default 300s cooldownPeriod for 1→0, unlike the Kafka scaler's fast 30s)"
-# The KEDA HTTP add-on's generated ScaledObject uses KEDA's DEFAULT
-# cooldownPeriod (~300s) for the final 1→0 — the HTTPScaledObject's 30s
-# scaledownPeriod governs metric idle, not the cooldown. So scale-to-zero
-# lands at ~5 min. Wait past it. (Unlike the Kafka ScaledObject, whose own
-# cooldownPeriod: 30 is honored directly and scales down in well under a minute.)
-wait_until "0 replicas" 600 is_zero \
-    || fail "graphql-gateway did not return to zero after traffic stopped (waited 420s)"
-printf '    ✓ scaled back to ZERO\n'
+# Close the port-forward FIRST. The `concurrency` metric counts in-flight
+# connections, and a held port-forward (with keep-alive) can read as >=1, keeping
+# the metric active and continually resetting KEDA's cooldown — the gateway then
+# oscillates (scales down, gets re-woken) instead of settling at zero. Dropping
+# the connection lets the metric decay so the cooldown can actually elapse.
+[[ -n "$PF_PID" ]] && kill "$PF_PID" 2>/dev/null; PF_PID=""
+
+step "Stopping traffic (and closing the interceptor connection); waiting for scale back to ZERO"
+# Assert on KEDA's DECISION — the Deployment's desired replicas reaching 0 —
+# rather than waiting for the last pod to finish terminating. desired=0 is the
+# scale-to-zero signal and is robust to graceful-termination / brief oscillation
+# lag. The HTTP add-on uses KEDA's default ~300s cooldownPeriod for the 1→0 (the
+# HTTPScaledObject's 30s scaledownPeriod governs metric idle, not the cooldown),
+# so this lands at ~5 min — unlike the Kafka ScaledObject, whose own
+# cooldownPeriod: 30 scales down in well under a minute.
+desired_zero() { [[ "$(kubectl get deploy graphql-gateway -n "$NS" -o jsonpath='{.spec.replicas}' 2>/dev/null)" == "0" ]]; }
+wait_until "desired replicas = 0 (KEDA scaled to zero)" 600 desired_zero \
+    || fail "graphql-gateway desired replicas did not reach 0 within 600s after traffic stopped"
+printf '    ✓ scaled back to ZERO (KEDA set desired replicas to 0)\n'
 
 step "SUCCESS"
 printf 'graphql-gateway is an elastic data product: 0 when idle, woke from zero\n'

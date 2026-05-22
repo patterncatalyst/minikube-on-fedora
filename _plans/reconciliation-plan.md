@@ -3076,5 +3076,28 @@ final reader shouldn't see. Items:
   held cold-start request asserting 200. Re-apply needs setup-keda.sh re-run (to
   update the interceptor).
 
+  **Cluster run (r28.2):** the waitTimeout fix LANDED — "woke from ZERO and served
+  200 in 10s" on two consecutive runs (the erratic 8–400s scale-up is gone). Only
+  the final scale-to-zero failed, and the dump showed why: the gateway oscillating
+  (a 49s pod Terminating, deployment already desired=0) with the interceptor pods
+  themselves restarting (52–119s old — the add-on auto-scales the interceptor). The
+  smoke was ALSO holding the port-forward open through the scale-down wait; with the
+  `concurrency` metric, a held keep-alive connection reads as ≥1 in-flight, keeping
+  the metric active and resetting KEDA's cooldown so the gateway never settles.
+  **r28.3:** close the port-forward before the scale-down wait, and assert on KEDA's
+  DECISION (Deployment `.spec.replicas` → 0) instead of waiting for the last pod to
+  finish terminating — robust to termination/oscillation lag. Fixed the stale "420s"
+  message (the wait was already 600s). **Apply note:** re-run ONLY
+  `./demos/smoke-keda-http.sh` — do NOT re-run setup-keda.sh first (it restarts the
+  interceptors mid-test, which is what churned this run); the add-on already carries
+  waitTimeout=180s from the prior setup-keda run.
+
+  This is the configuration answer to "is there a setting for this": not a KEDA
+  timeout (responseHeaderTimeout is 0.5s here and governs forwarding, not
+  scale-down) — the lever is not holding a connection open during the scale-down
+  window, plus asserting on the scale-to-zero decision rather than full pod
+  termination. The ~300s cooldown itself is by-design and only tunable via
+  skip-scaledobject-creation + a hand-authored ScaledObject (deemed overkill).
+
   Then **r29**: the lean OTEL → Prometheus/Tempo → Grafana
   observability stack per CAP-026's sizing.
