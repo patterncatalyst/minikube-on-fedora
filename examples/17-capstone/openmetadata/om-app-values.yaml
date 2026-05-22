@@ -40,9 +40,10 @@ openmetadata:
 
     # ── Backend database: reuse capstone Postgres ─────────────────────────
     # Flipped from the chart's MySQL defaults to PostgreSQL. Points at the
-    # CloudNativePG read-write service. Credentials come from the
-    # `openmetadata-db-secret` that setup-openmetadata.sh creates; the matching
-    # role + database are provisioned in the capstone-postgres cluster.
+    # CloudNativePG read-write service. The password comes from the
+    # `openmetadata-db-app-secret` that setup-openmetadata.sh creates (a name
+    # distinct from the chart's own generated `openmetadata-db-secret`); the
+    # matching role + database are provisioned in the capstone-postgres cluster.
     database:
       host: capstone-postgres-rw
       port: 5432
@@ -52,7 +53,13 @@ openmetadata:
       auth:
         username: openmetadata
         password:
-          secretRef: openmetadata-db-secret
+          # IMPORTANT: this secret name must NOT be "openmetadata-db-secret" —
+          # the chart GENERATES a Helm-owned secret of that name (holding
+          # DB_HOST/DB_PORT/DB_USER/... assembled from this block) and reads the
+          # password from the secret named here via secretKeyRef. Using the same
+          # name collides with the chart's own secret. So we use a distinct name,
+          # created by setup-openmetadata.sh before install.
+          secretRef: openmetadata-db-app-secret
           secretKey: openmetadata-db-password
       # CloudNativePG presents a server certificate. sslmode=require uses TLS
       # without client-certificate verification, which works against CNPG's
