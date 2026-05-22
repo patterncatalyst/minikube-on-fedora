@@ -143,7 +143,7 @@ data and its API contract.
 | notification-service | Notifications | `notifications` table | Kafka consumer only — subscribes to `orders.placed`, `payments.processed`, `shipments.dispatched` and emits notifications |
 
 Note the deliberate variation: not every service exposes every
-protocol. Per the decision in r19's PRD addition, each service
+protocol. By design, each service
 exposes the protocols that *make sense for its role*, not a
 uniform multi-protocol surface. notification-service is
 Kafka-only because its job is to react to events, not to be
@@ -222,8 +222,8 @@ starting, confirm:
   Repeat `poetry env use python3.12 && poetry lock && poetry
   install` for each service. This keeps your local environment on
   the same Python the container runs (CAP-014).
-- **A protobuf/gRPC code generator**, needed once per protocol
-  iteration (from r23 on) to regenerate the gRPC stubs that
+- **A protobuf/gRPC code generator**, needed to regenerate the
+  gRPC stubs (whenever the protos change) that
   `scripts/gen-protos.sh` commits into each service. The script
   tries several generators in order, so on a stock Fedora 44 you
   can use whichever is easiest — no global install required:
@@ -303,7 +303,7 @@ pattern.
 
 order-service is a Python/FastAPI application that owns the
 `orders` schema in the shared capstone Postgres (CAP-003).
-For r21 it speaks only REST; gRPC, GraphQL, and Kafka are
+As the walking skeleton, it began by speaking only REST; gRPC, GraphQL, and Kafka are
 layered on in later iterations.
 
 ### Dependencies with Poetry
@@ -460,7 +460,7 @@ object.
 
 order-service's helm subchart
 (`charts/capstone/charts/order-service/`) is deliberately
-minimal for r21: a Deployment and a Service. The Deployment
+minimal: a Deployment and a Service. The Deployment
 wires the Postgres connection from the CNPG secret via
 `secretKeyRef`, declares resource requests and limits
 (*Predictable Demands*), and defines liveness (`/health`) and
@@ -486,8 +486,8 @@ persisted in the `orders.orders` table. A `trap` cleans up on
 exit. The whole run ends with `✓ SUCCESS` or fails loudly at
 the first broken assertion.
 
-That single passing run proves the entire spine. From here,
-r22 adds the other four services as parallel repetitions of
+That single passing run proves the entire spine. The other
+four services follow as parallel repetitions of
 this template; later iterations layer on gRPC, GraphQL, Kafka,
 KEDA scaling, the observability stack, OpenMetadata, and
 Prefect.
@@ -671,43 +671,24 @@ to ingest all of it into lineage. Writing the destination down first means the
 iterations can correct this explanation against what actually gets built —
 which is exactly how the rest of §17 has proceeded.
 
-## What §17 delivers vs what's coming
+## What the capstone builds, and what's still ahead
 
-The skeleton (r20) — the directory structure under
-`examples/17-capstone/`, the helm umbrella chart's `Chart.yaml`
-and `values.yaml` (with feature flags for every subchart), the
-profile setup and teardown scripts, the architecture diagram —
-and the order-service walking skeleton (r21, documented above)
-are complete and **verified end-to-end on Fedora 44**: image
-build → in-cluster registry → operator-managed Postgres → REST
-round-trip → row persisted.
+The capstone assembles a small but complete data mesh: five domain services
+(order, inventory, payment, shipping, notification) plus a GraphQL gateway,
+each an independently deployed data product with its own Postgres schema,
+communicating over the protocol that fits each interaction — REST for the
+order API, gRPC for the order→inventory stock check, GraphQL for federated
+reads, and Kafka events for the asynchronous order→notification flow.
+Postgres is managed by the CloudNativePG operator and Kafka by the Strimzi
+operator, all running rootless on a dedicated minikube profile.
 
-Subsequent iterations fill in the rest:
-
-- **r21** — order-service: FastAPI + REST + Postgres schema +
-  helm subchart + smoke test. **Done & verified.** Establishes
-  the pattern every other service follows
-- **r22** — inventory, payment, shipping, notification —
-  identical pattern to order-service, parallelized
-- **r23** — gRPC layer: proto definitions, `buf` codegen,
-  client/server wiring, `ghz` test scripts
-- **r24** — GraphQL layer: per-service subgraphs +
-  Strawberry-based federation gateway
-- **r25** — Kafka integration: topics, schema registration
-  via Apicurio, producers + consumers, demo flows
-- **r26** — KEDA + Istio wiring: ScaledObjects, traffic
-  shifting, Kiali walkthrough
-- **r27** — observability: OTEL Collector deployment,
-  Prometheus + Grafana + Tempo, OpenMetadata install with
-  schema ingestion
-- **r28** — Prefect orchestration: server install, flows for
-  metadata sync and nightly reconciliation
-- **r29** — tests + Postman collection + walkthrough prose
-- **r30** — editorial pass + verification + project close-out
-
-The PRD addition from r19 includes the success criteria and
-risk register; refer to `PRD.md` § "Capstone: a data mesh on
-minikube" for the full scope statement.
+Still ahead, layered on this foundation: a schema registry (Apicurio) to give
+every protocol's contract a versioned home, a data catalog (OpenMetadata) to
+turn the contracts and data sources into lineage, autoscaling and traffic
+management (KEDA and Istio), an observability stack (OpenTelemetry,
+Prometheus, Grafana, Tempo), and scheduled cross-service orchestration
+(Prefect). Each lands as its own focused, independently verifiable increment —
+the same rhythm the protocol work has followed.
 
 ## References
 
@@ -724,30 +705,31 @@ minikube" for the full scope statement.
 - **KEDA**: <https://keda.sh/>
 - **Istio**: <https://istio.io/>
 
-## Verification: examples/17-capstone/
+## The examples/17-capstone/ directory
 
-The capstone has its own `examples/17-capstone/` directory
-containing the helm charts, service source code, demo
-scripts, and Postman collection. The directory structure
-shipped in r20:
+Everything for the capstone lives under `examples/17-capstone/`: the helm
+umbrella chart and per-service subcharts, the service source, the protocol
+definitions, the operator setup scripts, and the demo scripts that verify
+each capability end-to-end against a live cluster.
 
 ```
 examples/17-capstone/
 ├── README.md                  ← overview & quick-start
-├── charts/capstone/           ← helm umbrella chart (skeleton)
-│   ├── Chart.yaml
-│   └── values.yaml
-├── scripts/
-│   ├── setup-capstone-profile.sh
-│   └── teardown.sh
-├── proto/                     ← gRPC proto definitions (r23)
-├── postman/                   ← API collection (r29)
-├── demos/                     ← demo scripts (r25 onwards)
-└── services/                  ← service source (r21 onwards)
+├── charts/capstone/           ← helm umbrella chart
+│   └── charts/                ← per-service + platform subcharts
+│       ├── order-service/   inventory-service/   payment-service/
+│       ├── shipping-service/ notification-service/ graphql-gateway/
+│       ├── postgres/          ← CloudNativePG cluster CR
+│       └── kafka/             ← Strimzi KRaft cluster + topic
+├── services/                  ← FastAPI service source (one dir per service)
+├── proto/                     ← gRPC protobuf definitions
+├── scripts/                   ← profile + operator setup, codegen
+└── demos/                     ← smoke scripts (one per capability)
 ```
 
-Empty directories are placeholders for content arriving in
-the iterations listed above. Each iteration's reconciliation
-plan entry tracks what landed in which directory.
+Each capability has a smoke script under `demos/` that deploys what it needs
+and asserts the behaviour: the REST round-trip, the gRPC stock check, the
+federated GraphQL query, and the Kafka event flow. They're the executable
+proof behind the claims in this section.
 
 [← Back to §16: Examples]({{ "/docs/16-examples/" | relative_url }})

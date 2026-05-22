@@ -2637,3 +2637,31 @@ have to derive them.
   events are still ad-hoc JSON and neither Apicurio nor OpenMetadata is
   deployed — it describes the destination so the iterations can correct it
   against reality. No verified-fact change (documentation): holds at **119**.
+
+### Documentation cleanup backlog (pre-launch editorial)
+
+Tracked so it isn't lost; the page has accreted iteration-scaffolding that a
+final reader shouldn't see. Items:
+
+- ✅ **§17 "what's coming" section** — rewritten from the rNN/"Done &
+  verified" iteration list into a clean reader-facing "What the capstone
+  builds, and what's still ahead" (done in the r25-docs-cleanup pass).
+- ✅ **§17 "Verification: examples/17-capstone/" section** — rewritten into
+  "The examples/17-capstone/ directory" showing the real, populated tree
+  (subcharts, services, proto, demos) instead of r20-era placeholders and
+  "content arriving in iteration rNN" language (done).
+- ✅ **Stray rNN references in body prose** — the r19/r21/r22/r23 mentions
+  scattered through the prerequisites, order-service, and helm sections
+  reworded to drop iteration numbers (CAP-NNN decision-log references kept,
+  since those are traceable rationale a reader benefits from) (done).
+- 🔲 **"Project Plans" section on the main site page** — the site landing/docs
+  index renders cards for the reconciliation plan and iteration plan. These
+  should NOT be public reader-facing; they stay as repo documents for our own
+  tracking. **Action:** remove the Project Plans cards from the site index
+  page. (This lives outside `_docs/17-capstone.md` — in the docs landing/index
+  file — which isn't in the current working set; needs the file to edit.)
+- 🔲 **Topic-name drift (minor, content accuracy)** — the §17 five-services
+  table lists notification consuming `orders.placed`, `payments.processed`,
+  `shipments.dispatched`, but the implemented topic is `order-placed`
+  (single topic, single event). Reconcile the table with what's built (or
+  frame it explicitly as the intended end-state) during the editorial pass.
