@@ -1170,6 +1170,24 @@ HTTPScaledObject.
   - (−) Per-pod limits/probes are not visible offline — verified on the cluster
     (the restart + a clean r26b HTTP run).
 
+### Outcome (Fedora 44, r28 + r28.2)
+
+r28 fixed the crash loop on the first apply — graphql-gateway came up 0/0 with
+zero restarts (the 256Mi OOM was real; 512Mi + startupProbe resolved it). But the
+HTTP smoke kept timing out on a slow/erratic scale-up (230–400s) that turned out
+to be a SECOND, separate issue: the KEDA HTTP interceptor's
+`interceptor.replicas.waitTimeout` defaults to **20s**, too short for a cold start
+here (KEDA activation + image pull + Python boot + startupProbe). Every held
+request 502'd with "context deadline exceeded" before a backend existed, which
+ALSO starved KEDA of the stable pending-request pressure it activates on — so
+scale-up only crawled up on churn. **r28.2** raises waitTimeout to 180s in
+setup-keda.sh; the interceptor now holds the cold-start request through the whole
+boot, KEDA gets steady pressure and activates promptly, and a single cold-start
+request returns 200. Documented in §17 as a cold-start caveat. Lesson: KEDA HTTP
+on a single node has THREE timing knobs that bite — pod resources (OOM),
+interceptor waitTimeout (cold-start hold), and the 300s scale-down cooldown —
+none visible offline.
+
 ---
 
 ## Decisions inherited from r19 (PRD planning)

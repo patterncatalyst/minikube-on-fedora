@@ -95,36 +95,25 @@ for _ in $(seq 1 15); do
     sleep 1
 done
 
-step "Waking the gateway from zero through the interceptor (Host: $HOST)"
-# A single request can 502 if the cold start outruns the interceptor's ~20s
-# WorkloadReplicas wait — and with imagePullPolicy: Always (CAP-015) a cold pull
-# can push the gateway past that. So we drive SUSTAINED trigger requests (each
-# keeps a pending request, so KEDA keeps the gateway scaled up) while we wait for
-# the Deployment to report a Ready replica. The 0→Ready transition IS the
-# wake-from-zero proof; we then assert the gateway serves a 200.
-ready_replicas() { kubectl get deployment graphql-gateway -n "$NS" -o jsonpath='{.status.readyReplicas}' 2>/dev/null; }
-is_ready() { [[ "$(ready_replicas)" =~ ^[0-9]+$ ]] && [[ "$(ready_replicas)" -ge 1 ]]; }
-
-( while true; do
-    curl -s -o /dev/null --max-time 25 -H "Host: $HOST" "http://127.0.0.1:${LOCAL_PORT}/health" || true
-    sleep 1
-  done ) &
-LOAD_PIDS+=($!)
-
+step "Firing a cold-start request through the interceptor (Host: $HOST)"
+# With interceptor.replicas.waitTimeout raised to 180s (setup-keda.sh), the
+# interceptor BUFFERS this request, signals KEDA to scale graphql-gateway from
+# zero, and HOLDS the connection until a replica is Ready — then forwards it and
+# returns the gateway's response. A 200 is the wake-from-zero proof; the elapsed
+# time is the cold-start cost. A single held request also gives KEDA the stable
+# pending-request pressure it needs to activate promptly (the old 20s wait made
+# requests churn-and-502 before a backend existed, starving that signal).
 START=$(date +%s)
-wait_until "gateway Ready (woke from zero)" 420 is_ready || {
-    printf '    deployment/pods at timeout:\n'
-    kubectl get deployment,pods -n "$NS" -l app.kubernetes.io/name=graphql-gateway 2>&1 | sed 's/^/      /'
-    fail "graphql-gateway did not reach a Ready replica under traffic within 420s — KEDA scale-up or pod start (see above)."
-}
-ELAPSED=$(( $(date +%s) - START ))
-printf '    ✓ woke from ZERO to a Ready replica in %ss\n' "$ELAPSED"
-
-# Now that a replica is Ready, the interceptor forwards: assert a real 200.
-CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 \
+CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 200 \
     -H "Host: $HOST" "http://127.0.0.1:${LOCAL_PORT}/health" || echo "000")
-[[ "$CODE" == "200" ]] || fail "gateway is Ready but the interceptor returned HTTP $CODE (routing?)"
-printf '    ✓ interceptor served HTTP 200 from the woken gateway\n'
+ELAPSED=$(( $(date +%s) - START ))
+if [[ "$CODE" != "200" ]]; then
+    printf '    cold-start returned HTTP %s after %ss\n' "$CODE" "$ELAPSED"
+    kubectl get deployment,pods -n "$NS" -l app.kubernetes.io/name=graphql-gateway 2>&1 | sed 's/^/      /'
+    fail "interceptor did not serve a 200 from a woken gateway (HTTP $CODE). 502 'context deadline exceeded' = waitTimeout too short; 404 = Host didn't match the HTTPScaledObject."
+fi
+printf '    ✓ woke from ZERO and served 200 in %ss (cold start)\n' "$ELAPSED"
+[[ "$(count_pods)" -gt 0 ]] || fail "served a 200 but no gateway pod present?!"
 MAXSEEN="$(count_pods)"
 
 step "Driving brief sustained load (it stays warm under traffic)"

@@ -999,7 +999,13 @@ is KEDA's HTTP add-on: an interceptor sits in front of the Service, scales the
 gateway on how many requests are in flight, and — the part that makes
 scale-to-zero usable for a request/response service — holds the very first
 request while a replica starts, so waking from zero is invisible to the caller
-beyond a cold-start pause.
+beyond a cold-start pause. (One install detail earns its keep here: the
+interceptor's `waitTimeout` — how long it will hold that first request — defaults
+to 20 seconds, and a real cold start on a single node, image pull and Python boot
+included, can outrun that. When it does, the held request fails with a
+"context deadline exceeded" 502 *before* a backend exists, which also denies KEDA
+the steady pending-request signal it scales on. `setup-keda.sh` raises it to 180s
+so the cold start fits inside the hold.)
 
 Two placement choices are deliberate. HTTP scaling lives on the gateway, not on
 order-service: order-service is the canary subject, and the add-on's interceptor

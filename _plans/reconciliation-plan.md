@@ -3066,5 +3066,15 @@ final reader shouldn't see. Items:
   asymmetry, not a defect. On a re-run the gateway is already at 0, so the opening
   check is instant; budget ~10-15 min for wake + final scale-down.
 
+  **Cluster run (r28.1) → root-caused (r28.2):** r28's calibration confirmed
+  working (gateway 1/1, 0 restarts — crash loop gone). The persistent slow/erratic
+  scale-up (~300s) was finally root-caused to the interceptor's
+  `replicas.waitTimeout` default of 20s (the add-on's own error,
+  "context deadline exceeded", and docs confirm): too short for a cold start, so
+  requests 502 before a backend exists AND KEDA never gets stable pending pressure.
+  r28.2 sets waitTimeout=180s in setup-keda.sh and reverts the smoke to a single
+  held cold-start request asserting 200. Re-apply needs setup-keda.sh re-run (to
+  update the interceptor).
+
   Then **r29**: the lean OTEL → Prometheus/Tempo → Grafana
   observability stack per CAP-026's sizing.

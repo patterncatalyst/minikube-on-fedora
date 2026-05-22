@@ -54,9 +54,17 @@ helm upgrade --install keda kedacore/keda \
 
 # ─── 3. KEDA HTTP add-on ─────────────────────────────────────────────────────
 printf '==> Installing the KEDA HTTP add-on %s into namespace %s\n' "$KEDA_HTTP_VERSION" "$NAMESPACE"
+# interceptor.replicas.waitTimeout (default 20s) is how long the interceptor
+# holds a request waiting for the scaled-from-zero workload to have a Ready
+# replica. 20s is too short here: a cold start (KEDA activation + image pull +
+# Python boot + startupProbe) routinely exceeds it, so requests 502 with
+# "context deadline exceeded" BEFORE a backend exists — which also starves KEDA
+# of the stable pending-request pressure it needs to activate promptly, making
+# scale-up slow and erratic. 180s holds the request through the whole cold start.
 helm upgrade --install keda-add-ons-http kedacore/keda-add-ons-http \
     --version "$KEDA_HTTP_VERSION" \
     --namespace "$NAMESPACE" \
+    --set interceptor.replicas.waitTimeout=180s \
     --wait
 
 # ─── Done ────────────────────────────────────────────────────────────────────
