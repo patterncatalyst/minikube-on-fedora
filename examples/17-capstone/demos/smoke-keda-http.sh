@@ -75,10 +75,10 @@ kubectl apply -f "$KEDA_DIR/gateway-httpscaledobject.yaml" >/dev/null \
 printf '    ✓ applied — KEDA HTTP add-on now fronts graphql-gateway\n'
 
 # ─── 1. Scale to zero (no traffic) ───────────────────────────────────────────
-step "Waiting for scale-to-zero (no traffic → 0 replicas; ~5 min on a fresh run)"
+step "Waiting for scale-to-zero (KEDA HTTP cooldown ~300s + HPA settle; up to ~6 min if the gateway was just (re)deployed — instant if already at 0)"
 # See the note below on the HTTP add-on's ~300s default cooldown. On a re-run
 # where the gateway is already at zero this returns immediately.
-wait_until "0 replicas" 420 is_zero \
+wait_until "0 replicas" 600 is_zero \
     || fail "graphql-gateway did not scale to zero — is the HTTPScaledObject Ready?"
 printf '    ✓ scaled to ZERO (no traffic, costing nothing)\n'
 
@@ -140,13 +140,13 @@ LOAD_PIDS=()
 printf '    ✓ stayed up under load (peak %s replica(s))\n' "$MAXSEEN"
 
 # ─── 3. Traffic stops → scale back to zero ───────────────────────────────────
-step "Stopping traffic; waiting for scale back to ZERO"
+step "Stopping traffic; waiting for scale back to ZERO (~5 min — the HTTP add-on uses KEDA's default 300s cooldownPeriod for 1→0, unlike the Kafka scaler's fast 30s)"
 # The KEDA HTTP add-on's generated ScaledObject uses KEDA's DEFAULT
 # cooldownPeriod (~300s) for the final 1→0 — the HTTPScaledObject's 30s
 # scaledownPeriod governs metric idle, not the cooldown. So scale-to-zero
 # lands at ~5 min. Wait past it. (Unlike the Kafka ScaledObject, whose own
 # cooldownPeriod: 30 is honored directly and scales down in well under a minute.)
-wait_until "0 replicas" 420 is_zero \
+wait_until "0 replicas" 600 is_zero \
     || fail "graphql-gateway did not return to zero after traffic stopped (waited 420s)"
 printf '    ✓ scaled back to ZERO\n'
 

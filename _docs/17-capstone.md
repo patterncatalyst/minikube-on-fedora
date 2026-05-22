@@ -1016,6 +1016,18 @@ traffic burst for the gateway), and back to zero once the work is gone. The
 principle the two share: a data product's footprint should track its demand, and
 zero demand should mean zero footprint.
 
+One honest asymmetry worth knowing: the two scalers scale *down* at very
+different speeds. The Kafka `ScaledObject` carries its own `cooldownPeriod: 30`,
+so the consumer returns to zero within a minute of the backlog clearing. The HTTP
+add-on, by contrast, generates a ScaledObject under the hood that uses KEDA's
+default 300-second cooldown for the final 1→0 step — the HTTPScaledObject's
+`scaledownPeriod` governs when traffic is considered idle, not that cooldown — so
+the gateway can take around five minutes to fully stand down after traffic stops.
+It's tunable (hand-author the ScaledObject via the add-on's
+`skip-scaledobject-creation` annotation if you need a snappier scale-down), but
+the default is a reasonable anti-flap guard, and it's the kind of timing detail
+worth knowing before you wonder why a quiet service is still running.
+
 ## What the capstone builds, and what's still ahead
 
 The capstone assembles a small but complete data mesh: five domain services

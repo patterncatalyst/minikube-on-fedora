@@ -3053,5 +3053,18 @@ final reader shouldn't see. Items:
   gateway no longer OOMs and the startupProbe prevents the premature liveness
   kill). On a green HTTP smoke, promote **both r26b and r28** to ✅ and bump the
   count to **130** (the two KEDA rows; r28 is the enabling fix, not a separate
-  capability count). Then **r29**: the lean OTEL → Prometheus/Tempo → Grafana
+  capability count). **Cluster run (r28 apply):** the calibration WORKED — graphql-gateway came up
+  clean (0/0, no restart churn; the 256Mi OOM crash-loop is gone). The HTTP smoke
+  then failed only on the OPENING scale-to-zero wait: the `helm upgrade` reset the
+  gateway to 1 replica, and KEDA's HTTP 1→0 takes ~300s default cooldown + HPA
+  settle + the new startupProbe grace (~420s total), past the 420s wait. Root-caused
+  via the add-on's own issue tracker: the HTTPScaledObject's `scaledownPeriod` (30s)
+  does NOT govern the 1→0 — the generated ScaledObject uses KEDA's default 300s
+  `cooldownPeriod`, not exposed on the HTTPScaledObject. **r28.1:** bumped both
+  HTTP-smoke scale-to-zero waits to 600s and documented the ~5-min HTTP scale-to-zero
+  (vs the Kafka scaler's fast 30s) as expected behavior in §17 — an honest timing
+  asymmetry, not a defect. On a re-run the gateway is already at 0, so the opening
+  check is instant; budget ~10-15 min for wake + final scale-down.
+
+  Then **r29**: the lean OTEL → Prometheus/Tempo → Grafana
   observability stack per CAP-026's sizing.
