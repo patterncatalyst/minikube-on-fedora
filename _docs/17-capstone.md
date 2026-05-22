@@ -1032,7 +1032,14 @@ the gateway can take around five minutes to fully stand down after traffic stops
 It's tunable (hand-author the ScaledObject via the add-on's
 `skip-scaledobject-creation` annotation if you need a snappier scale-down), but
 the default is a reasonable anti-flap guard, and it's the kind of timing detail
-worth knowing before you wonder why a quiet service is still running.
+worth knowing before you wonder why a quiet service is still running. On a
+single node you may also see it *oscillate* briefly near zero — scale down, take
+one more request from a stray health check or the add-on's own bookkeeping, scale
+down again — before it stays put. The workload does reach zero; it just doesn't
+always get there in one clean step. (The bundled `smoke-keda-http.sh` accounts for
+this: it verifies the wake-from-zero and stay-warm legs as hard assertions and
+reports the return-to-zero as an observation, since a stable non-flapping zero is
+the one thing that's awkward to assert deterministically on a single node.)
 
 ## What the capstone builds, and what's still ahead
 
