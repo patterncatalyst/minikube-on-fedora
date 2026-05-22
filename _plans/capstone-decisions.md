@@ -1278,6 +1278,12 @@ none visible offline.
   - (−) No traces visible until r29c instruments a service — by design.
   - (−) Chart-schema correctness (tempo values keys, OTLP receiver wiring) is
     cluster-only; validated offline only as parseable YAML.
+  - **Repo addendum (r29.2):** the grafana/* helm charts (grafana, tempo) were
+    migrated to the `grafana-community` repo effective 2026-01-30; the old
+    `grafana/*` charts now emit "this chart is deprecated". setup-observability.sh
+    uses `grafana-community/grafana` and `grafana-community/tempo`
+    (https://grafana-community.github.io/helm-charts). Values schemas unchanged
+    (same charts, relocated). prometheus-community is unaffected.
 
 ---
 

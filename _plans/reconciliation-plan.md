@@ -3214,3 +3214,21 @@ final reader shouldn't see. Items:
   own metrics verification first). Next: **r29c** — instrument the gateway (REST
   + gRPC clients) with OpenTelemetry to emit the GraphQL fan-out trace to Tempo;
   the real end-to-end traces proof, isolated onto this now-verified backend.
+
+- 🔲 **r29.2** (2026-05-22) — Chart-repo migration fix. r29b's clean run surfaced
+  `level=WARN msg="this chart is deprecated"` on the tempo and grafana installs:
+  the entire grafana/* helm-charts repo moved to `grafana-community` effective
+  2026-01-30 (updates/support now only there). setup-observability.sh repointed
+  `grafana` → `grafana-community` repo and `grafana/{grafana,tempo}` →
+  `grafana-community/{grafana,tempo}`; values unchanged (same charts relocated);
+  prometheus-community untouched. Validated: `bash -n` clean.
+  **Apply note:** existing `tempo`/`grafana` releases upgrade onto the relocated
+  charts (seamless — same chart). If helm errors on an immutable field
+  (selector labels), `helm uninstall tempo grafana -n observability` then re-run
+  setup-observability.sh — persistence is off, so no data loss.
+
+  Status of the observability line after this: **r29 metrics** + **r29b traces
+  backend** both verified by clean smokes (Tempo Ready, Grafana datasources
+  provisioned/reachable, Prometheus scraping) — promote both to ✅ once the
+  grafana-community re-run is confirmed (count → 132). Then **r29c**: instrument
+  the gateway to emit real traces onto this backend.

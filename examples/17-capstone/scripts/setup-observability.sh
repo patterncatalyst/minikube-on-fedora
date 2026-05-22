@@ -40,10 +40,10 @@ if [[ "$current_context" != "capstone" ]]; then
 fi
 
 # ─── 1. helm repos ───────────────────────────────────────────────────────────
-printf '==> Ensuring the prometheus-community and grafana helm repos are registered\n'
+printf '==> Ensuring the prometheus-community and grafana-community helm repos are registered\n'
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts >/dev/null 2>&1 || true
-helm repo add grafana https://grafana.github.io/helm-charts >/dev/null 2>&1 || true
-helm repo update prometheus-community grafana >/dev/null
+helm repo add grafana-community https://grafana-community.github.io/helm-charts >/dev/null 2>&1 || true
+helm repo update prometheus-community grafana-community >/dev/null
 
 # ─── 2. Prometheus (+ kube-state-metrics) ────────────────────────────────────
 # Chart versions intentionally unpinned (latest from the repo) so this keeps
@@ -56,16 +56,17 @@ helm upgrade --install prometheus prometheus-community/prometheus \
     --wait
 
 # ─── 3. Tempo (trace backend) ────────────────────────────────────────────────
-# Monolithic single-binary Tempo (r29b). In the grafana repo, so no extra repo.
+# Monolithic single-binary Tempo (r29b). In the grafana-community repo (the
+# grafana/* charts moved there 2026-01-30), so no extra repo beyond Grafana.
 printf '==> Installing Tempo (trace backend) into namespace %s\n' "$NAMESPACE"
-helm upgrade --install tempo grafana/tempo \
+helm upgrade --install tempo grafana-community/tempo \
     --namespace "$NAMESPACE" \
     -f "$OBS_DIR/tempo-values.yaml" \
     --wait
 
 # ─── 4. Grafana ──────────────────────────────────────────────────────────────
 printf '==> Installing Grafana into namespace %s\n' "$NAMESPACE"
-helm upgrade --install grafana grafana/grafana \
+helm upgrade --install grafana grafana-community/grafana \
     --namespace "$NAMESPACE" \
     -f "$OBS_DIR/grafana-values.yaml" \
     --wait
