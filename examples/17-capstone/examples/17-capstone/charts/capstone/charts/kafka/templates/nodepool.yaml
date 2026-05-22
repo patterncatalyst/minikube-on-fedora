@@ -1,0 +1,16 @@
+apiVersion: kafka.strimzi.io/v1beta2
+kind: KafkaNodePool
+metadata:
+  name: dual
+  namespace: {{ .Release.Namespace }}
+  labels:
+    strimzi.io/cluster: {{ .Values.clusterName }}
+spec:
+  replicas: {{ .Values.replicas }}
+  roles:
+    - controller
+    - broker
+  # Ephemeral storage: fine for a dev cluster (metadata + logs are lost on
+  # restart). Production uses persistent-claim volumes.
+  storage:
+    type: ephemeral

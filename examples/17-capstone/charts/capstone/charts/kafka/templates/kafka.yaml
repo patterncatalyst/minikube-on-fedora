@@ -1,0 +1,26 @@
+apiVersion: kafka.strimzi.io/v1beta2
+kind: Kafka
+metadata:
+  name: {{ .Values.clusterName }}
+  namespace: {{ .Release.Namespace }}
+  annotations:
+    strimzi.io/node-pools: enabled
+    strimzi.io/kraft: enabled
+spec:
+  kafka:
+    listeners:
+      - name: plain
+        port: 9092
+        type: internal
+        tls: false
+    config:
+      offsets.topic.replication.factor: {{ .Values.replicationFactor }}
+      transaction.state.log.replication.factor: {{ .Values.replicationFactor }}
+      transaction.state.log.min.isr: {{ .Values.minInsyncReplicas }}
+      default.replication.factor: {{ .Values.replicationFactor }}
+      min.insync.replicas: {{ .Values.minInsyncReplicas }}
+  # The Entity Operator runs the Topic and User operators, so KafkaTopic CRs
+  # (below) become real Kafka topics declaratively.
+  entityOperator:
+    topicOperator: {}
+    userOperator: {}

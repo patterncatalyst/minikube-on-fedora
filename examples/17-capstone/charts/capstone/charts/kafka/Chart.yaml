@@ -1,0 +1,6 @@
+apiVersion: v2
+name: kafka
+description: Single-node KRaft Kafka cluster (Strimzi CRs) for the §17 capstone async spine. Dev-scale — ephemeral storage, replication factor 1.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

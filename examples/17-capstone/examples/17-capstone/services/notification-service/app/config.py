@@ -29,13 +29,5 @@ class Settings(BaseSettings):
     kafka_order_topic: str = "order-placed"
     kafka_group: str = "notification-service"
 
-    @property
-    def database_url(self) -> str:
-        """Async SQLAlchemy URL using the asyncpg driver."""
-        return (
-            f"postgresql+asyncpg://{self.pg_user}:{self.pg_password}"
-            f"@{self.pg_host}:{self.pg_port}/{self.pg_database}"
-        )
-
 
 settings = Settings()
