@@ -2894,10 +2894,23 @@ final reader shouldn't see. Items:
   new §17 prose carries no Go-template `{{ }}`.
 
   **Cluster verification pending** (Fedora 44, user-run): `scripts/setup-istio.sh`
-  → one-time `kubectl delete deployment order-service` + `helm upgrade` (selector
-  immutability) → rebuild the order-service image so v1 carries `/version`
-  (`scripts/build-image.sh services/order-service order-service v1`) →
-  `demos/smoke-canary.sh`. **Expected cluster-only risk**: the Istio API/install
+  → deploy/recreate order-service v1 as its OWN release (this project installs
+  each component separately per `scaffold-service.sh`, NOT via the umbrella
+  chart — the umbrella declares no `dependencies:`):
+  `helm upgrade --install order-service charts/capstone/charts/order-service -n capstone`
+  (an already-running v1 needs a one-time `kubectl delete deployment order-service`
+  first, for selector immutability; a fresh install does not) → `demos/smoke-canary.sh`.
+  The order-service image must carry `/version`
+  (`scripts/build-image.sh services/order-service order-service v1`).
+  **Convention correction (r26.1):** the r26 deliverable initially mis-stated the
+  install as `helm upgrade --install capstone ./charts/capstone`; corrected to the
+  per-service release in setup-istio.sh + smoke-canary.sh messages.
+  **Smoke fix (r26.2):** the sidecar assertion checked only `.spec.containers`,
+  but Istio 1.29 on k8s >=1.29 injects istio-proxy as a NATIVE sidecar
+  (initContainer, restartPolicy:Always) — so the check now inspects
+  initContainers too. Both subsets came up 2/2 (meshed) on the first cluster run;
+  this was a false-negative in the assertion, not a mesh failure.
+  **Expected cluster-only risk**: the Istio API/install
   specifics (`networking.istio.io/v1` kinds, ingressgateway Service name,
   subset-by-label routing, sidecar-injection timing), flagged `VERIFY-POINT` in
   `istio/routing.yaml`. Promote to `verified (Fedora 44)` and bump the count to

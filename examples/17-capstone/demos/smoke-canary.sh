@@ -101,7 +101,8 @@ for t in kubectl curl; do command -v "$t" >/dev/null || fail "$t not in PATH"; d
 kubectl get deployment istiod -n istio-system >/dev/null 2>&1 \
     || fail "Istio not installed — run scripts/setup-istio.sh first"
 kubectl get deployment order-service -n "$NS" >/dev/null 2>&1 \
-    || fail "order-service (v1) not deployed — helm upgrade the capstone chart first"
+    || fail "order-service (v1) not deployed — install it first:
+       helm upgrade --install order-service charts/capstone/charts/order-service -n $NS"
 
 # Selector migration check (r26 immutability): v1 Deployment must select version=v1.
 SEL_VERSION="$(kubectl get deployment order-service -n "$NS" \
@@ -109,7 +110,7 @@ SEL_VERSION="$(kubectl get deployment order-service -n "$NS" \
 if [[ "$SEL_VERSION" != "v1" ]]; then
     fail "order-service Deployment predates r26 (selector lacks version=v1). One-time migration:
        kubectl delete deployment order-service -n $NS
-       helm upgrade --install capstone ./charts/capstone -n $NS
+       helm upgrade --install order-service charts/capstone/charts/order-service -n $NS
      then re-run this smoke. (Deployment selectors are immutable, so v1 must be recreated.)"
 fi
 printf '    ✓ v1 selector carries version=v1\n'
@@ -123,12 +124,15 @@ kubectl rollout status deployment/order-service-v2 -n "$NS" --timeout=3m \
     || fail "order-service-v2 did not become available"
 printf '    ✓ order-service-v2 rolled out\n'
 
-# Confirm BOTH subsets are meshed (istio-proxy sidecar injected → 2 containers).
+# Confirm BOTH subsets are meshed (istio-proxy present). Istio may inject the
+# proxy either as a regular container (classic) or as a native sidecar — an
+# initContainer with restartPolicy:Always (default on k8s >=1.29) — so check
+# BOTH lists. Either way a meshed pod reports 2/2 Ready.
 for v in v1 v2; do
-    containers="$(kubectl get pod -n "$NS" -l "app.kubernetes.io/name=order-service,version=$v" \
-        -o jsonpath='{.items[0].spec.containers[*].name}' 2>/dev/null || echo '')"
-    printf '    %s containers: %s\n' "$v" "$containers"
-    [[ "$containers" == *istio-proxy* ]] \
+    names="$(kubectl get pod -n "$NS" -l "app.kubernetes.io/name=order-service,version=$v" \
+        -o jsonpath='{.items[0].spec.containers[*].name} {.items[0].spec.initContainers[*].name}' 2>/dev/null || echo '')"
+    printf '    %s containers: %s\n' "$v" "$names"
+    [[ "$names" == *istio-proxy* ]] \
         || fail "$v pod has no istio-proxy sidecar — injection didn't happen (was the namespace labeled / pod created after setup-istio.sh?)"
 done
 printf '    ✓ both subsets are in the mesh\n'
