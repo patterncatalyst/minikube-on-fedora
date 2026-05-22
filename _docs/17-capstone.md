@@ -596,6 +596,81 @@ JSON to a binary schema), and notification-service's own **`notifications`
 table with Alembic migrations**, finally retiring the startup `create_all`
 for schema evolution.
 
+## Contracts, the registry, and the catalog
+
+By now the mesh speaks four protocols — REST, gRPC, GraphQL, and Kafka
+events — and each of those is, at heart, a **contract**: a promise about the
+shape of the data crossing a boundary. order-service's REST API promises a
+certain JSON shape; inventory's gRPC service promises the `CheckStock`
+message types; the gateway promises its GraphQL schema; the `order.placed`
+event promises its fields. In a data mesh, where each service is an
+independent data product owned by a different team, these contracts are the
+load-bearing structure. A consumer doesn't depend on a producer's code or
+database — it depends on the producer's *contract*. So the contracts need a
+home: somewhere they're stored, versioned, checked for compatibility as they
+evolve, and discoverable by anyone (or anything) that wants to integrate.
+
+That home is a **schema registry**, and the capstone uses **Apicurio**. The
+key thing to understand about Apicurio is that it's deliberately
+*multi-format*: it doesn't only hold Avro schemas for Kafka. It holds **all
+four protocols' contracts, each as its native artifact type** — Avro for the
+Kafka events, Protobuf for the gRPC service definitions, OpenAPI for the REST
+surfaces (the document FastAPI already generates at `/openapi.json`), and
+GraphQL SDL for the gateway's schema. One registry, every contract.
+
+![Contracts, the registry, and the catalog — how the four protocols' contracts live in Apicurio and feed OpenMetadata]({{ "/assets/diagrams/17-capstone-contracts.svg" | relative_url }})
+
+There's an important distinction in *how* those contracts are used, and it's
+worth drawing because the two kinds have very different coupling:
+
+- **Runtime serialization contracts.** For Kafka events with Avro, the
+  producer and consumer actually talk to the registry at run time: the
+  producer serializes the event against the registered schema (and stamps the
+  bytes with a schema id), and the consumer fetches that schema by id to
+  deserialize. The event literally won't encode or decode without the
+  registered schema. This is online, in the hot path, load-bearing. (gRPC's
+  Protobuf is similar in spirit — the message types are a hard runtime
+  contract — though the stubs are compiled ahead of time rather than fetched.)
+- **Discovery contracts.** For REST (OpenAPI) and GraphQL (SDL), the contract
+  is *published* to the registry as the source of truth for "what's the shape
+  of this service," but nothing fails at run time if the registry is absent —
+  the service still serves requests. These exist to be discovered: by humans
+  browsing the catalog, by CI checking for breaking changes, and — crucially
+  — by the data catalog described next.
+
+The flow diagram makes the two paths concrete: the runtime path (top) is the
+Avro serialize → Kafka → deserialize round-trip that touches the registry on
+both ends; the discovery path (bottom) is the offline publish-and-ingest that
+populates the catalog.
+
+![Contract flow — the runtime serialization path versus the discovery and lineage path]({{ "/assets/diagrams/17-capstone-contract-flow.svg" | relative_url }})
+
+Sitting *on top* of the registry is the data catalog, **OpenMetadata**. Where
+Apicurio answers "what is the contract for X," OpenMetadata answers "what data
+products exist, who owns them, and how does data flow between them." It builds
+that picture by **ingesting** from several sources: the contracts in Apicurio,
+the Postgres schemas each service owns (via CloudNativePG), and the Kafka
+topics (via Strimzi). From those it assembles **lineage** — the traceable
+chain that order-service produces `order.placed`, which is the Avro schema
+Apicurio holds, which notification-service consumes. That lineage graph is
+what turns a pile of services into a navigable, governed data mesh.
+
+This layering is also why the two arrive in that order. Apicurio is the
+*contract* metadata; OpenMetadata is the *lineage and discovery* metadata
+derived from it. A catalog with nothing to catalog is empty, so the registry
+has to hold the contracts before the catalog has anything truthful to ingest.
+
+A note on honesty about the current state: as of the iteration you're reading,
+the `order.placed` event is still ad-hoc **JSON** with no registry behind it,
+and neither Apicurio nor OpenMetadata is deployed yet. This section describes
+the architecture the next iterations build toward, deliberately in small
+steps: first Apicurio with the Avro **runtime** contract for the event (the
+load-bearing path), then publishing the **discovery** contracts (OpenAPI,
+Protobuf, SDL) into the same registry, and finally OpenMetadata layered on top
+to ingest all of it into lineage. Writing the destination down first means the
+iterations can correct this explanation against what actually gets built —
+which is exactly how the rest of §17 has proceeded.
+
 ## What §17 delivers vs what's coming
 
 The skeleton (r20) — the directory structure under

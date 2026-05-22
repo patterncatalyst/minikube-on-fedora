@@ -2614,3 +2614,26 @@ have to derive them.
   (order + notification, aiokafka added) → `gen-protos.sh` (order still needs
   its stubs) → `smoke-kafka.sh`. Verified count holds at **118** until that
   run passes; then the async flow is the 119th fact.
+
+- ✅ **r25** verified (Fedora 44) — `smoke-kafka.sh` green: the Strimzi
+  operator installed cleanly (9 CRDs), the single-node KRaft Kafka cluster
+  reached Ready (broker pod Running, entity operator Running, `order-placed`
+  topic READY True), order-service published `order.placed` and
+  notification-service consumed it in ~2s. One bug fixed en route: the
+  rewrite of notification-service's `config.py` had dropped the
+  `database_url` property `db.py` depends on → AttributeError CrashLoopBackOff;
+  restored it (no relock, just rebuild). **Count: 118 → 119.**
+
+- 📝 **r25-docs** (2026-05-22) — documentation iteration ahead of r25b (no
+  code). Added the §17 "Contracts, the registry, and the catalog" section
+  explaining the contract/metadata architecture (Apicurio as a multi-format
+  registry holding all four protocols' contracts; runtime vs discovery
+  contracts; OpenMetadata layered on top building lineage; the sequencing
+  rationale), plus two diagrams — `17-capstone-contracts.svg` (relationships)
+  and `17-capstone-contract-flow.svg` (runtime vs discovery flow), each with
+  an Excalidraw companion. Recorded **CAP-018** (contract/metadata
+  architecture + multi-iteration plan: r25b Avro runtime → discovery-contracts
+  publish → r27 OpenMetadata). The section is explicit that, as written,
+  events are still ad-hoc JSON and neither Apicurio nor OpenMetadata is
+  deployed — it describes the destination so the iterations can correct it
+  against reality. No verified-fact change (documentation): holds at **119**.

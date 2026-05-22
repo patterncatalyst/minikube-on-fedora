@@ -571,6 +571,62 @@ Status values: **accepted**, **superseded by CAP-NNN**,
   `notifications` table with Alembic migrations, retiring `create_all` for
   that service (CAP-004).
 
+## CAP-018 — Contract/metadata architecture: multi-format Apicurio, OpenMetadata on top
+
+- **Date:** r25 (documentation iteration, ahead of r25b implementation)
+- **Status:** accepted (architecture + sequencing); implemented across
+  r25b → r27
+- **Context:** The mesh now speaks four protocols, each of which is a
+  contract. A data mesh needs those contracts stored, versioned,
+  compatibility-checked, and discoverable — and needs lineage over them. We
+  documented the target architecture now (prose + two diagrams in §17) so the
+  iterations can correct it against reality rather than back-filling
+  explanation at the end.
+- **Decisions:**
+  - **Apicurio as a multi-format registry holding all four contracts.** Not
+    just Avro/Kafka — Apicurio stores each protocol's contract as its native
+    artifact type: **Avro** (Kafka events), **Protobuf** (gRPC defs),
+    **OpenAPI** (REST, from FastAPI `/openapi.json`), **GraphQL SDL**
+    (gateway). One registry, every contract.
+  - **Runtime vs discovery contracts.** Avro events are a *runtime*
+    contract — producer/consumer serialize against the registry, the event
+    won't encode/decode without it (gRPC Protobuf is similar in spirit,
+    compiled ahead of time). OpenAPI and SDL are *discovery* contracts —
+    published as source-of-truth, but nothing fails at runtime if absent;
+    they exist for humans, CI breaking-change checks, and catalog ingestion.
+  - **Avro for events, Protobuf stays for gRPC.** Each is conventional in its
+    domain (Avro is the polished Kafka-registry path; Protobuf is gRPC's
+    native IDL and reuses the `buf` tooling from CAP-013). Both live in the
+    registry; the event format being distinct from the gRPC format is fine.
+  - **OpenMetadata layered on top, ingesting from Apicurio + Postgres +
+    Kafka.** Apicurio is the *contract* metadata; OpenMetadata is the
+    *lineage/discovery* metadata derived from it (plus CNPG Postgres schemas
+    and Strimzi topics), assembling the who-produces/who-consumes graph.
+  - **Sequencing rationale:** Apicurio before OpenMetadata, because a catalog
+    with nothing to catalog is empty — the registry must hold contracts
+    before the catalog can ingest them. And within the registry work, the
+    runtime path (Avro event) before the discovery path (publishing
+    OpenAPI/Protobuf/SDL), because the runtime path is load-bearing and
+    independently verifiable.
+- **Implementation plan (multi-iteration, one concern at a time):**
+  - **r25b** — deploy Apicurio; move `order.placed` from ad-hoc JSON to a
+    registered **Avro** schema; producer/consumer validate against it (the
+    runtime contract).
+  - **discovery-contracts follow-on** — publish OpenAPI (each FastAPI
+    service), Protobuf (the `.proto` defs), and GraphQL SDL into Apicurio as
+    the artifacts OpenMetadata will ingest.
+  - **r27** — deploy OpenMetadata; ingest Apicurio + Postgres + Kafka; build
+    lineage.
+- **Consequences:**
+  - (+) Single source of contract truth across all protocols; clean
+    separation of contract metadata (Apicurio) from lineage metadata
+    (OpenMetadata)
+  - (+) Documented destination lets iterations correct the explanation
+    against what's actually built
+  - (−) Several distinct registration mechanisms (Avro serde, proto upload,
+    OpenAPI/SDL publish) — hence split across iterations rather than one big
+    step
+
 ---
 
 ## Decisions inherited from r19 (PRD planning)
