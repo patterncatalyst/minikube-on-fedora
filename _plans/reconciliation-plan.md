@@ -2824,7 +2824,7 @@ final reader shouldn't see. Items:
   count → **126** (r25c's 125 plus "OpenMetadata deployed, Postgres-backed,
   serving"). **r27b** follows: register Postgres + Kafka, run ingestion Jobs,
   declare cross-product lineage.
-- 🔲 **r27b** (2026-05-22) — populate the catalog and declare cross-product
+- ✅ **r27b** (2026-05-22) — populate the catalog and declare cross-product
   lineage (CAP-023). Ships, under `examples/17-capstone/openmetadata/ingestion/`:
   `postgres.yaml` and `kafka.yaml` (the two `metadata ingest` workflow configs —
   Postgres pointed at `capstone-postgres-rw` as the `capstone_app` role scoped to
@@ -2853,14 +2853,15 @@ final reader shouldn't see. Items:
   (the only thing CI exercises) — the new §17 prose carries no Go-template
   `{{ }}` so no `{% raw %}` wrap is needed (r10a trap not triggered).
 
-  **Cluster verification pending** (Fedora 44, user-run): `scripts/setup-openmetadata.sh`
-  (r27, done) → app deployed with at least one order placed → `scripts/ingest-openmetadata.sh`
-  → `demos/smoke-om-lineage.sh`. **Expected live-fix risk** — the analog of r27's
-  secret-wiring cycles — is the OpenMetadata 1.12.8 API/connector specifics:
-  Postgres `authType.password`/`sslMode`, Kafka `bootstrapServers`/`MessagingMetadata`,
-  the basic-auth login shape, the lineage `PUT` payload, and the lineage-by-name
-  response shape. Every such spot is flagged `VERIFY-POINT` in its file. Promote to
-  `verified (Fedora 44)` and bump the verified count to **127** ("catalog populated;
-  cross-product lineage orders → order-placed → notifications browsable") once the
-  smoke passes on hardware. **r27c** follows: Apicurio ingestion + schema-registry
-  linkage.
+  **Verified on Fedora 44** — `scripts/ingest-openmetadata.sh` ran all three
+  Jobs to completion first try, and `demos/smoke-om-lineage.sh` passed every
+  assertion: both services present (`capstone-postgres` Database,
+  `capstone-kafka` Messaging), the three spine entities cataloged, and the
+  `order-placed` topic carrying exactly one upstream edge (orders) and one
+  downstream edge (notifications). **Notably, every flagged `VERIFY-POINT` held
+  as written** — the OM 1.12.8 Postgres/Kafka connector keys, the basic-auth
+  login shape, the lineage `PUT` payload, and the lineage-by-name response shape
+  all matched on the first live run, so unlike r27 (three secret-wiring fix
+  cycles) r27b needed no live fixes. Verified count → **127** ("catalog
+  populated; cross-product lineage orders → order-placed → notifications
+  browsable"). **r27c** follows: Apicurio ingestion + schema-registry linkage.

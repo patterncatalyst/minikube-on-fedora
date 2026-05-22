@@ -894,9 +894,8 @@ first install.
 ## CAP-023 — Catalog ingestion + cross-product lineage: one-off Jobs, app-role read, bare Kafka, explicit lineage via the REST API
 
 - **Date:** r27b
-- **Status:** accepted (packaging + wiring decisions); the OpenMetadata 1.12.8
-  API/connector specifics carry unverified risk until the live run (see
-  consequences)
+- **Status:** accepted (packaging + wiring decisions); **verified on Fedora 44,
+  r27b** — every API/connector verify-point held first try (see Outcome)
 - **Context:** r27 (CAP-022) deployed OpenMetadata but left the catalog empty of
   mesh content. CAP-018 set the destination — the catalog ingests from Postgres
   + Kafka (+ Apicurio) and represents cross-product lineage. CAP-022 already
@@ -974,6 +973,21 @@ first install.
     in the file that contains it.
   - (−) Kafka topics carry no schema link yet (decision C); Apicurio ingestion
     and the registry linkage are r27c.
+
+### Outcome (verified on Fedora 44, r27b)
+
+Green first try. `ingest-openmetadata.sh` ran all three Jobs to completion and
+`smoke-om-lineage.sh` passed every assertion — both services, the three spine
+entities, and the topic's one-upstream/one-downstream lineage. The flagged
+verification risk did **not** materialize: the OM 1.12.8 Postgres connector
+(`authType.password`, `sslMode: require` against CNPG), the bare Kafka connector
+(`bootstrapServers` + `MessagingMetadata`), the admin basic-auth login, the
+lineage `PUT /api/v1/lineage` payload, and the `GET /api/v1/lineage/topic/name/{fqn}`
+response shape all matched as written. Unlike r27 (three secret-wiring fix
+cycles), r27b needed no live fixes. Worth noting against the project-wide "static
+checks miss cluster-only failures" pattern: this time the cluster agreed with the
+offline-authored configs on the first run — the verify-point flags were
+appropriate caution, not a deferred bug.
 
 ---
 
