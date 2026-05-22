@@ -1,0 +1,50 @@
+# job-lineage.yaml — one-off Job that declares the cross-product lineage.
+#
+# Runs LAST (after om-ingest-postgres and om-ingest-kafka complete), because
+# the three entities it links must already exist in the catalog. Fetches an
+# admin token, exports it as OM_JWT, and runs lineage.py, which resolves the
+# three FQNs to ids and PUTs the two directed edges
+# (orders -> order-placed -> notifications). Idempotent.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: om-declare-lineage
+  namespace: capstone
+  labels:
+    app.kubernetes.io/part-of: capstone
+    app.kubernetes.io/component: openmetadata-ingestion
+    capstone.ingestion/source: lineage
+spec:
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/part-of: capstone
+        app.kubernetes.io/component: openmetadata-ingestion
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: declare-lineage
+          image: docker.io/openmetadata/ingestion:1.12.8
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+              echo "==> obtaining OpenMetadata token (admin login, in-cluster)"
+              export OM_JWT="$(python3 /opt/ingestion/get_token.py)"
+              echo "==> declaring cross-product lineage"
+              python3 /opt/ingestion/lineage.py
+          env:
+            - name: OM_HOST
+              value: http://openmetadata:8585
+            - name: OM_ADMIN_PASSWORD
+              value: admin            # demo default (r27); not a real secret
+          volumeMounts:
+            - name: ingestion-config
+              mountPath: /opt/ingestion
+              readOnly: true
+      volumes:
+        - name: ingestion-config
+          configMap:
+            name: om-ingestion-config

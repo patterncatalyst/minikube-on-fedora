@@ -891,6 +891,90 @@ invisible to Claude's static checks and only appears in-cluster. A
 exists with the right shape" pre-flight would have caught all three before the
 first install.
 
+## CAP-023 — Catalog ingestion + cross-product lineage: one-off Jobs, app-role read, bare Kafka, explicit lineage via the REST API
+
+- **Date:** r27b
+- **Status:** accepted (packaging + wiring decisions); the OpenMetadata 1.12.8
+  API/connector specifics carry unverified risk until the live run (see
+  consequences)
+- **Context:** r27 (CAP-022) deployed OpenMetadata but left the catalog empty of
+  mesh content. CAP-018 set the destination — the catalog ingests from Postgres
+  + Kafka (+ Apicurio) and represents cross-product lineage. CAP-022 already
+  pre-decided the *mechanism*: ingestion runs as one-off Kubernetes Jobs
+  (`openmetadata/ingestion` running `metadata ingest -c <yaml>`), not Airflow,
+  not the k8s pipeline client. r27b decides how those Jobs are *packaged and
+  wired*, and how lineage is declared. Apicurio ingestion is explicitly out of
+  scope (deferred to r27c) — r27b ingests Postgres + Kafka and declares the
+  spine.
+- **Decisions:**
+  - **(A) Job packaging: kubectl-applied Jobs, not Helm.** The ingestion
+    workflow configs (`postgres.yaml`, `kafka.yaml`) plus two helper scripts
+    (`get_token.py`, `lineage.py`) ship under `openmetadata/ingestion/`,
+    delivered as a single ConfigMap (`om-ingestion-config`) that all three Jobs
+    mount read-only at `/opt/ingestion`. `scripts/ingest-openmetadata.sh`
+    creates the ConfigMap and runs the Jobs in sequence, deleting any prior Job
+    of each name before applying. *Rejected:* a Helm subchart of Jobs — a Job's
+    pod template is immutable, and these are meant to be re-run, so `helm
+    upgrade` would fight us. Same reasoning as CAP-021's init-container-vs-hook
+    call: long-lived resources go through Helm, one-off re-runnable Jobs are
+    cleaner as kubectl-applied manifests driven by a script (mirroring how
+    `setup-openmetadata.sh` does its kubectl provisioning).
+  - **(B) Postgres read credential: reuse the `capstone_app` role.** The CNPG
+    app role owns every service schema (it created them — CAP-003), so one
+    credential reads them all; the password comes from the existing
+    `capstone-postgres-app` secret via `secretKeyRef`. No new role, no
+    superuser. Ingestion is scoped to the `capstone` database, so the
+    `openmetadata` operational database is never touched — the catalog does not
+    catalog itself.
+  - **(C) Kafka ingestion is bare — no schema registry.** The Kafka connector
+    gets bootstrap servers only (`capstone-kafka-kafka-bootstrap:9092`); topics
+    are cataloged as entities, but their Avro schemas are not linked. Wiring
+    `schemaRegistryURL` at Apicurio's ccompat endpoint *would* enrich
+    `order-placed` with its registered `order-placed-value` schema — but that is
+    exactly the long-pending "Apicurio connector vs REST" question, which
+    belongs with proper Apicurio ingestion (r27c), not bolted onto r27b. Keeping
+    Kafka bare keeps Apicurio out of this iteration's scope.
+  - **(D) Lineage is declared explicitly via the REST API, not inferred.**
+    OpenMetadata derives lineage automatically only from query logs / dbt, which
+    the capstone has none of, and the spine crosses entity types
+    (Table → Topic → Table), which the first-class lineage API handles cleanly.
+    `lineage.py` resolves the three FQNs to ids and `PUT`s two directed edges
+    (`PUT /api/v1/lineage`). It runs as the *third* Job, after the Postgres and
+    Kafka Jobs, because the entities must exist to be linked. *Rejected:* a
+    custom-lineage ingestion YAML — keeps the `metadata ingest` idiom but its
+    Topic↔Table support is shakier than the API. Both stay stdlib-only Python in
+    the ingestion image, so no dependency is added.
+  - **Auth refinement (supersedes the "ingestion-bot JWT" phrasing in the r27b
+    plan):** the Jobs authenticate by **admin login**
+    (`POST /api/v1/users/login` → `accessToken`), not by retrieving the
+    ingestion-bot's stored JWT. Reading the bot's auth mechanism needs admin
+    credentials anyway, so logging in as admin and using that token directly is
+    strictly simpler and self-contained — no extra secret, no host-side token
+    plumbing. Each Job fetches its own token in-cluster via `get_token.py`. The
+    ingestion-bot path remains the production alternative for unattended
+    pipelines.
+  - **The spine (the demonstrable payoff of the whole CAP-018 arc):**
+    `capstone-postgres.capstone.orders.orders` (Table, order-service) →
+    `capstone-kafka.order-placed` (Topic) →
+    `capstone-postgres.capstone.notifications.notifications` (Table,
+    notification-service). The first time the mesh's cross-product data flow is
+    queryable metadata rather than tribal knowledge.
+- **Consequences:**
+  - (+) The catalog now holds the mesh's tables and topics, with the
+    cross-product lineage explicit and browsable — CAP-018's destination
+    reached for Postgres + Kafka.
+  - (+) Ingestion is re-runnable and legible (three Jobs, plain manifests,
+    stdlib helpers); no orchestrator, no new dependency, no committed secret.
+  - (−) **The OpenMetadata 1.12.8 API/connector specifics are the verification
+    risk** — the Postgres `authType.password`/`sslMode` keys, the Kafka
+    `bootstrapServers`/`MessagingMetadata` keys, the basic-auth login shape, the
+    lineage PUT payload, and the lineage-by-name response shape are not
+    renderable offline. This is r27b's analog of r27's secret-wiring cycles;
+    expect at least one live fix cycle. Every such spot is flagged `VERIFY-POINT`
+    in the file that contains it.
+  - (−) Kafka topics carry no schema link yet (decision C); Apicurio ingestion
+    and the registry linkage are r27c.
+
 ---
 
 ## Decisions inherited from r19 (PRD planning)
@@ -920,9 +1004,12 @@ Restated here so the decision log is the single source of truth.
   (CAP-021). Other services keep `create_all` until they need to evolve.
 - **GraphQL gateway scaling** — single replica assumed; revisit
   if demos need more.
-- **OpenMetadata ingestion mechanism** — official Apicurio
-  connector vs OpenMetadata REST API ingestion. Resolve at r27
-  when OpenMetadata lands.
+- **OpenMetadata ingestion mechanism** — *partly resolved (CAP-023, r27b):*
+  Postgres + Kafka are ingested via one-off Jobs and lineage is declared via the
+  REST API. The remaining open question is narrowed to **Apicurio/schema-registry
+  linkage** — the official Apicurio connector vs publishing contracts through the
+  REST API, and whether to wire the Kafka connector's `schemaRegistryURL` at
+  Apicurio's ccompat endpoint. Deferred to **r27c** (Apicurio ingestion).
 
 ### r26 design intent — KEDA + Istio as data-mesh capabilities (not bolted on)
 

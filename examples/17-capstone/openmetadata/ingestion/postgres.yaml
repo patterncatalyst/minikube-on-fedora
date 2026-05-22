@@ -1,0 +1,62 @@
+# postgres.yaml — OpenMetadata ingestion workflow: the capstone Postgres source.
+#
+# Run by the openmetadata/ingestion image as `metadata ingest -c <this>`,
+# inside a one-off Kubernetes Job (CAP-022 chose Jobs over Airflow; CAP-023
+# packages them). This catalogs every service schema in the `capstone`
+# database — orders, notifications, and the other domain products — as Table
+# entities under a single Database Service named `capstone-postgres`.
+#
+# Two placeholders are substituted by the Job at runtime, NOT stored here:
+#   __PG_PASSWORD__  ← key `password` of the CNPG secret `capstone-postgres-app`
+#   __OM_JWT__       ← an admin bearer token the Job fetches in-cluster
+# Keeping them out of the file means no credential is committed to the repo or
+# baked into the ConfigMap.
+#
+# Connection facts (all verified against the capstone charts):
+#   * read-write Service  capstone-postgres-rw:5432
+#   * database            capstone
+#   * login role          capstone_app  (owns every service schema — CAP-003 —
+#                          so one role reads them all)
+#
+# VERIFY-POINTS (OpenMetadata 1.12.8 connector schema; confirm at build time —
+# these key paths are not renderable offline):
+#   * `authType.password` is the 1.1+ shape; older docs show a bare `password`.
+#   * `sslMode: require` matches what the server uses against CNPG's
+#     self-signed cert. If ingestion can't connect, try `prefer` then `disable`
+#     (same fallback ladder as om-app-values.yaml's dbParams).
+
+source:
+  type: postgres
+  serviceName: capstone-postgres
+  serviceConnection:
+    config:
+      type: Postgres
+      username: capstone_app
+      authType:
+        password: __PG_PASSWORD__
+      hostPort: capstone-postgres-rw:5432
+      database: capstone
+      sslMode: require
+  sourceConfig:
+    config:
+      type: DatabaseMetadata
+      # Ingest only the product schemas; skip Postgres' own system schemas.
+      # (The `openmetadata` operational database is a separate database and is
+      # never reached because `database: capstone` scopes ingestion to one db —
+      # the catalog does not catalog itself.)
+      schemaFilterPattern:
+        excludes:
+          - information_schema
+          - pg_catalog
+          - pg_toast.*
+
+sink:
+  type: metadata-rest
+  config: {}
+
+workflowConfig:
+  openMetadataServerConfig:
+    hostPort: http://openmetadata:8585/api
+    authProvider: openmetadata
+    securityConfig:
+      jwtToken: __OM_JWT__

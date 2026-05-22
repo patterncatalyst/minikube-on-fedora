@@ -1,0 +1,54 @@
+# kafka.yaml — OpenMetadata ingestion workflow: the capstone Kafka source.
+#
+# Run by the openmetadata/ingestion image as `metadata ingest -c <this>`,
+# inside a one-off Job. Catalogs the Strimzi cluster's topics as Topic entities
+# under a Messaging Service named `capstone-kafka`.
+#
+# DECISION C (CAP-023): BARE ingestion — bootstrap servers only, no schema
+# registry. Topics are discovered as entities; their Avro schemas are NOT
+# linked yet. Pointing `schemaRegistryURL` at Apicurio's ccompat endpoint would
+# enrich `order-placed` with its registered `order-placed-value` schema, but
+# that is exactly the deferred Apicurio-ingestion decision — resolved in r27c,
+# not here. Keeping Kafka bare keeps Apicurio out of r27b's scope.
+#
+# One placeholder is substituted by the Job at runtime:
+#   __OM_JWT__  ← an admin bearer token the Job fetches in-cluster
+#
+# Connection fact (verified against the kafka subchart and the services'
+# config): the Strimzi plain listener is reachable in-cluster at
+#   capstone-kafka-kafka-bootstrap:9092
+#
+# VERIFY-POINT (OpenMetadata 1.12.8 Kafka connector schema; confirm at build
+# time): `bootstrapServers` and `MessagingMetadata` are the expected keys; the
+# topic filter syntax (`topicFilterPattern.includes`) is stable across 1.x but
+# worth a glance against the 1.12.8 docs.
+
+source:
+  type: kafka
+  serviceName: capstone-kafka
+  serviceConnection:
+    config:
+      type: Kafka
+      bootstrapServers: capstone-kafka-kafka-bootstrap:9092
+      # schemaRegistryURL deliberately omitted (decision C — bare). The
+      # consumer-side runtime contract still lives in Apicurio; the catalog
+      # link to it is r27c's job.
+  sourceConfig:
+    config:
+      type: MessagingMetadata
+      # The capstone has one topic today; an explicit include keeps the catalog
+      # tidy and makes the lineage spine obvious. Drop the filter to ingest all.
+      topicFilterPattern:
+        includes:
+          - order-placed
+
+sink:
+  type: metadata-rest
+  config: {}
+
+workflowConfig:
+  openMetadataServerConfig:
+    hostPort: http://openmetadata:8585/api
+    authProvider: openmetadata
+    securityConfig:
+      jwtToken: __OM_JWT__

@@ -888,6 +888,53 @@ carrying to any chart of this size: before installing, render it and list every
 secret it both *creates* and *references*, and make sure each one exists with the
 shape the chart expects. The decision log records the specifics.
 
+## Pointing ingestion at the sources, and declaring the lineage
+
+A deployed catalog is an empty catalog until something feeds it. OpenMetadata's
+model is pull-based: you describe a source — a database, a message broker — and
+an *ingestion workflow* connects to it, reads its metadata, and writes entities
+back through the server's API. Because the deploy runs no orchestrator (the
+Airflow tier was the first thing dropped), each workflow runs as a plain,
+one-off Kubernetes Job built on the `openmetadata/ingestion` image, which
+carries the `metadata` CLI. A Job mounts its workflow config, fetches a token,
+and runs `metadata ingest -c <config>`. There is no scheduler to keep alive
+between runs; you re-run the Job when you want to refresh.
+
+Two sources feed the catalog here. The first is Postgres. The workflow points at
+the same CloudNativePG read-write Service the services use, authenticating as the
+application role — and because that one role owns every service's schema (one
+database, a schema per product), a single connection catalogs them all. The
+scope is the `capstone` database only, so the catalog never wanders into
+OpenMetadata's own operational store. The result is a Database Service whose
+tables are the products' tables: orders, notifications, and the rest. The second
+is Kafka. That workflow needs only the broker's bootstrap address; it discovers
+the topics and records them as a Messaging Service. It stops there deliberately —
+the topics' Avro schemas live in the registry, and linking the catalog to the
+registry is a later, separate step. Keeping this pass to broker-and-topics keeps
+the concern small.
+
+Ingestion gives you an inventory: these tables exist, these topics exist. What it
+does not give you is the relationship *between* them — that an order written to
+one product's table becomes an event on a topic that a different product consumes
+into its own table. That flow is real, it crosses product boundaries, and it is
+exactly the thing a mesh catalog exists to make visible. OpenMetadata can infer
+lineage from query logs, but there are none here; and this flow runs from a table
+to a topic to a table, across entity types. So you declare it, using the
+catalog's first-class lineage API: two directed edges that spell out the spine.
+
+> orders (Postgres table) → order-placed (Kafka topic) → notifications (Postgres table)
+
+The first edge is order-service's producer relationship; the second is
+notification-service's consumer relationship. A third Job declares them, after
+the two ingestion Jobs, because you can only link entities that already exist.
+The whole sequence is one script — `scripts/ingest-openmetadata.sh` runs the
+three Jobs in order and waits for each — and `demos/smoke-om-lineage.sh` proves
+the outcome over the API: both services present, the three entities cataloged,
+and the topic carrying an upstream edge from orders and a downstream edge to
+notifications. Open the topic's Lineage tab in the UI and the cross-product flow
+is drawn for you. That picture — assembled from the products' own ground truth,
+not hand-maintained — is what the contract-and-catalog arc was building toward.
+
 ## What the capstone builds, and what's still ahead
 
 The capstone assembles a small but complete data mesh: five domain services
@@ -899,13 +946,14 @@ reads, and Kafka events for the asynchronous order→notification flow.
 Postgres is managed by the CloudNativePG operator and Kafka by the Strimzi
 operator, all running rootless on a dedicated minikube profile.
 
-Still ahead, layered on this foundation: a schema registry (Apicurio) to give
-every protocol's contract a versioned home, a data catalog (OpenMetadata) to
-turn the contracts and data sources into lineage, autoscaling and traffic
+Still ahead, layered on this foundation: autoscaling and traffic
 management (KEDA and Istio), an observability stack (OpenTelemetry,
 Prometheus, Grafana, Tempo), and scheduled cross-service orchestration
-(Prefect). Each lands as its own focused, independently verifiable increment —
-the same rhythm the protocol work has followed.
+(Prefect). The contract-and-catalog layer is now in place — a schema registry
+(Apicurio) gives every protocol's contract a versioned home, and the data
+catalog (OpenMetadata) turns the Postgres schemas and Kafka topics into
+browsable, lineage-bearing metadata. Each increment lands the same way: focused
+and independently verifiable — the rhythm the protocol work has followed.
 
 ## References
 

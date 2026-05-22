@@ -1,0 +1,55 @@
+# job-kafka.yaml — one-off Job that runs the Kafka ingestion workflow.
+#
+# Same shape as job-postgres.yaml: mounts om-ingestion-config, fetches an admin
+# token, injects it into a writable copy of kafka.yaml, runs `metadata ingest`.
+# No database password is needed (Kafka ingestion is bare — decision C).
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: om-ingest-kafka
+  namespace: capstone
+  labels:
+    app.kubernetes.io/part-of: capstone
+    app.kubernetes.io/component: openmetadata-ingestion
+    capstone.ingestion/source: kafka
+spec:
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/part-of: capstone
+        app.kubernetes.io/component: openmetadata-ingestion
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: ingest
+          image: docker.io/openmetadata/ingestion:1.12.8
+          command:
+            - /bin/bash
+            - -c
+            - |
+              set -euo pipefail
+              echo "==> obtaining OpenMetadata token (admin login, in-cluster)"
+              export OM_JWT="$(python3 /opt/ingestion/get_token.py)"
+              echo "==> injecting token into a writable workflow config"
+              python3 - <<'PY'
+              import os
+              t = open("/opt/ingestion/kafka.yaml").read()
+              t = t.replace("__OM_JWT__", os.environ["OM_JWT"])
+              open("/tmp/kafka.yaml", "w").write(t)
+              PY
+              echo "==> running Kafka ingestion"
+              metadata ingest -c /tmp/kafka.yaml
+          env:
+            - name: OM_HOST
+              value: http://openmetadata:8585
+            - name: OM_ADMIN_PASSWORD
+              value: admin            # demo default (r27); not a real secret
+          volumeMounts:
+            - name: ingestion-config
+              mountPath: /opt/ingestion
+              readOnly: true
+      volumes:
+        - name: ingestion-config
+          configMap:
+            name: om-ingestion-config

@@ -2824,3 +2824,43 @@ final reader shouldn't see. Items:
   count → **126** (r25c's 125 plus "OpenMetadata deployed, Postgres-backed,
   serving"). **r27b** follows: register Postgres + Kafka, run ingestion Jobs,
   declare cross-product lineage.
+- 🔲 **r27b** (2026-05-22) — populate the catalog and declare cross-product
+  lineage (CAP-023). Ships, under `examples/17-capstone/openmetadata/ingestion/`:
+  `postgres.yaml` and `kafka.yaml` (the two `metadata ingest` workflow configs —
+  Postgres pointed at `capstone-postgres-rw` as the `capstone_app` role scoped to
+  the `capstone` db; Kafka bare at `capstone-kafka-kafka-bootstrap:9092`, topics
+  only, no registry per decision C), `get_token.py` (stdlib admin-login → bearer
+  token, run in-cluster by each Job), `lineage.py` (stdlib; resolves the three
+  FQNs to ids and `PUT`s the two edges), and `job-postgres.yaml` /
+  `job-kafka.yaml` / `job-lineage.yaml` (one-off Jobs on
+  `openmetadata/ingestion:1.12.8`, mounting a shared `om-ingestion-config`
+  ConfigMap, injecting secrets via Python not sed). Plus
+  `scripts/ingest-openmetadata.sh` (creates the ConfigMap, runs the three Jobs in
+  order with delete-then-apply for re-runnability, waits on each) and
+  `demos/smoke-om-lineage.sh` (asserts both services, the three spine entities,
+  and an upstream+downstream edge on the `order-placed` topic, over the API).
+  The spine: `capstone-postgres.capstone.orders.orders` → `capstone-kafka.order-placed`
+  → `capstone-postgres.capstone.notifications.notifications`. Decision **CAP-023**
+  recorded; the long-pending "ingestion mechanism" decision narrowed to
+  Apicurio/registry linkage (deferred r27c); §17 gained the "Pointing ingestion
+  at the sources, and declaring the lineage" section and its closer updated
+  (catalog + lineage now in place).
+
+  **Validated statically** (Claude env — no cluster/network): all Job YAML and
+  both workflow YAML parse; the embedded Python heredocs de-indent to column-0
+  and compile; `get_token.py` and `lineage.py` compile; both shell scripts pass
+  `bash -n`. CI (`gh run watch` after push) confirms the Jekyll site still builds
+  (the only thing CI exercises) — the new §17 prose carries no Go-template
+  `{{ }}` so no `{% raw %}` wrap is needed (r10a trap not triggered).
+
+  **Cluster verification pending** (Fedora 44, user-run): `scripts/setup-openmetadata.sh`
+  (r27, done) → app deployed with at least one order placed → `scripts/ingest-openmetadata.sh`
+  → `demos/smoke-om-lineage.sh`. **Expected live-fix risk** — the analog of r27's
+  secret-wiring cycles — is the OpenMetadata 1.12.8 API/connector specifics:
+  Postgres `authType.password`/`sslMode`, Kafka `bootstrapServers`/`MessagingMetadata`,
+  the basic-auth login shape, the lineage `PUT` payload, and the lineage-by-name
+  response shape. Every such spot is flagged `VERIFY-POINT` in its file. Promote to
+  `verified (Fedora 44)` and bump the verified count to **127** ("catalog populated;
+  cross-product lineage orders → order-placed → notifications browsable") once the
+  smoke passes on hardware. **r27c** follows: Apicurio ingestion + schema-registry
+  linkage.
