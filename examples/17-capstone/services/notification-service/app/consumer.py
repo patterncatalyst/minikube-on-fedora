@@ -1,35 +1,38 @@
 """Kafka consumer for notification-service.
 
-r25 consumed ad-hoc JSON. r25b consumes registered **Avro**: each message is
-in the Confluent Wire Format (magic + schema id + Avro bytes), and the
-consumer fetches the writer schema from Apicurio by that id to decode it (see
-`avro_serde.py`). The consumer holds no local copy of the schema — it learns
-it from the registry, which is the point of a runtime contract.
+Consumes registered **Avro** `order.placed` events (Confluent Wire Format;
+the writer schema is fetched from Apicurio by the id in each message — see
+`avro_serde.py`) and **persists** each one to the `notifications` table.
+
+r25c change: received events are now written to Postgres (the `notifications`
+table created by Alembic), replacing the in-memory list. The benefit is real
+durability — a notification survives a pod restart, which the in-memory
+version did not.
+
+At-least-once delivery (Kleppmann, DDIA): Kafka can redeliver, so the write is
+idempotent — an INSERT ... ON CONFLICT DO NOTHING keyed by the unique
+`order_id` makes a redelivery a no-op rather than a duplicate row.
 
 Managed Lifecycle: the consumer runs as a background asyncio task started and
 cancelled by the app lifespan.
-
-At-least-once delivery (Kleppmann, DDIA): Kafka can redeliver, so the consumer
-is idempotent — keyed by `order_id`, a redelivery overwrites rather than
-duplicates. (r25 keeps received events in memory — a deliberate stand-in; the
-real `notifications` table + Alembic arrive in a follow-on.)
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
-from collections import OrderedDict
 
 from aiokafka import AIOKafkaConsumer
+from sqlalchemy import desc, select
+from sqlalchemy.dialects.postgresql import insert as pg_insert
 
 from app.avro_serde import AvroRegistrySerde
 from app.config import settings
+from app.db import SessionLocal
+from app.models import Notification
 
 logger = logging.getLogger("notification-service.consumer")
 
-_MAX_KEEP = 100
-_received: "OrderedDict[str, dict]" = OrderedDict()
 _task: asyncio.Task | None = None
 
 # Consumer-only serde: no local schema; decode() fetches writer schemas by id.
@@ -38,9 +41,49 @@ _serde = AvroRegistrySerde(
     subject=settings.kafka_order_topic,
 )
 
+# Columns we persist (the event fields we know about).
+_FIELDS = ("event_type", "customer_id", "item_sku", "quantity", "amount", "status")
 
-def received_events() -> list[dict]:
-    return list(_received.values())
+
+async def persist_event(event: dict) -> None:
+    """Idempotently insert one consumed event as a notification row."""
+    order_id = event["order_id"]
+    values = {
+        "id": order_id,  # order_id is a stable, unique key — reuse it as PK
+        "order_id": order_id,
+        **{f: event.get(f) for f in _FIELDS},
+    }
+    stmt = (
+        pg_insert(Notification)
+        .values(**values)
+        .on_conflict_do_nothing(index_elements=["order_id"])
+    )
+    async with SessionLocal() as session:
+        await session.execute(stmt)
+        await session.commit()
+
+
+async def recent_notifications(limit: int = 100) -> list[dict]:
+    """Read recent notifications from the table (newest first)."""
+    async with SessionLocal() as session:
+        rows = (
+            await session.execute(
+                select(Notification).order_by(desc(Notification.created_at)).limit(limit)
+            )
+        ).scalars().all()
+    return [
+        {
+            "order_id": r.order_id,
+            "event_type": r.event_type,
+            "customer_id": r.customer_id,
+            "item_sku": r.item_sku,
+            "quantity": r.quantity,
+            "amount": r.amount,
+            "status": r.status,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in rows
+    ]
 
 
 async def _consume_loop() -> None:
@@ -53,7 +96,7 @@ async def _consume_loop() -> None:
     )
     await consumer.start()
     logger.info(
-        "kafka consumer started (topic=%s group=%s, Avro via %s)",
+        "kafka consumer started (topic=%s group=%s, Avro via %s) — persisting to DB",
         settings.kafka_order_topic,
         settings.kafka_group,
         settings.apicurio_url,
@@ -65,12 +108,12 @@ async def _consume_loop() -> None:
             except Exception as exc:  # noqa: BLE001 — bad/undecodable message
                 logger.warning("skipping undecodable message at offset %s: %s", msg.offset, exc)
                 continue
-            order_id = event.get("order_id", f"offset-{msg.offset}")
-            _received[order_id] = event  # idempotent by order_id
-            _received.move_to_end(order_id)
-            while len(_received) > _MAX_KEEP:
-                _received.popitem(last=False)
-            logger.info("received %s for order %s", event.get("event_type"), order_id)
+            try:
+                await persist_event(event)
+            except Exception as exc:  # noqa: BLE001 — surface but keep consuming
+                logger.error("failed to persist event for order %s: %s", event.get("order_id"), exc)
+                continue
+            logger.info("persisted %s for order %s", event.get("event_type"), event.get("order_id"))
     finally:
         await consumer.stop()
         logger.info("kafka consumer stopped")

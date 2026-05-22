@@ -2713,3 +2713,54 @@ final reader shouldn't see. Items:
   + the services up; gateway rebuilt for `/sdl`). Verified count holds at
   **120** until that run passes; then the three discovery artifacts are the
   121st–123rd facts.
+
+- 🔲 **r25c** (2026-05-22) — notification-service's real `notifications` table
+  with Alembic, retiring `create_all` for that service (CAP-021). Ships the
+  `Notification` model (in the `notifications` schema, unique `order_id`), an
+  async Alembic environment (`alembic.ini`, `alembic/env.py` with the
+  `run_sync` bridge + per-service `version_table_schema`,
+  `script.py.mako`, and `versions/0001_create_notifications.py`), a rewired
+  consumer that persists each event idempotently
+  (`INSERT … ON CONFLICT (order_id) DO NOTHING`) instead of holding it in
+  memory, `db.py` with `init_schema()`/`create_all` removed, `main.py` whose
+  lifespan no longer creates schema, `/received` reading from the table,
+  `alembic` added to pyproject, the Containerfile copying `alembic.ini` +
+  `alembic/`, a `migrate` init container in the notification Deployment
+  (`alembic upgrade head`, same image + PG env), and
+  `demos/smoke-notifications.sh` (asserts the migration ran, the table exists,
+  an event is persisted, and it **survives a pod restart**). Decision
+  **CAP-021** recorded; §17 async-spine prose updated.
+
+  **Validated statically** (Claude env — no sqlalchemy/alembic/cluster): all
+  notification modules + `env.py` + the migration `py_compile`; the migration
+  revision identifiers are consistent (`0001_create_notifications`,
+  down=None); the deployment renders to valid YAML with the `migrate` init
+  container (command `alembic upgrade head`, workingDir `/opt/app-root/src`,
+  full PG env) and the app container intact; pyproject parses with
+  `alembic ^1.18`. **Cluster verification pending** on Fedora 44 via
+  `smoke-notifications.sh` (needs `poetry lock`/`install` for alembic, rebuild,
+  Apicurio + Kafka + Postgres up). The async env.py `run_sync` flow, the
+  `pg_insert(...).on_conflict_do_nothing(...)` upsert, and the init-container
+  PATH/cwd resolution are the cluster-only unknowns. Verified count holds at
+  **123** until that run passes; then notification persistence + the migration
+  are the 124th–125th facts.
+
+  **r25c docs addendum** (same iteration): added a §17 subsection "Schema
+  migrations, and two kinds of temporary container" explaining the async
+  Alembic `run_sync` bridge, the per-service `version_table_schema`, and the
+  **Init Container pattern** (cited to *Kubernetes Patterns*, Ibryam & Huss,
+  2nd ed., Chapter 15) — pairing it with **ephemeral containers**
+  (`kubectl debug`) as the on-demand debugging counterpart, motivated honestly
+  by our minimal runtime images (no curl/psql to `exec` with). Ships
+  `demos/debug-ephemeral.sh`, which attaches two ephemeral containers to a live
+  notification-service pod (network-shared `curl localhost:8080/received`, and
+  `--target` process-shared inspection by reading `/proc` directly — no `ps`
+  dependency) and prints what each saw. **User-verified on Fedora 44**: probe 1
+  returned the app's `/received` (`[]` on a fresh pod) from a container whose
+  image has no curl; `--target` confirmed working. Probe 2 initially used `ps`,
+  which is **not** present in `ubi9/ubi` (only `curl` is) — fixed to read
+  `/proc/[0-9]*/comm`, which needs no package and more directly shows the
+  shared PIDs. Lesson (recurring "tool-presence only verifiable in-cluster"):
+  don't assume a base image carries a tool because it carries another; the
+  script now surfaces a probe's terminated reason + exitCode instead of hiding
+  stderr, so a missing tool is never a silent blank again.

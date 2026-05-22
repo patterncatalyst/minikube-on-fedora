@@ -1,0 +1,3 @@
+Async Alembic environment for notification-service. The DB URL is built in
+env.py from the service settings; migrations run via an init container
+(`alembic upgrade head`) before the app starts. See CAP-021.

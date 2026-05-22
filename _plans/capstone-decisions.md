@@ -722,6 +722,60 @@ Status values: **accepted**, **superseded by CAP-NNN**,
 - **Remaining for CAP-018:** OpenMetadata (r27) ingests Apicurio + Postgres +
   Kafka into lineage — the last layer.
 
+## CAP-021 — Alembic migrations via an init container; retire create_all for notification
+
+- **Date:** r25c
+- **Status:** accepted (applies to notification-service; other services keep
+  `create_all` for now)
+- **Context:** CAP-004 chose `Base.metadata.create_all` at startup for the
+  walking skeleton, with Alembic deferred until schema *evolution* mattered.
+  notification-service is the first service to gain a real domain table
+  (`notifications`, persisting consumed events), so it's the right place to
+  introduce Alembic and retire create_all.
+- **Decisions:**
+  - **Alembic, async template.** notification uses the SQLAlchemy 2.0 async
+    engine (asyncpg), so env.py is the `-t async` style with the
+    `connection.run_sync(do_run_migrations)` bridge (the default sync env.py
+    does not work with asyncpg). Migrations themselves are plain sync
+    `op.*` functions — Alembic runs them inside `run_sync` (per Alembic
+    discussion #1208); they are not awaited.
+  - **Run as a Kubernetes init container, not at app startup.** The Deployment
+    gets a `migrate` init container (same image, same DB env) that runs
+    `alembic upgrade head` before the app container starts. This is the
+    idiomatic k8s pattern and is precisely what *retires* create_all: when the
+    app process starts, the schema and table already exist, so the app issues
+    no DDL. `db.py`'s `init_schema()` is removed and the lifespan no longer
+    creates anything.
+    - *Alternative considered:* a Helm pre-install/pre-upgrade hook Job. Also
+      valid; the init container was chosen because it's co-located with the
+      Deployment, re-runs idempotently on every rollout, and needs no separate
+      Job lifecycle. A hook Job becomes attractive once multiple services share
+      migrations or migrations must run exactly once cluster-wide.
+  - **Per-service `alembic_version` in the service's own schema.** One Postgres
+    database, schema per service (CAP-003). The version table goes in the
+    `notifications` schema via `version_table_schema`, so each service keeps an
+    isolated migration history (a shared `public.alembic_version` would
+    collide). env.py `CREATE SCHEMA IF NOT EXISTS` + commits before stamping,
+    since the version table lives in that schema.
+  - **DB URL built in env.py, not via `config.set_main_option`.** Setting the
+    URL through configparser triggers `%` interpolation, which would corrupt a
+    CloudNativePG password containing `%`. env.py builds the async engine
+    directly from `settings.database_url`; `alembic.ini`'s `sqlalchemy.url` is
+    an unused placeholder.
+  - **Idempotent persistence.** The consumer writes each event via
+    `INSERT ... ON CONFLICT (order_id) DO NOTHING` (unique constraint on
+    `order_id`), so Kafka's at-least-once redelivery is a no-op, not a
+    duplicate. `/received` now reads from the table; durability across pod
+    restarts is the observable benefit over the in-memory list.
+- **Consequences:**
+  - (+) Real schema-evolution path for notification; create_all retired there;
+    establishes the Alembic pattern other services can adopt
+  - (+) Migrations run before the app, declaratively, on every rollout
+  - (−) Other services still use create_all (deferred; not yet evolving)
+  - (−) The async env.py + run_sync bridge is non-obvious boilerplate (the
+    documented async pitfalls: sync-only default env, empty autogenerate if
+    models aren't imported, `%` interpolation) — captured in env.py comments
+
 ---
 
 ## Decisions inherited from r19 (PRD planning)

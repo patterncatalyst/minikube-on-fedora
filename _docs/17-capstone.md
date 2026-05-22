@@ -588,14 +588,103 @@ worth knowing:
   broker and controller pools, persistent volumes, replication factor 3, and
   `min.insync.replicas` 2.
 
-For now the consumer keeps received events in memory and exposes them at
-`/received` so the flow is observable. The event itself is now a **registered
-Avro contract** — order-service registers the `order.placed` schema with
-Apicurio and serializes against it, and notification-service fetches that
-schema by id to decode (the next section explains the registry in full). What
-remains to make notification a complete data product is its own
-**`notifications` table with Alembic migrations**, finally retiring the
-startup `create_all` for schema evolution.
+The consumer now **persists** each event to its own `notifications` table and
+exposes the rows at `/received`. The event itself is a **registered Avro
+contract** — order-service registers the `order.placed` schema with Apicurio
+and serializes against it, and notification-service fetches that schema by id
+to decode (the next section explains the registry in full). And the table is
+created and evolved by **Alembic migrations** run in a Kubernetes init
+container (`alembic upgrade head`) before the app starts — which retires the
+startup `create_all` for this service: the app issues no DDL, it just consumes
+and persists. The payoff is durability — a notification now survives a pod
+restart, which the earlier in-memory version did not.
+
+## Schema migrations, and two kinds of temporary container
+
+Up to now every service created its tables with SQLAlchemy's
+`Base.metadata.create_all` at startup. That's fine for a walking skeleton —
+it makes a table that doesn't exist — but it does nothing about a table that
+*already* exists and needs to *change*. The moment a column is added or a
+type changes, `create_all` silently leaves the old shape in place. Real
+schema evolution needs migrations, so notification-service — the first
+service with a domain table worth evolving — switches to **Alembic**.
+
+Two wrinkles are worth calling out, because both cost people time. First, the
+service uses the SQLAlchemy 2.0 **async** engine (asyncpg), and Alembic's
+default generated `env.py` is sync-only — point it at an `asyncpg` URL and it
+fails. The fix is the async template's bridge: build an `AsyncEngine`, then run
+the migration body through `connection.run_sync(...)`, which hands the
+migration a normal synchronous connection underneath. The migration functions
+themselves stay ordinary sync `op.*` calls — they are *not* awaited, because
+Alembic runs them inside that `run_sync` bridge. Second, this is one Postgres
+database with a schema per service (the ownership boundary from earlier), so
+each service keeps its own `alembic_version` table inside its own schema
+(`version_table_schema`) — otherwise every service's migration history would
+collide in a shared `public.alembic_version`. The schema therefore has to
+exist before the version table is stamped, so `env.py` issues a
+`CREATE SCHEMA IF NOT EXISTS` and commits it first.
+
+The more interesting question is *where* the migration runs. Running it inside
+the application's own startup is tempting but wrong: every replica would race
+to migrate, startup and schema-change concerns would be tangled together, and
+a failed migration would look like a failed app. The cloud-native answer is an
+**init container** — the Init Container pattern from *Kubernetes Patterns*
+(Ibryam & Huss, 2nd ed., Chapter 15), which gives initialization tasks a
+lifecycle separate from the main container. notification-service's Deployment
+runs a `migrate` init container — same image, same database credentials — that
+executes `alembic upgrade head` to completion *before* the application
+container starts. Kubernetes guarantees the app container only starts if the
+init container exits zero, so the app can assume its schema is present and
+issue no DDL of its own. This is exactly what lets us delete `create_all` for
+this service: the table is there before the app is.
+
+```yaml
+initContainers:
+  - name: migrate
+    image: "{{ image }}"          # same image as the app
+    workingDir: /opt/app-root/src # where alembic.ini lives
+    command: ["alembic", "upgrade", "head"]
+    env: # same PG_* connection the app uses
+      # ...
+```
+
+That init container does its work and is gone before the app serves its first
+request. Its mirror image — a temporary container you attach to a pod that's
+*already running* — is the **ephemeral container**, added with
+`kubectl debug`. The two bracket the main container's life: the init container
+runs once, before; the ephemeral container appears on demand, during. They
+solve opposite problems, and ephemeral containers solve a problem this project
+deliberately created. Our runtime images are minimal by design — they carry
+the application's virtualenv and nothing else, no `curl`, no `psql`, not even a
+debugger. That keeps the image small and the attack surface narrow, but it
+means you can't just `kubectl exec` into a running pod and poke around; the
+tools aren't there. Rather than bake debug tooling into the production image,
+you attach it temporarily:
+
+```console
+$ POD=$(kubectl get pod -n capstone \
+    -l app.kubernetes.io/name=notification-service \
+    -o jsonpath='{.items[0].metadata.name}')
+
+# Attach a throwaway container that shares the pod's network, and hit the
+# app's own endpoint from inside the pod — even though the app image has no curl:
+$ kubectl debug -n capstone "$POD" -it \
+    --image=registry.access.redhat.com/ubi9/ubi \
+    -- curl -s http://localhost:8080/received
+```
+
+The ephemeral container joins the pod's namespaces — it shares the network, so
+`localhost:8080` *is* the application container — and with `--target` it can
+share the application's process namespace too, letting you inspect the running
+process directly. It has no resources, no probes, and can't be restarted or
+removed; it lives and dies with the debugging session and leaves the pod's real
+containers untouched. (See the Kubernetes documentation on
+[ephemeral containers](https://kubernetes.io/docs/concepts/workloads/pods/ephemeral-containers/)
+and `kubectl debug`.) `demos/debug-ephemeral.sh` runs this against a live
+notification-service pod so you can see it work. It's a small thing, but it
+captures a real cloud-native instinct: keep the running image lean, and reach
+for a temporary container — before startup for setup, or mid-flight for
+debugging — when you need to do something the lean image shouldn't carry.
 
 ## Contracts, the registry, and the catalog
 

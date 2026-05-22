@@ -18,6 +18,37 @@ spec:
         app.kubernetes.io/name: notification-service
         app.kubernetes.io/part-of: capstone
     spec:
+      # Init container runs Alembic migrations before the app starts, so the
+      # `notifications` schema + table exist and the app issues no DDL
+      # (retires create_all — CAP-021). Same image, same DB env as the app.
+      initContainers:
+        - name: migrate
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          workingDir: /opt/app-root/src
+          command: ["alembic", "upgrade", "head"]
+          env:
+            - name: SERVICE_SCHEMA
+              value: {{ .Values.postgres.schema | quote }}
+            - name: PG_HOST
+              value: "{{ .Values.postgres.clusterName }}-rw.{{ .Release.Namespace }}.svc.cluster.local"
+            - name: PG_PORT
+              value: "5432"
+            - name: PG_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgres.appSecret }}
+                  key: dbname
+            - name: PG_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgres.appSecret }}
+                  key: username
+            - name: PG_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.postgres.appSecret }}
+                  key: password
       containers:
         - name: notification-service
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
