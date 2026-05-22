@@ -11,6 +11,18 @@ RUN poetry export --without-hashes --only main -f requirements.txt -o requiremen
     && python -m venv /opt/venv \
     && /opt/venv/bin/pip install --no-cache-dir -r requirements.txt
 
+# r29c: OpenTelemetry auto-instrumentation. Installed with pip into the venv (not
+# poetry) so we don't regenerate poetry.lock for an observability concern.
+# opentelemetry-bootstrap inspects the installed libraries (FastAPI, httpx, grpc)
+# and pulls the matching opentelemetry-instrumentation-* packages;
+# opentelemetry-instrument (wrapping the CMD below) activates them at startup.
+# Spans export to Tempo over OTLP — endpoint/sampling come from env on the
+# Deployment, so this image traces only when those are set.
+RUN /opt/venv/bin/pip install --no-cache-dir \
+        "opentelemetry-distro" \
+        "opentelemetry-exporter-otlp-proto-grpc" \
+    && /opt/venv/bin/opentelemetry-bootstrap -a install
+
 FROM registry.access.redhat.com/ubi9/python-312:latest AS runtime
 WORKDIR /opt/app-root/src
 COPY --from=builder --chown=1001:0 /opt/venv /opt/venv
@@ -22,4 +34,7 @@ ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1
 USER 1001:0
 EXPOSE 8080
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+# r29c: opentelemetry-instrument activates the auto-instrumentations installed
+# above and wraps the ASGI app, then execs uvicorn. A no-op if no OTEL_* env is
+# set (it just runs uvicorn), so the image is safe to run untraced too.
+CMD ["opentelemetry-instrument", "uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]

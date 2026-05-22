@@ -1287,6 +1287,56 @@ none visible offline.
 
 ---
 
+## CAP-029 — Traces source: instrument the gateway with OpenTelemetry (pip-in-image, env-gated, gateway-scoped)
+
+- **Date:** r29c
+- **Status:** accepted; cluster-verification pending (Fedora 44)
+- **Context:** With the trace backend verified (CAP-028), something has to emit
+  spans. The gateway is the entry point for the federated read path, so a single
+  GraphQL query there produces the most instructive trace (HTTP server span +
+  REST client span to order-service + gRPC client span to inventory-service).
+- **Decisions:**
+  - **Auto-instrument via pip-in-Containerfile, not poetry.** The builder
+    `pip install`s `opentelemetry-distro` + `opentelemetry-exporter-otlp-proto-grpc`
+    into the venv and runs `opentelemetry-bootstrap -a install`, which inspects the
+    installed libs (FastAPI, httpx, grpc) and pulls matching instrumentations.
+    Going through pip (not poetry) means NO `poetry.lock` regeneration — important
+    since we can't run `poetry lock` in the build/authoring environment, and it
+    keeps an observability concern out of the app's dependency manifest.
+  - **Wrap the entrypoint** with `opentelemetry-instrument` (CMD becomes
+    `opentelemetry-instrument uvicorn app.main:app ...`). It activates the
+    instrumentations and is a no-op without `OTEL_*` env, so the same image runs
+    untraced.
+  - **Env-gated on the Deployment** (`tracing.enabled`, default true):
+    `OTEL_SERVICE_NAME`, `OTEL_EXPORTER_OTLP_ENDPOINT`
+    (tempo.observability:4317), `OTEL_EXPORTER_OTLP_PROTOCOL=grpc`,
+    traces-only (`OTEL_METRICS/LOGS_EXPORTER=none`), sampler ratio (1.0 for the
+    demo).
+  - **Scoped to the gateway** (not all six services). The async consumers
+    (payment/shipping/notification) aren't on the read path, and uniform
+    auto-instrumentation across heterogeneous services (Kafka consumers, gRPC
+    servers) is uneven — so backends emit no spans yet, and their hops appear as
+    the gateway's *client* spans. Full multi-service traces are a mechanical
+    extension, deliberately deferred.
+- **Files:** services/graphql-gateway/Containerfile (OTEL install + wrapped CMD),
+  graphql-gateway values.yaml (`tracing:` block) + deployment.yaml (OTEL env),
+  demos/smoke-trace-flow.sh, §17 traces paragraph.
+- **Consequences:**
+  - (+) A real distributed trace of the federated query, visible in Grafana's
+    Tempo explorer — the federation section made concrete.
+  - (+) Instrumenting the load-bearing KEDA gateway is low-risk here: the span
+    exporter is async/fire-and-forget (Tempo down ≠ request impact), and the
+    added startup/memory is absorbed by the r28 startupProbe (60s) + KEDA
+    waitTimeout (180s) + 512Mi limit.
+  - (−) Partial coverage: backend server spans are absent until those services
+    are instrumented too.
+  - (−) Unpinned OTEL package versions (bootstrap aligns instrumentation versions
+    to the installed SDK); pin for a fully reproducible image. Instrumentation
+    correctness and the Tempo search format are cluster-only — smoke-trace-flow's
+    trace-found check is therefore best-effort (the HTTP 200 is the hard part).
+
+---
+
 ## Decisions inherited from r19 (PRD planning)
 
 These were resolved during r19 planning and accepted by the user.

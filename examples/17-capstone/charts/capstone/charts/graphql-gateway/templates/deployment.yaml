@@ -36,6 +36,28 @@ spec:
               value: {{ .Values.downstream.orderRestUrl | quote }}
             - name: INVENTORY_GRPC_ADDR
               value: {{ .Values.downstream.inventoryGrpcAddr | quote }}
+            {{- if .Values.tracing.enabled }}
+            # r29c: OpenTelemetry → Tempo. opentelemetry-instrument (the image
+            # entrypoint) reads these; no app code change.
+            - name: OTEL_SERVICE_NAME
+              value: {{ .Values.tracing.serviceName | quote }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: {{ .Values.tracing.otlpEndpoint | quote }}
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: "grpc"
+            - name: OTEL_TRACES_EXPORTER
+              value: "otlp"
+            - name: OTEL_METRICS_EXPORTER
+              value: "none"
+            - name: OTEL_LOGS_EXPORTER
+              value: "none"
+            - name: OTEL_TRACES_SAMPLER
+              value: "parentbased_traceidratio"
+            - name: OTEL_TRACES_SAMPLER_ARG
+              value: {{ .Values.tracing.sampleRatio | quote }}
+            - name: OTEL_RESOURCE_ATTRIBUTES
+              value: "service.namespace=capstone"
+            {{- end }}
           resources:
             requests:
               cpu: {{ .Values.resources.requests.cpu }}

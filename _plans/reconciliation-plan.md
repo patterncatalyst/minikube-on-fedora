@@ -3232,3 +3232,39 @@ final reader shouldn't see. Items:
   provisioned/reachable, Prometheus scraping) — promote both to ✅ once the
   grafana-community re-run is confirmed (count → 132). Then **r29c**: instrument
   the gateway to emit real traces onto this backend.
+
+- 🔲 **r29c** (2026-05-22) — Traces source (CAP-029): graphql-gateway instrumented
+  with OpenTelemetry. Containerfile pip-installs opentelemetry-distro +
+  otlp-proto-grpc and runs `opentelemetry-bootstrap -a install` (auto-detects
+  FastAPI/httpx/grpc), entrypoint wrapped with `opentelemetry-instrument`; OTLP
+  env on the Deployment points at tempo.observability:4317 (env-gated via
+  values.tracing.enabled, so the image also runs untraced). A GraphQL query now
+  yields a distributed trace: gateway server span + order-service REST client
+  span (+ inventory gRPC client span when the order exists). Pip-not-poetry on
+  purpose: no poetry.lock regeneration. Scoped to the gateway; backends emit no
+  spans yet (their hops show as the gateway's client spans). Files:
+  services/graphql-gateway/Containerfile, graphql-gateway values.yaml + deployment
+  (OTEL env), demos/smoke-trace-flow.sh, §17.
+
+  **Validated statically** (Claude env): smoke-trace-flow `bash -n` clean; gateway
+  values parse with the tracing block; deployment template braces balanced (25/25)
+  and if/end matched with 9 OTEL env lines; Containerfile has the OTEL install,
+  bootstrap, and wrapped CMD. OTEL package versions unpinned (bootstrap aligns
+  them). Instrumentation behavior + Tempo search format are cluster-only.
+
+  **Cluster verification pending** (Fedora 44, user-run): rebuild the gateway
+  image so it carries the instrumentation, then redeploy and drive a query:
+    ./scripts/build-image.sh services/graphql-gateway graphql-gateway v1
+    helm upgrade --install graphql-gateway charts/capstone/charts/graphql-gateway -n capstone
+    ./demos/smoke-trace-flow.sh
+  smoke-trace-flow drives a GraphQL query through the interceptor (hard assert:
+  HTTP 200 = gateway ran + exported) and searches Tempo for a graphql-gateway
+  trace (retried; reported, not failed, if indexing lags). Confirm visually in
+  Grafana → Explore → Tempo. On green, promote to ✅ (count → 133). The gateway is
+  KEDA-scaled, so watch the first cold start: startupProbe (60s) + waitTimeout
+  (180s) absorb the added OTEL boot cost; the span exporter is async so a
+  Tempo outage can't affect request handling.
+
+  **Observability arc status:** r29 (metrics) ✅, r29b (traces backend) ✅, r29.2
+  (chart-repo deprecation) ✅, r29c (traces source) pending this rebuild. Optional
+  follow-on: instrument the remaining services for full multi-service traces.

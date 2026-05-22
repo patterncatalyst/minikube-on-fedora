@@ -1086,14 +1086,27 @@ jsonpath='{.data.admin-password}' | base64 -d`. The setup script prints this for
 you.
 
 This is the metrics half of observability, and it stands on its own. The traces
-half has its backend in place too: `setup-observability.sh` also installs Grafana
-Tempo (monolithic mode, receiving OTLP directly — no separate collector, since
-our metrics come from scraping rather than OTLP), and Grafana is wired with a
-Tempo datasource. What's left is the trace *source*: a service has to be
-instrumented to emit spans. Following a single GraphQL query as it fans out from
-the gateway to the order (REST) and inventory (gRPC) services is the trace worth
-having, and it needs the gateway — and ideally its callees — instrumented with
-OpenTelemetry. That's the next increment; the pipeline is ready to receive it.
+half is wired end to end too. `setup-observability.sh` installs Grafana Tempo
+(monolithic mode, receiving OTLP directly — no separate collector, since our
+metrics come from scraping rather than OTLP), and the gateway's image is
+instrumented with OpenTelemetry: its Containerfile pip-installs the OTEL distro
+and runs `opentelemetry-bootstrap`, which detects FastAPI, httpx, and gRPC and
+pulls the matching instrumentations, and its entrypoint is wrapped with
+`opentelemetry-instrument`. With `OTEL_EXPORTER_OTLP_ENDPOINT` pointed at Tempo
+(set on the Deployment), a single GraphQL query becomes a distributed trace: a
+server span for the incoming request, a client span for the REST call to
+order-service, and — when the order exists — a client span for the gRPC stock
+check against inventory-service. The fan-out you read about in the federation
+section is now a picture in Grafana's Tempo explorer. `demos/smoke-trace-flow.sh`
+drives a query through the interceptor and confirms the trace lands; instrumenting
+the remaining services (so their server-side spans join the same trace) is a
+mechanical extension of the same pattern.
+
+Two notes that save confusion. The instrumentation is a no-op without the
+`OTEL_*` env, so the same image runs fine untraced. And spans export
+fire-and-forget over a batch processor — if Tempo is down, the gateway doesn't
+care, which is the right failure mode for telemetry but also why a missing trace
+points at the exporter config or Tempo, never at the request path.
 
 ## What the capstone builds, and what's still ahead
 
@@ -1106,16 +1119,17 @@ reads, and Kafka events for the asynchronous order→notification flow.
 Postgres is managed by the CloudNativePG operator and Kafka by the Strimzi
 operator, all running rootless on a dedicated minikube profile.
 
-Still ahead, layered on this foundation: distributed tracing (Tempo and an
-OpenTelemetry Collector, following a query across services) to complete the
-observability picture, and scheduled cross-service orchestration (Prefect). The
-contract, catalog, traffic-management, autoscaling, and metrics layers are now in
-place — Apicurio versions every contract, OpenMetadata turns schemas and topics
-into browsable lineage, Istio shifts live traffic between contract versions as a
-controlled canary, KEDA scales each product to the demand on it and back to zero
-when idle, and Prometheus plus Grafana make that scaling and the mesh traffic
-visible. Each increment lands the same way: focused and independently
-verifiable — the rhythm the protocol work has followed.
+Still ahead, layered on this foundation: extending tracing across every service
+(only the gateway is instrumented today, so a query's downstream hops show as
+client spans rather than full server-side spans) and scheduled cross-service
+orchestration (Prefect). The contract, catalog, traffic-management, autoscaling,
+metrics, and tracing layers are now in place — Apicurio versions every contract,
+OpenMetadata turns schemas and topics into browsable lineage, Istio shifts live
+traffic between contract versions as a controlled canary, KEDA scales each
+product to the demand on it and back to zero when idle, Prometheus plus Grafana
+make that scaling and the mesh traffic visible, and Tempo turns a GraphQL query
+into a distributed trace. Each increment lands the same way: focused and
+independently verifiable — the rhythm the protocol work has followed.
 
 ## References
 

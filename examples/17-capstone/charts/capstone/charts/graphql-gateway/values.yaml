@@ -17,6 +17,16 @@ downstream:
   orderRestUrl: http://order-service
   inventoryGrpcAddr: inventory-service:50051
 
+# r29c: OpenTelemetry tracing. The image is instrumented (FastAPI server span +
+# httpx and gRPC client spans), so a GraphQL query becomes a fan-out trace —
+# order-service (REST) and inventory-service (gRPC) appear as child spans. Spans
+# export over OTLP/gRPC to the Tempo backend. Set enabled:false to run untraced.
+tracing:
+  enabled: true
+  otlpEndpoint: http://tempo.observability.svc.cluster.local:4317
+  serviceName: graphql-gateway
+  sampleRatio: "1.0"   # demo: trace every request
+
 resources:
   requests:
     cpu: 100m
