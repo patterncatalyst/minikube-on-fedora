@@ -2923,3 +2923,36 @@ final reader shouldn't see. Items:
   count → **128** ("order-service v1→v2 canary: weighted Istio traffic split,
   observed and shiftable"). **r26b** follows: the KEDA dual-scaler (Kafka-lag on
   notification, HTTP add-on on the gateway) per CAP-025.
+- 🔲 **r26b** (2026-05-22) — KEDA dual-scaler (CAP-025), the "elastic data
+  products" half of the r26 design intent. Two first-party scalers under
+  `examples/17-capstone/keda/`: `notification-scaledobject.yaml` (keda.sh/v1alpha1
+  ScaledObject — kafka trigger on the `notification-service` group / `order-placed`
+  topic, lagThreshold 5, min 0 / max 3) scales the event consumer on consumer-lag;
+  `gateway-httpscaledobject.yaml` (http.keda.sh/v1alpha1 — target graphql-gateway
+  service:80, concurrency target 5, min 0 / max 3) scales the synchronous gateway
+  on in-flight HTTP requests. `scripts/setup-keda.sh` installs KEDA 2.19.0 + HTTP
+  add-on 0.12.2 (§12 versions) into the `keda` ns. Both KEDA-scaled Deployments
+  gained `sidecar.istio.io/inject: "false"` (keep them unmeshed — the namespace is
+  injection-labeled from r26; mesh stays scoped to order-service). §17 gained the
+  "Scaling to demand, and to zero: elastic data products" section, the stack-table
+  line was corrected ("graphql-gateway on HTTP load"), and the closer updated
+  (autoscaling now in place; observability + Prefect ahead). CAP-025 → implemented.
+
+  **Validated statically** (Claude env — no helm/kubectl/keda, no network): both
+  KEDA manifests parse with the expected targets/triggers; `setup-keda.sh` +
+  `smoke-keda-kafka.sh` + `smoke-keda-http.sh` pass `bash -n`; both chart
+  deployments carry the inject:false annotation; §17 prose carries no Go-template
+  `{{ }}`; liquid + cross-ref linters clean on `_docs/`. CI confirms the site build.
+
+  **Cluster verification pending** (Fedora 44, user-run): `scripts/setup-keda.sh`
+  → ensure notification-service + graphql-gateway are deployed (their own releases)
+  → `kubectl apply -f keda/notification-scaledobject.yaml -f keda/gateway-httpscaledobject.yaml`
+  → `./demos/smoke-keda-kafka.sh` (expects 0 → up(≤3) → 0 on a 500-msg lag burst)
+  and `./demos/smoke-keda-http.sh` (expects 0 → woke-from-zero under /health load
+  → 0). **Expected cluster-only risk**: KEDA core + HTTP-add-on API/install
+  specifics (the `keda.sh/v1alpha1` + `http.keda.sh/v1alpha1` kinds, interceptor
+  proxy service name/port, scale-to-zero timing), flagged `VERIFY-POINT` in the
+  HTTPScaledObject. On a green pair of smokes, promote r26b → ✅, bump the count to
+  **130** (+2: "notification-service scales on Kafka lag, 0→up→0" and
+  "graphql-gateway scales on HTTP load, woke-from-zero→0"), and add the CAP-025
+  outcome. With r26b done, the r26 design intent (KEDA + Istio) is fully realized.

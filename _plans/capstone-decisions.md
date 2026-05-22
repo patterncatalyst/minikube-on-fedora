@@ -1079,8 +1079,8 @@ Reconciliation row r26 → ✅; verified count → 128.
 
 ## CAP-025 — KEDA as elastic data products: dual scalers (Kafka lag + HTTP add-on), placed to avoid the canary
 
-- **Date:** r26 (decision locked); **implementation deferred to r26b**
-- **Status:** accepted (placement + scaler choice); built next
+- **Date:** r26 (decision locked); **implemented in r26b**
+- **Status:** implemented (r26b); cluster-verification pending (Fedora 44)
 - **Context:** The r26 design intent framed KEDA as "elastic data products" —
   autoscaling a product on the demand placed on it, back to zero when idle. The
   §17 platform-stack table promises *both* KEDA scaler types ("scale
@@ -1109,6 +1109,26 @@ Reconciliation row r26 → ✅; verified count → 128.
     sidecar on the same workload is a known interaction to validate — the r26b
     cluster-only risk, by analogy to the verify-points elsewhere.
   - (−) Implementation deferred to r26b to keep r26 to one concern (the canary).
+
+### Implementation (r26b)
+
+Shipped as first-party capstone manifests under `examples/17-capstone/keda/`:
+`notification-scaledobject.yaml` (keda.sh/v1alpha1 ScaledObject, kafka trigger on
+the `notification-service` consumer group / `order-placed` topic, lagThreshold 5,
+min 0 / max 3) and `gateway-httpscaledobject.yaml` (http.keda.sh/v1alpha1, target
+graphql-gateway service:80, concurrency target 5, min 0 / max 3). Install via
+`scripts/setup-keda.sh` (KEDA 2.19.0 + HTTP add-on 0.12.2 into the `keda` ns, the
+§12 versions). Both KEDA-scaled Deployments gained `sidecar.istio.io/inject:
+"false"` so the injection-labeled namespace doesn't mesh them — keeping the
+mesh scoped to order-service (CAP-024) and the autoscaling paths clear of Envoy.
+The §17 stack-table line was corrected to "Scale graphql-gateway on HTTP load."
+Two smokes prove the full 0→up→0 lifecycle: `demos/smoke-keda-kafka.sh` (produces
+a 500-message raw burst to create lag — the consumer auto-commits and skips
+undecodable messages, so no Avro path is needed) and `demos/smoke-keda-http.sh`
+(drives /health load through the interceptor to wake the gateway from zero).
+Validated statically (bash -n, pyyaml parse, disjoint targets). Cluster-only
+risk: KEDA + HTTP-add-on API/install specifics, flagged `VERIFY-POINT` in the
+HTTPScaledObject.
 
 ---
 

@@ -17,6 +17,12 @@ spec:
       labels:
         app.kubernetes.io/name: notification-service
         app.kubernetes.io/part-of: capstone
+      annotations:
+        # r26b: keep this KEDA-scaled consumer OUT of the mesh. The namespace is
+        # injection-labeled (r26, for the order-service canary), so without this
+        # opt-out a recreated pod would get an istio-proxy sidecar. Only
+        # order-service is meshed; notification-service scales on Kafka lag.
+        sidecar.istio.io/inject: "false"
     spec:
       # Init container runs Alembic migrations before the app starts, so the
       # `notifications` schema + table exist and the app issues no DDL

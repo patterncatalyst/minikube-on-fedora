@@ -17,6 +17,12 @@ spec:
       labels:
         app.kubernetes.io/name: graphql-gateway
         app.kubernetes.io/part-of: capstone
+      annotations:
+        # r26b: keep the gateway OUT of the mesh. The namespace is
+        # injection-labeled (r26), but the KEDA HTTP add-on's interceptor fronts
+        # this service — an istio-proxy sidecar would contend with it on the
+        # ingress path (CAP-025). Only order-service is meshed.
+        sidecar.istio.io/inject: "false"
     spec:
       containers:
         - name: graphql-gateway

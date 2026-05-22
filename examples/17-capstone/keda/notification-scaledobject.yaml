@@ -1,0 +1,38 @@
+# notification-scaledobject.yaml — KEDA Kafka consumer-lag autoscaling for
+# notification-service (r26b, CAP-025).
+#
+# notification-service is an event consumer: it reads the `order-placed` topic
+# (consumer group `notification-service`) and persists a notification per order.
+# This makes it an "elastic data product" — KEDA polls the group's lag and runs
+# exactly as many consumers as the backlog warrants, down to ZERO when the topic
+# is quiet. The §12 Kafka pattern, now applied to a capstone data product.
+#
+# Scale-to-zero works because KEDA reads lag directly from Kafka (committed
+# offset vs. log-end offset for the group) even when no consumer is running, so
+# a quiet topic costs nothing and the first backlog wakes the consumer.
+#
+# Once applied, KEDA owns the Deployment's replica count (via a generated HPA).
+# A subsequent `helm upgrade` of notification-service may transiently reset
+# replicas to the chart's value; KEDA reconciles it back within a polling
+# interval. (Refactoring the chart to omit `replicas` for KEDA-managed workloads
+# is a later cleanup, out of r26b scope.)
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: notification-service-scaler
+  namespace: capstone
+spec:
+  scaleTargetRef:
+    name: notification-service        # the Deployment KEDA scales
+  pollingInterval: 5                  # check Kafka lag every 5s
+  cooldownPeriod: 30                  # 30s with no lag → scale to 0
+  minReplicaCount: 0                  # scale-to-zero
+  maxReplicaCount: 3                  # bounded (≈ order-placed partition count)
+  triggers:
+    - type: kafka
+      metadata:
+        bootstrapServers: capstone-kafka-kafka-bootstrap:9092
+        consumerGroup: notification-service
+        topic: order-placed
+        lagThreshold: "5"             # one replica per 5 messages of lag
+        offsetResetPolicy: earliest

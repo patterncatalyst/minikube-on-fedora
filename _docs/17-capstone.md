@@ -159,7 +159,7 @@ flagged.
 | Component | Purpose | First introduced |
 |---|---|---|
 | Strimzi + Kafka | Event backbone; KEDA's consumer-lag scaling target | §12 |
-| KEDA + HTTP add-on | Scale order-service on HTTP load; scale Kafka consumers on lag | §12 |
+| KEDA + HTTP add-on | Scale graphql-gateway on HTTP load; scale Kafka consumers on lag | §12 |
 | Istio + Kiali | mTLS, traffic shifting, fault injection, mesh visualization | §11 |
 | Prometheus + Grafana + Tempo + OTEL Collector | Per-service metrics + distributed traces + dashboards | **new in §17** |
 | Apicurio Registry | OpenAPI (REST), proto descriptors (gRPC), Avro/JSON schemas (Kafka) | **new in §17** |
@@ -975,6 +975,47 @@ infer from logs. The principle underneath: in a mesh, a product owns its own
 rollout, and changing a contract is a controlled, observable operation rather
 than a coordinated outage.
 
+## Scaling to demand, and to zero: elastic data products
+
+A canary controls *which* version serves traffic; the next question is *how
+much* of each product to run at all. In a data mesh the honest answer is "as
+much as the demand warrants, and nothing when there's none" — products that
+cost nothing while idle and expand when work arrives. KEDA provides that, and
+the capstone uses it in the two shapes the mesh actually needs, because its
+products take work in two different ways.
+
+The event consumers take work as backlog. notification-service reads the
+`order-placed` topic, so the natural signal is consumer-group lag: a
+`ScaledObject` watches the gap between what's been produced and what the group
+has consumed, and runs one consumer per few messages of lag, up to a bound —
+and to zero when the topic is quiet. KEDA reads that lag straight from Kafka
+even with no consumer running, so an idle product wakes the moment a backlog
+appears and costs nothing in between. That's the §12 Kafka pattern, now earning
+its place on a real product rather than a toy consumer.
+
+The synchronous services take work as requests. graphql-gateway answers GraphQL
+queries over HTTP, so the signal is in-flight request concurrency, and the tool
+is KEDA's HTTP add-on: an interceptor sits in front of the Service, scales the
+gateway on how many requests are in flight, and — the part that makes
+scale-to-zero usable for a request/response service — holds the very first
+request while a replica starts, so waking from zero is invisible to the caller
+beyond a cold-start pause.
+
+Two placement choices are deliberate. HTTP scaling lives on the gateway, not on
+order-service: order-service is the canary subject, and the add-on's interceptor
+would fight Istio's VirtualService over that service's ingress path. And both
+KEDA-scaled services stay *out* of the mesh — the namespace is injection-labeled
+for the canary, so each carries an explicit `sidecar.istio.io/inject: "false"`
+to keep the autoscaling path clear of an Envoy sidecar. The mesh stays scoped to
+the one product being canaried; everything else scales unmeshed.
+
+`scripts/setup-keda.sh` installs KEDA core plus the HTTP add-on;
+`demos/smoke-keda-kafka.sh` and `demos/smoke-keda-http.sh` each prove the whole
+arc — scaled to zero, scaled up under load (a message burst for the consumer, a
+traffic burst for the gateway), and back to zero once the work is gone. The
+principle the two share: a data product's footprint should track its demand, and
+zero demand should mean zero footprint.
+
 ## What the capstone builds, and what's still ahead
 
 The capstone assembles a small but complete data mesh: five domain services
@@ -986,16 +1027,14 @@ reads, and Kafka events for the asynchronous order→notification flow.
 Postgres is managed by the CloudNativePG operator and Kafka by the Strimzi
 operator, all running rootless on a dedicated minikube profile.
 
-Still ahead, layered on this foundation: autoscaling that lets products scale
-to the demand on them and back to zero (KEDA — consumer-lag scaling for the
-event consumers, HTTP-load scaling for the synchronous gateway), an
-observability stack (OpenTelemetry, Prometheus, Grafana, Tempo), and scheduled
-cross-service orchestration (Prefect). The contract, catalog, and
-traffic-management layers are now in place — Apicurio versions every contract,
-OpenMetadata turns schemas and topics into browsable lineage, and Istio shifts
-live traffic between contract versions so a product can evolve its interface as
-a controlled canary. Each increment lands the same way: focused and
-independently verifiable — the rhythm the protocol work has followed.
+Still ahead, layered on this foundation: an observability stack (OpenTelemetry,
+Prometheus, Grafana, Tempo) and scheduled cross-service orchestration (Prefect).
+The contract, catalog, traffic-management, and autoscaling layers are now in
+place — Apicurio versions every contract, OpenMetadata turns schemas and topics
+into browsable lineage, Istio shifts live traffic between contract versions as a
+controlled canary, and KEDA scales each product to the demand on it and back to
+zero when idle. Each increment lands the same way: focused and independently
+verifiable — the rhythm the protocol work has followed.
 
 ## References
 

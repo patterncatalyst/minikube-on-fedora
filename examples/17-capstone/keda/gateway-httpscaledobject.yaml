@@ -1,0 +1,44 @@
+# gateway-httpscaledobject.yaml — KEDA HTTP add-on autoscaling for the
+# graphql-gateway (r26b, CAP-025).
+#
+# The gateway is the mesh's synchronous read surface: clients issue GraphQL
+# queries over HTTP. The HTTP add-on scales it on in-flight request volume —
+# including from ZERO. With no traffic the gateway costs nothing; the first
+# query through the add-on's interceptor wakes it (the interceptor holds the
+# request until a replica is Ready), and sustained concurrency scales it out.
+# The §12 HTTP-add-on pattern, now on a capstone data product.
+#
+# This is the OTHER half of "elastic data products" from the Kafka-lag scaler:
+# event consumers scale on backlog, synchronous services scale on request load.
+#
+# Placement note (CAP-025): the HTTP add-on lives on the gateway, NOT
+# order-service — order-service is the Istio canary subject, and the add-on's
+# interceptor would contend with Istio's VirtualService over that service's
+# ingress path. The gateway is kept out of the mesh (inject: "false" on its
+# Deployment) so the interceptor → gateway path is clean.
+#
+# VERIFY-POINTS (KEDA HTTP add-on API/install; not renderable offline):
+#   * apiVersion http.keda.sh/v1alpha1 (matches the §12 add-on version, 0.12.x).
+#   * scaleTargetRef.service/port reference the gateway's ClusterIP Service.
+#   * Traffic must arrive via the interceptor with a matching Host header
+#     (the smoke port-forwards keda-add-ons-http-interceptor-proxy and sets it).
+apiVersion: http.keda.sh/v1alpha1
+kind: HTTPScaledObject
+metadata:
+  name: graphql-gateway-http
+  namespace: capstone
+spec:
+  hosts:
+    - graphql-gateway.capstone        # Host header the interceptor routes on
+  scaleTargetRef:
+    name: graphql-gateway             # Deployment to scale
+    kind: Deployment
+    service: graphql-gateway          # Service the interceptor forwards to
+    port: 80                          # the Service's port
+  replicas:
+    min: 0                            # scale-to-zero
+    max: 3                            # bounded for the demo
+  scaledownPeriod: 30                 # 30s idle → back to 0
+  scalingMetric:
+    concurrency:
+      targetValue: 5                  # one replica per 5 in-flight requests
