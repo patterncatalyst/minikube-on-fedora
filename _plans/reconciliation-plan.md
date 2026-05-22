@@ -2944,6 +2944,77 @@ final reader shouldn't see. Items:
   deployments carry the inject:false annotation; §17 prose carries no Go-template
   `{{ }}`; liquid + cross-ref linters clean on `_docs/`. CI confirms the site build.
 
+  **Cluster fixes (r26b.1):** first cluster run surfaced two issues, both fixed.
+  (1) The Kafka `ScaledObject` used the short bootstrap name, but the KEDA
+  operator runs in the `keda` namespace and resolves DNS relative to ITS
+  namespace — `no such host`. Changed to the FQDN
+  `capstone-kafka-kafka-bootstrap.capstone.svc.cluster.local:9092` (cross-namespace
+  DNS — exactly the flagged VERIFY-POINT class). notification-service's own
+  consumer is unaffected (it lives in `capstone`, short name resolves). (2) Both
+  smokes' `count_pods` did `grep -c . || echo 0`, which on zero pods printed `0`
+  AND `0` (grep -c exits non-zero on no match, firing the `||`), yielding `"0\n0"`
+  → `[[: arithmetic syntax error`. Replaced with `grep -vc 'Terminating'`, which
+  emits exactly one integer. The KEDA machinery itself worked on the first run
+  (graphql-gateway scaled to 0/0, HTTPScaledObject Ready=True) — issue (2) was a
+  false-negative counter, not a scaling failure.
+
+  **Cluster run 1 (r26b.2):** Kafka half **PASSED** — notification-service scaled
+  0 → 1 → 0 on the 500-msg lag burst once the FQDN bootstrap landed. HTTP half
+  revealed the KEDA HTTP scaler working (it scaled graphql-gateway 0 → 3 under
+  load) but the pods hit `ErrImagePull` — the graphql-gateway image was never
+  built into this cluster's registry (only order-service was, this session;
+  notification-service's image happened to be present, so its smoke ran). Fix is a
+  prerequisite, not code: build the gateway image
+  (`./scripts/build-image.sh services/graphql-gateway graphql-gateway v1`) before
+  the HTTP smoke. Also bumped the HTTP scale-up wait 120s → 240s (the add-on's
+  cold-start activation clipped the old timeout).
+
+  **Cluster run 2 (r26b.3):** with the gateway image built, pods no longer
+  ErrImagePull, but KEDA still created the first pod only at ~240s — the load
+  wasn't registering as pending requests. Root cause: the smoke discovered the
+  interceptor proxy port via `ports[0]`, which can be a non-proxy port; the proven
+  §12 pattern hardcodes proxy :8080. Rewrote the HTTP smoke to mirror §12 — a
+  port-forward readiness check, then a single cold-start request asserting HTTP
+  200 (the interceptor buffers it, scales the gateway from zero, holds until
+  Ready, forwards) as the proof of wake-from-zero, with the response code +
+  interceptor logs dumped on non-200. Followed by brief sustained load to show it
+  stays warm.
+
+  **Cluster run 3 (r26b.4):** the rewrite worked — cold-start served HTTP 200 in
+  7s (woke graphql-gateway from zero), stayed up at 1 replica under load. Only the
+  final scale-back-to-zero clipped the 150s wait (the dump showed 0/0 — it DID
+  reach zero, just past the timeout: KEDA's idle period plus HPA scale-down
+  settling). Bumped the scale-to-zero waits (initial 240s, post-load 300s).
+  Behavior is fully correct; the timeout was the only gap.
+
+  **Cluster run 4 → resolved (r26b.5):** root-caused the slow scale-to-zero —
+  the HTTP add-on's generated ScaledObject uses KEDA's DEFAULT cooldownPeriod
+  (~300s) for the 1→0; the HTTPScaledObject's 30s scaledownPeriod only governs
+  metric idle, not the cooldown (the Kafka ScaledObject's own cooldownPeriod: 30
+  IS honored, hence its fast scale-down). Bumped both scale-to-zero waits to 420s
+  to outwait the ~330s settling. Wake-from-zero (200 in ~8s) and stay-warm were
+  green across runs; this is the last gap.
+
+  **Cluster run 5 (r26b.6):** the rewrite-to-200 surfaced the genuine cold-start
+  race — the interceptor's WorkloadReplicas wait is ~20s, but with
+  imagePullPolicy: Always (CAP-015) a cold pull pushes the gateway Ready past 20s,
+  so the single request 502'd (the dump showed the pod ContainerCreating at 20s,
+  i.e. KEDA HAD woken it). Earlier 200-in-8s runs had the image node-cached.
+  Reworked the wake phase: drive SUSTAINED trigger requests (keeping KEDA scaled
+  up) while waiting for the Deployment to report a Ready replica (the 0→Ready
+  transition is the wake-from-zero proof, 240s budget for a cold pull), then assert
+  the interceptor serves 200. Robust to pull-time variance.
+
+  **Cluster run 6 (r26b.7):** wake-from-zero confirmed working (dump showed
+  graphql-gateway 1/1 Ready) but KEDA's scale-up latency proved highly variable —
+  ~8s when the gateway had been idle a while (image cached), ~230s here because
+  the wake phase began the instant the prior 1→0 scale-down completed (KEDA's
+  post-scaledown settle). The pod reached Ready at ~232s vs the 240s wait — a 3s
+  miss. Bumped the wake wait to 420s (observed max ~230s) and replaced the
+  (misleadingly stale) interceptor-log dump with a live deployment/pods snapshot
+  on timeout. KEDA's up/down timings here are minutes and variable — both waits
+  now budget for that.
+
   **Cluster verification pending** (Fedora 44, user-run): `scripts/setup-keda.sh`
   → ensure notification-service + graphql-gateway are deployed (their own releases)
   → `kubectl apply -f keda/notification-scaledobject.yaml -f keda/gateway-httpscaledobject.yaml`
@@ -2956,3 +3027,31 @@ final reader shouldn't see. Items:
   **130** (+2: "notification-service scales on Kafka lag, 0→up→0" and
   "graphql-gateway scales on HTTP load, woke-from-zero→0"), and add the CAP-025
   outcome. With r26b done, the r26 design intent (KEDA + Istio) is fully realized.
+- 🔲 **r28** (2026-05-22) — Resource calibration (CAP-026), prompted by r26b's
+  HTTP smoke repeatedly surfacing a graphql-gateway crash-loop (RESTARTS 2 in 21s
+  at a 256Mi limit) rather than true KEDA failure. Research-backed (istiod ~1Gi
+  default req but low actual on a tiny mesh; istio-proxy 128Mi/sidecar, only
+  order-service meshed; kube-prometheus prod guides 2–4Gi assume long retention —
+  a demo is far leaner; Tempo monolithic + OTEL Collector are light). Applied
+  uniformly to all six Python services: requests 128→**192Mi**, limits
+  256→**512Mi** (the OOM fix), plus a **startupProbe** (path /health,
+  failureThreshold 30 × periodSeconds 2 = 60s grace) that gates liveness/readiness
+  until the app has booted (the prior 5s liveness initialDelay was killing slow
+  Python starts). CAP-026 records the full plan including the lean observability
+  sizing for r29 and the verdict: **no cluster-profile bump** — 24Gi/16CPU is
+  adequate (current ~12–13Gi, projected ~14Gi, ~10Gi free).
+
+  **Validated statically** (Claude env): all six values.yaml carry 192Mi/512Mi +
+  a `startup:` block; all six deployment templates carry a `startupProbe` before
+  `livenessProbe` with balanced Go-template braces; no `{{ }}` introduced into
+  prose. (Helm render not available offline — chart behavior verified on apply.)
+
+  **Cluster verification pending** (Fedora 44, user-run): re-deploy the six
+  services as their own releases (`helm upgrade --install <svc>
+  charts/capstone/charts/<svc> -n capstone`) — a rolling restart, NOT a rebuild —
+  then re-run `./demos/smoke-keda-http.sh`, which should now pass cleanly (the
+  gateway no longer OOMs and the startupProbe prevents the premature liveness
+  kill). On a green HTTP smoke, promote **both r26b and r28** to ✅ and bump the
+  count to **130** (the two KEDA rows; r28 is the enabling fix, not a separate
+  capability count). Then **r29**: the lean OTEL → Prometheus/Tempo → Grafana
+  observability stack per CAP-026's sizing.

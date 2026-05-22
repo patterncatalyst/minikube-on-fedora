@@ -32,8 +32,7 @@ declare -a LOAD_PIDS=()
 
 step() { printf '\n==> %s\n' "$1"; }
 count_pods() {
-    kubectl get pods -n "$NS" -l "$SEL" --no-headers 2>/dev/null \
-        | grep -v 'Terminating' | grep -c . || echo 0
+    kubectl get pods -n "$NS" -l "$SEL" --no-headers 2>/dev/null | grep -vc 'Terminating'
 }
 cleanup() {
     for p in "${LOAD_PIDS[@]:-}"; do kill "$p" 2>/dev/null; done
@@ -76,43 +75,79 @@ kubectl apply -f "$KEDA_DIR/gateway-httpscaledobject.yaml" >/dev/null \
 printf '    ✓ applied — KEDA HTTP add-on now fronts graphql-gateway\n'
 
 # ─── 1. Scale to zero (no traffic) ───────────────────────────────────────────
-step "Waiting for scale-to-zero (no traffic → 0 replicas, ~scaledownPeriod 30s)"
-wait_until "0 replicas" 150 is_zero \
+step "Waiting for scale-to-zero (no traffic → 0 replicas; ~5 min on a fresh run)"
+# See the note below on the HTTP add-on's ~300s default cooldown. On a re-run
+# where the gateway is already at zero this returns immediately.
+wait_until "0 replicas" 420 is_zero \
     || fail "graphql-gateway did not scale to zero — is the HTTPScaledObject Ready?"
 printf '    ✓ scaled to ZERO (no traffic, costing nothing)\n'
 
-# ─── 2. Drive traffic through the interceptor → wake from zero ───────────────
-step "Port-forwarding the KEDA HTTP interceptor"
-PROXY_PORT="$(kubectl get svc "$PROXY_SVC" -n keda -o jsonpath='{.spec.ports[0].port}' 2>/dev/null)"
-[[ -n "$PROXY_PORT" ]] || PROXY_PORT=8080
-kubectl port-forward -n keda "svc/$PROXY_SVC" "${LOCAL_PORT}:${PROXY_PORT}" >/dev/null 2>&1 &
+# ─── 2. Wake from zero through the interceptor ───────────────────────────────
+step "Port-forwarding the KEDA HTTP interceptor (proxy :8080)"
+# The proxy listens on 8080 on keda-add-ons-http-interceptor-proxy (matches the
+# proven §12 pattern). Hardcoded — discovering ports[0] risks hitting a non-proxy
+# port, which silently drops the routing and the pending-request metric.
+kubectl port-forward -n keda "svc/$PROXY_SVC" "${LOCAL_PORT}:8080" >/dev/null 2>&1 &
 PF_PID=$!
-sleep 4
+# Wait for the port-forward TCP socket to accept connections (not a routing check).
+for _ in $(seq 1 15); do
+    curl -s -o /dev/null --max-time 2 "http://127.0.0.1:${LOCAL_PORT}/" && break
+    sleep 1
+done
 
-step "Driving HTTP load at /health through the interceptor (wakes it from zero)"
-# A handful of concurrent loops keeps in-flight concurrency above the target so
-# the gateway both activates and stays up while we observe it.
-for _ in $(seq 1 12); do
-    ( while true; do
-        curl -m 90 -s -o /dev/null -H "Host: $HOST" "http://127.0.0.1:${LOCAL_PORT}/health" || true
+step "Waking the gateway from zero through the interceptor (Host: $HOST)"
+# A single request can 502 if the cold start outruns the interceptor's ~20s
+# WorkloadReplicas wait — and with imagePullPolicy: Always (CAP-015) a cold pull
+# can push the gateway past that. So we drive SUSTAINED trigger requests (each
+# keeps a pending request, so KEDA keeps the gateway scaled up) while we wait for
+# the Deployment to report a Ready replica. The 0→Ready transition IS the
+# wake-from-zero proof; we then assert the gateway serves a 200.
+ready_replicas() { kubectl get deployment graphql-gateway -n "$NS" -o jsonpath='{.status.readyReplicas}' 2>/dev/null; }
+is_ready() { [[ "$(ready_replicas)" =~ ^[0-9]+$ ]] && [[ "$(ready_replicas)" -ge 1 ]]; }
+
+( while true; do
+    curl -s -o /dev/null --max-time 25 -H "Host: $HOST" "http://127.0.0.1:${LOCAL_PORT}/health" || true
+    sleep 1
+  done ) &
+LOAD_PIDS+=($!)
+
+START=$(date +%s)
+wait_until "gateway Ready (woke from zero)" 420 is_ready || {
+    printf '    deployment/pods at timeout:\n'
+    kubectl get deployment,pods -n "$NS" -l app.kubernetes.io/name=graphql-gateway 2>&1 | sed 's/^/      /'
+    fail "graphql-gateway did not reach a Ready replica under traffic within 420s — KEDA scale-up or pod start (see above)."
+}
+ELAPSED=$(( $(date +%s) - START ))
+printf '    ✓ woke from ZERO to a Ready replica in %ss\n' "$ELAPSED"
+
+# Now that a replica is Ready, the interceptor forwards: assert a real 200.
+CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 30 \
+    -H "Host: $HOST" "http://127.0.0.1:${LOCAL_PORT}/health" || echo "000")
+[[ "$CODE" == "200" ]] || fail "gateway is Ready but the interceptor returned HTTP $CODE (routing?)"
+printf '    ✓ interceptor served HTTP 200 from the woken gateway\n'
+MAXSEEN="$(count_pods)"
+
+step "Driving brief sustained load (it stays warm under traffic)"
+for _ in $(seq 1 8); do
+    ( for _ in $(seq 1 40); do
+        curl -s -o /dev/null --max-time 10 -H "Host: $HOST" "http://127.0.0.1:${LOCAL_PORT}/health" || true
       done ) &
     LOAD_PIDS+=($!)
 done
-
-wait_until ">0 replicas" 120 is_scaledup \
-    || fail "graphql-gateway did not wake from zero under traffic — interceptor routing / Host header?"
-MAXSEEN="$(count_pods)"
-for _ in 1 2 3 4; do sleep 4; [[ "$(count_pods)" -gt "$MAXSEEN" ]] && MAXSEEN="$(count_pods)"; done
-printf '    ✓ woke from ZERO and scaled to %s replica(s) under load\n' "$MAXSEEN"
-
-# stop the load
+for _ in 1 2 3 4 5; do sleep 3; [[ "$(count_pods)" -gt "$MAXSEEN" ]] && MAXSEEN="$(count_pods)"; done
 for p in "${LOAD_PIDS[@]}"; do kill "$p" 2>/dev/null; done
 LOAD_PIDS=()
+printf '    ✓ stayed up under load (peak %s replica(s))\n' "$MAXSEEN"
 
 # ─── 3. Traffic stops → scale back to zero ───────────────────────────────────
 step "Stopping traffic; waiting for scale back to ZERO"
-wait_until "0 replicas" 150 is_zero \
-    || fail "graphql-gateway did not return to zero after traffic stopped"
+# The KEDA HTTP add-on's generated ScaledObject uses KEDA's DEFAULT
+# cooldownPeriod (~300s) for the final 1→0 — the HTTPScaledObject's 30s
+# scaledownPeriod governs metric idle, not the cooldown. So scale-to-zero
+# lands at ~5 min. Wait past it. (Unlike the Kafka ScaledObject, whose own
+# cooldownPeriod: 30 is honored directly and scales down in well under a minute.)
+wait_until "0 replicas" 420 is_zero \
+    || fail "graphql-gateway did not return to zero after traffic stopped (waited 420s)"
 printf '    ✓ scaled back to ZERO\n'
 
 step "SUCCESS"

@@ -100,6 +100,12 @@ spec:
             limits:
               memory: {{ .Values.resources.limits.memory }}
           # Health Probe pattern (Kubernetes Patterns, Ibryam & Huss).
+          startupProbe:
+            httpGet:
+              path: {{ .Values.probes.startup.path }}
+              port: http
+            failureThreshold: {{ .Values.probes.startup.failureThreshold }}
+            periodSeconds: {{ .Values.probes.startup.periodSeconds }}
           livenessProbe:
             httpGet:
               path: {{ .Values.probes.liveness.path }}

@@ -25,12 +25,20 @@ postgres:
 resources:
   requests:
     cpu: 100m
-    memory: 128Mi
+    memory: 192Mi
   limits:
-    memory: 256Mi
+    memory: 512Mi
 
 # /health is liveness; /healthz is readiness (checks Postgres).
 probes:
+  # r28: startupProbe gates liveness/readiness until the app has finished booting.
+  # Python services (imports + gRPC channels + schema build) can take 10-30s; a 5s
+  # liveness initialDelay was killing them mid-boot (and the gateway OOM-looped at
+  # 256Mi). 30 x 2s = 60s startup grace.
+  startup:
+    path: /health
+    failureThreshold: 30
+    periodSeconds: 2
   liveness:
     path: /health
     initialDelaySeconds: 5

@@ -31,10 +31,10 @@ BURST=500
 
 step() { printf '\n==> %s\n' "$1"; }
 
-# count_pods — non-terminating pods for the consumer (KEDA's replica count, live)
+# count_pods — non-terminating pods for the consumer (KEDA's replica count, live).
+# grep -vc emits exactly one integer (0 on empty input) — no spurious second line.
 count_pods() {
-    kubectl get pods -n "$NS" -l "$SEL" --no-headers 2>/dev/null \
-        | grep -v 'Terminating' | grep -c . || echo 0
+    kubectl get pods -n "$NS" -l "$SEL" --no-headers 2>/dev/null | grep -vc 'Terminating'
 }
 
 dump() {

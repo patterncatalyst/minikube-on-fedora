@@ -1130,6 +1130,46 @@ Validated statically (bash -n, pyyaml parse, disjoint targets). Cluster-only
 risk: KEDA + HTTP-add-on API/install specifics, flagged `VERIFY-POINT` in the
 HTTPScaledObject.
 
+## CAP-026 — Resource calibration: fix the gateway crash-loop, right-size for observability (research-backed)
+
+- **Date:** r28
+- **Status:** accepted; cluster-verification pending (Fedora 44)
+- **Context:** r26b's HTTP smoke kept "failing" in ways that turned out to be the
+  graphql-gateway pod crash-looping (RESTARTS 2 in 21s on a 256Mi limit) plus
+  KEDA scale-up/down timing. Rather than keep bumping smoke timeouts, we stopped
+  to calibrate resources against reality before adding the (load-bearing)
+  observability stack. Researched realistic sizing for the heavy/uncertain
+  tenants: istiod default request ~1Gi (low actual on a tiny mesh), istio-proxy
+  sidecars 128Mi each (only order-service's 2 pods are meshed); kube-prometheus
+  production guides quote 2–4Gi but assume 15–30d retention + 50–100Gi storage —
+  a single-node demo with short retention is far leaner; Tempo monolithic mode is
+  a single light container; the OTEL Collector is a light Go binary.
+- **Decisions:**
+  - **Six Python services → 192Mi req / 512Mi limit** (was 128Mi/256Mi). A
+    FastAPI + Strawberry + grpcio service needs ~350–450Mi peak; 256Mi OOM-killed
+    the gateway. This is the crash-loop's primary fix.
+  - **Add a `startupProbe`** (path /health, failureThreshold 30 × periodSeconds
+    2 = 60s grace) to all six. A `startupProbe` gates liveness/readiness until the
+    app has booted, so the prior 5s liveness `initialDelaySeconds` no longer kills
+    a Python service mid-import. The crash-loop's secondary fix.
+  - **Observability sized lean for r29:** OTEL Collector 128Mi/256Mi, Prometheus
+    512Mi/1Gi (short retention, small PV), Tempo (monolithic) 256Mi/512Mi, Grafana
+    128Mi/256Mi — ~1Gi req / ~2Gi limit total.
+  - **No cluster profile bump.** 24Gi/16CPU is adequate: current usage ~12–13Gi
+    (OpenMetadata ~3.5–4Gi dominates), projected ~14Gi after observability,
+    leaving ~10Gi free — which also gives KEDA scale-ups room to schedule
+    promptly. OpenMetadata/OpenSearch/Kafka/Istio/KEDA left as-is.
+- **Consequences:**
+  - (+) The "KEDA flakiness" was a symptom; this addresses the cause. r26b's HTTP
+    smoke should pass on the recalibrated gateway (no OOM, no premature liveness
+    kill).
+  - (+) Reassuring scope: a rolling restart of the recalibrated service pods, not
+    a `minikube delete` / full rebuild.
+  - (−) istiod over-reserves (~1Gi) for our tiny mesh; left alone since we have
+    headroom (could right-size later if observability pushes us tight).
+  - (−) Per-pod limits/probes are not visible offline — verified on the cluster
+    (the restart + a clean r26b HTTP run).
+
 ---
 
 ## Decisions inherited from r19 (PRD planning)

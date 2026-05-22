@@ -31,7 +31,11 @@ spec:
   triggers:
     - type: kafka
       metadata:
-        bootstrapServers: capstone-kafka-kafka-bootstrap:9092
+        # FQDN, not the short name: the KEDA operator runs in the `keda`
+        # namespace and resolves DNS relative to ITS namespace, so the short
+        # `capstone-kafka-kafka-bootstrap` (which works from inside `capstone`)
+        # fails with "no such host". The fully-qualified name always resolves.
+        bootstrapServers: capstone-kafka-kafka-bootstrap.capstone.svc.cluster.local:9092
         consumerGroup: notification-service
         topic: order-placed
         lagThreshold: "5"             # one replica per 5 messages of lag
