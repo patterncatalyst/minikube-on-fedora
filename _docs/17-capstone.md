@@ -1085,10 +1085,15 @@ credentials from the secret with `kubectl get secret grafana -n observability -o
 jsonpath='{.data.admin-password}' | base64 -d`. The setup script prints this for
 you.
 
-This is the metrics half of observability. The other half — distributed tracing,
-following a single GraphQL query as it fans out across services — needs either
-application instrumentation or meshing every service, both larger moves, and is
-the natural next step rather than something to bolt on here.
+This is the metrics half of observability, and it stands on its own. The traces
+half has its backend in place too: `setup-observability.sh` also installs Grafana
+Tempo (monolithic mode, receiving OTLP directly — no separate collector, since
+our metrics come from scraping rather than OTLP), and Grafana is wired with a
+Tempo datasource. What's left is the trace *source*: a service has to be
+instrumented to emit spans. Following a single GraphQL query as it fans out from
+the gateway to the order (REST) and inventory (gRPC) services is the trace worth
+having, and it needs the gateway — and ideally its callees — instrumented with
+OpenTelemetry. That's the next increment; the pipeline is ready to receive it.
 
 ## What the capstone builds, and what's still ahead
 

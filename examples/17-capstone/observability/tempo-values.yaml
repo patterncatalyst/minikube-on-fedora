@@ -1,0 +1,39 @@
+# tempo-values.yaml — Grafana Tempo in monolithic (single-binary) mode (r29b,
+# CAP-028): the capstone's trace backend. Local storage, OTLP receivers on, lean.
+# Monolithic mode is Tempo's own recommendation for small/demo/test setups —
+# one container with distributor, ingester, querier, and compactor together.
+#
+# No separate OpenTelemetry Collector: our metrics come from Prometheus
+# *scraping* (CAP-027), so a collector would only forward traces that Tempo can
+# already receive itself. Instrumented services (r29c) send OTLP straight here.
+#
+# Used by scripts/setup-observability.sh:
+#   helm upgrade --install tempo grafana/tempo \
+#       -n observability -f observability/tempo-values.yaml
+
+tempo:
+  # Demo retention — traces are ephemeral; we're watching live flows, not
+  # keeping history.
+  retention: 1h
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      memory: 512Mi
+
+  # Receive OTLP directly from instrumented workloads (r29c) on both gRPC (4317)
+  # and HTTP (4318). The chart exposes these on the `tempo` Service.
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+
+# emptyDir — no StorageClass/PVC dependency. Traces vanish on restart, fine for
+# a teaching cluster.
+persistence:
+  enabled: false

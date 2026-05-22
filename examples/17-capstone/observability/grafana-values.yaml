@@ -38,6 +38,13 @@ datasources:
         access: proxy
         url: http://prometheus-server.observability.svc.cluster.local
         isDefault: true
+      # Traces backend (r29b). Tempo's query API is on :3200. Instrumented
+      # services (r29c) send OTLP to tempo:4317; Grafana reads traces from :3200.
+      - name: Tempo
+        uid: tempo
+        type: tempo
+        access: proxy
+        url: http://tempo.observability.svc.cluster.local:3200
 
 dashboardProviders:
   dashboardproviders.yaml:

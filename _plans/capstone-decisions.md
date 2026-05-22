@@ -1243,6 +1243,44 @@ none visible offline.
 
 ---
 
+## CAP-028 — Observability, traces half (backend): Tempo monolithic, no collector, source deferred
+
+- **Date:** r29b
+- **Status:** accepted; cluster-verification pending (Fedora 44)
+- **Context:** With metrics in place (CAP-027), the remaining observability piece
+  is distributed tracing. The KEDA marathon taught a hard lesson about dropping
+  multiple untestable new things at once, so this is scoped to isolate variables.
+- **Decisions:**
+  - **Backend now (r29b), source later (r29c).** r29b deploys the trace *backend*
+    (Tempo + Grafana datasource), verifiable on its own; r29c instruments a
+    service to emit traces. If traces later don't appear, the failure is
+    unambiguously the instrumentation, not the pipeline — the opposite of the
+    KEDA debugging experience.
+  - **Tempo in monolithic mode** (grafana/tempo single-binary), local storage
+    (emptyDir, no PVC), 1h retention, OTLP receivers on (gRPC 4317 / HTTP 4318),
+    256Mi/512Mi. Tempo's own recommendation for demo/test setups.
+  - **No OpenTelemetry Collector** — a deliberate deviation from CAP-026's sketch.
+    The collector's value is fanning telemetry out / processing it, but our
+    metrics come from Prometheus *scraping* (CAP-027), not OTLP, so the collector
+    would do nothing but forward traces that Tempo receives directly on its own
+    OTLP port. Instrumented services (r29c) send OTLP straight to
+    `tempo.observability:4317`. A collector can be added later if OTLP-based
+    metric/log aggregation or tail-sampling is ever wanted; it isn't now.
+  - **Grafana Tempo datasource** provisioned alongside Prometheus (uid=`tempo`,
+    url `http://tempo.observability:3200`).
+- **Files:** `observability/tempo-values.yaml`, grafana-values.yaml (+Tempo
+  datasource), setup-observability.sh (+Tempo install), `demos/smoke-tracing.sh`,
+  §17 traces-backend paragraph.
+- **Consequences:**
+  - (+) Leaner than the original sketch (one fewer component to run/debug).
+  - (+) Backend verifiable independently (smoke-tracing: Tempo ready + Grafana
+    datasource provisioned/reachable).
+  - (−) No traces visible until r29c instruments a service — by design.
+  - (−) Chart-schema correctness (tempo values keys, OTLP receiver wiring) is
+    cluster-only; validated offline only as parseable YAML.
+
+---
+
 ## Decisions inherited from r19 (PRD planning)
 
 These were resolved during r19 planning and accepted by the user.

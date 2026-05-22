@@ -3187,3 +3187,30 @@ final reader shouldn't see. Items:
   - r26b stands ✅ (count 130, unchanged — this upgrades it from
     verified-by-evidence to verified-by-clean-smoke). r29 (observability) still
     pending its own smoke-observability run + Grafana login confirmation.
+
+- 🔲 **r29b** (2026-05-22) — Observability, traces backend (CAP-028): Grafana
+  Tempo in monolithic mode (OTLP receivers on, local storage, 256Mi/512Mi)
+  installed by setup-observability.sh, plus a Tempo datasource provisioned in
+  Grafana. Deliberately scoped to the BACKEND only — instrumenting a service to
+  emit traces is r29c — to isolate variables (the KEDA lesson). Also a leaner
+  deviation from CAP-026: NO OpenTelemetry Collector, because our metrics come
+  from Prometheus scraping (not OTLP), so a collector would only forward traces
+  Tempo already receives directly; instrumented services will send OTLP straight
+  to tempo:4317. Files: observability/tempo-values.yaml, grafana-values.yaml
+  (+Tempo datasource), setup-observability.sh (+Tempo), demos/smoke-tracing.sh,
+  §17 traces-backend paragraph.
+
+  **Validated statically** (Claude env): tempo + grafana values parse; the Tempo
+  datasource (uid=tempo) is present alongside Prometheus; the embedded scaling
+  dashboard JSON is still valid; both scripts pass `bash -n`; §17 clears both
+  linters. Tempo chart-schema correctness (receiver keys, service ports) is
+  cluster-only — flagged as the likely first-fixup area if the install balks.
+
+  **Cluster verification pending** (Fedora 44, user-run): re-run
+  `./scripts/setup-observability.sh` (now also installs Tempo and re-applies
+  Grafana with the Tempo datasource), then `./demos/smoke-tracing.sh` — asserts
+  Tempo is Ready and answers /ready, and that Grafana has the Tempo datasource
+  provisioned and reachable. On green, promote to ✅ (count → 132, pending r29's
+  own metrics verification first). Next: **r29c** — instrument the gateway (REST
+  + gRPC clients) with OpenTelemetry to emit the GraphQL fan-out trace to Tempo;
+  the real end-to-end traces proof, isolated onto this now-verified backend.
