@@ -39,8 +39,7 @@ collections:
     output: true
     permalink: /docs/:name/
   plans:
-    output: true
-    permalink: /plans/:name/
+    output: false
   example_pages:
     output: true
     permalink: /examples/:name/

@@ -2654,12 +2654,12 @@ final reader shouldn't see. Items:
   scattered through the prerequisites, order-service, and helm sections
   reworded to drop iteration numbers (CAP-NNN decision-log references kept,
   since those are traceable rationale a reader benefits from) (done).
-- 🔲 **"Project Plans" section on the main site page** — the site landing/docs
-  index renders cards for the reconciliation plan and iteration plan. These
-  should NOT be public reader-facing; they stay as repo documents for our own
-  tracking. **Action:** remove the Project Plans cards from the site index
-  page. (This lives outside `_docs/17-capstone.md` — in the docs landing/index
-  file — which isn't in the current working set; needs the file to edit.)
+- ✅ **"Project Plans" section on the main site page** — removed. The "Project
+  plans" `<section>` in `index.html` (reconciliation + iteration plan cards),
+  the "Plan" nav link in `_includes/header.html`, and the footer link in
+  `_includes/footer.html` are deleted, and the `_plans` collection is set to
+  `output: false` in `_config.yml` so the plan pages no longer render publicly.
+  The `_plans/*.md` files remain in the repo as our own tracking documents.
 - 🔲 **Topic-name drift (minor, content accuracy)** — the §17 five-services
   table lists notification consuming `orders.placed`, `payments.processed`,
   `shipments.dispatched`, but the implemented topic is `order-placed`
