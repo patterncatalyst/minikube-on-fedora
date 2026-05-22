@@ -2691,3 +2691,25 @@ final reader shouldn't see. Items:
   (order + notification) → `gen-protos.sh` → `smoke-avro.sh`. Verified count
   holds at **119** until that run passes; then the registered-Avro flow is the
   120th fact.
+
+- 🔲 **r25b-discovery** (2026-05-22) — discovery contracts published to
+  Apicurio, completing the registry half of CAP-018. Ships a `/sdl` endpoint
+  on graphql-gateway (returns the Strawberry SDL), a reusable
+  `scripts/publish-discovery-contracts.sh` (stdlib Python, native v3 API,
+  idempotent), and `demos/smoke-discovery.sh` (deploys inventory/order/gateway,
+  publishes OpenAPI + Protobuf + GraphQL SDL, asserts each is retrievable from
+  Apicurio's v3 API plus the Avro runtime subject via ccompat). Three discovery
+  artifacts in the `default` group: `order-service-openapi` (OPENAPI, from the
+  live `/openapi.json`), `inventory-grpc-proto` (PROTOBUF, from the committed
+  `.proto`), `graphql-gateway-sdl` (GRAPHQL, from `/sdl`). Decision **CAP-020**
+  recorded; §17 prose updated — Apicurio now holds all four protocols'
+  contracts (runtime Avro + three discovery), with OpenMetadata the only
+  remaining layer.
+
+  **Validated statically** (Claude env): gateway `main.py` compiles with the
+  new `/sdl` route; `publish-discovery-contracts.sh` and `smoke-discovery.sh`
+  pass `bash -n`; the embedded Python publisher compiles. **Cluster
+  verification pending** on Fedora 44 via `smoke-discovery.sh` (needs Apicurio
+  + the services up; gateway rebuilt for `/sdl`). Verified count holds at
+  **120** until that run passes; then the three discovery artifacts are the
+  121st–123rd facts.

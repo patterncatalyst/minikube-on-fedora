@@ -12,12 +12,14 @@ production-scale pattern; see §17 prose for when you'd use it (CAP-016).
 Endpoints:
   GET  /health   — liveness (process is up)
   GET  /healthz  — readiness (process can serve; gateway has no datastore)
+  GET  /sdl      — the GraphQL schema as SDL (the gateway's discovery contract)
   /graphql       — the GraphQL endpoint (GraphiQL UI in a browser)
 """
 
 from __future__ import annotations
 
 from fastapi import FastAPI
+from fastapi.responses import PlainTextResponse
 from strawberry.fastapi import GraphQLRouter
 
 from app.config import settings
@@ -49,3 +51,16 @@ async def healthz() -> dict[str, str]:
     downstream failures surface per-field at query time instead.
     """
     return {"status": "ready", "service": settings.service_name}
+
+
+@app.get("/sdl", response_class=PlainTextResponse, tags=["ops"])
+async def sdl() -> str:
+    """The gateway's GraphQL schema as SDL — its **discovery contract**.
+
+    This is what gets published to Apicurio (as a GRAPHQL artifact) so the
+    schema is registered, versioned, and discoverable. Unlike the Avro event
+    contract, it's not on any runtime path — nothing here fails if the
+    registry is absent; it exists to be discovered (and later ingested into
+    the data catalog).
+    """
+    return schema.as_str()

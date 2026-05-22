@@ -661,18 +661,17 @@ This layering is also why the two arrive in that order. Apicurio is the
 derived from it. A catalog with nothing to catalog is empty, so the registry
 has to hold the contracts before the catalog has anything truthful to ingest.
 
-A note on honesty about the current state: the `order.placed` event now has a
-real **runtime contract** — its Avro schema is registered in Apicurio, and the
-producer and consumer serialize and deserialize against it (the registry is
-deployed in-memory; the producer re-registers the schema on startup). What's
-*not* yet built is the rest of the picture: the **discovery contracts** (the
-REST OpenAPI documents, the gRPC Protobuf definitions, and the GraphQL SDL)
-aren't published into Apicurio yet, and **OpenMetadata** isn't deployed, so
-there's no lineage catalog on top. This section describes the whole
-destination; the next iterations fill in the discovery contracts and then the
-catalog, deliberately in small steps — writing the destination down first
-means the iterations can correct this explanation against what actually gets
-built, which is how the rest of §17 has proceeded.
+A note on honesty about the current state: Apicurio now holds **all four
+protocols' contracts**. The `order.placed` event has its **runtime contract** —
+its Avro schema is registered, and the producer and consumer serialize and
+deserialize against it. And the three **discovery contracts** are published
+too: order-service's OpenAPI document, the inventory gRPC Protobuf definition,
+and the gateway's GraphQL SDL (exposed at `/sdl` and pushed to the registry by
+an offline publish step, not on any runtime path). What's *not* yet built is
+the top layer: **OpenMetadata** isn't deployed, so there's no lineage catalog
+ingesting all of this yet. That's the remaining step — the registry is now
+fully populated as its feedstock, which is exactly the ordering this section
+described: contracts first, catalog on top.
 
 ## What the capstone builds, and what's still ahead
 

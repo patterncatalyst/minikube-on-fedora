@@ -677,6 +677,51 @@ Status values: **accepted**, **superseded by CAP-NNN**,
   (OpenAPI/Protobuf/SDL) into Apicurio; then OpenMetadata (r27) ingests
   everything into lineage.
 
+## CAP-020 — Discovery contracts: publish OpenAPI, Protobuf, and GraphQL SDL to Apicurio
+
+- **Date:** r25b (discovery-contracts follow-on)
+- **Status:** accepted (completes the registry half of CAP-018; OpenMetadata
+  still follows)
+- **Context:** CAP-019 put the Avro *runtime* contract in Apicurio. This adds
+  the *discovery* contracts for the other three protocols, so the registry
+  holds all four — the feedstock OpenMetadata ingests (CAP-018).
+- **Decisions:**
+  - **Native v3 API, not ccompat.** Discovery artifacts are created via
+    `POST /apis/registry/v3/groups/{group}/artifacts` with the structured v3
+    body (`artifactId`, `artifactType`, `firstVersion.content`). The ccompat
+    API is reserved for the Avro runtime path (where producer/consumer expect
+    Confluent-style ids); discovery artifacts have no such constraint and use
+    Apicurio's first-class multi-format API. They share the `default` group.
+  - **Three artifacts, three sources.** `order-service-openapi` (OPENAPI,
+    fetched from the live `/openapi.json` — the REST exemplar), the publish
+    step generalizes to every service's OpenAPI; `inventory-grpc-proto`
+    (PROTOBUF, read from the committed `.proto` — no service needed);
+    `graphql-gateway-sdl` (GRAPHQL, fetched from a new gateway `/sdl`
+    endpoint that returns `schema.as_str()`).
+  - **A gateway `/sdl` endpoint.** Strawberry can emit the SDL directly; the
+    gateway exposes it so the schema is fetchable for publishing (and useful
+    on its own as a discoverable contract). It's explicitly off the runtime
+    path.
+  - **Publishing is offline, not per-service-startup.** A reusable
+    `scripts/publish-discovery-contracts.sh` (stdlib Python, given reachable
+    URLs) does the work; the smoke script supplies port-forwarded URLs. This
+    keeps discovery publishing as a CI/ops step, not runtime coupling baked
+    into every service (contrast the Avro runtime contract, which order-service
+    must register to function).
+  - **Idempotent.** An existing artifact (HTTP 409) is treated as already
+    published; production CI would add a new version (`ifExists=UPDATE`).
+- **Consequences:**
+  - (+) Apicurio now holds all four protocols' contracts; the runtime-vs-
+    discovery distinction in the diagrams is concrete (ccompat vs v3 API,
+    runtime-registered vs offline-published)
+  - (+) No new runtime coupling; only the gateway gained a read-only endpoint
+  - (−) OpenAPI publish needs the service running (fetched live); the proto is
+    static, the SDL needs the gateway up. The smoke deploys what it needs.
+  - (−) Only order-service's OpenAPI is published as the exemplar; extending
+    to all services is a trivial loop, deferred to keep the slice focused.
+- **Remaining for CAP-018:** OpenMetadata (r27) ingests Apicurio + Postgres +
+  Kafka into lineage — the last layer.
+
 ---
 
 ## Decisions inherited from r19 (PRD planning)
