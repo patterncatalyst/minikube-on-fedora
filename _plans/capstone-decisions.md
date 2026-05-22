@@ -776,6 +776,58 @@ Status values: **accepted**, **superseded by CAP-NNN**,
     documented async pitfalls: sync-only default env, empty autogenerate if
     models aren't imported, `%` interpolation) — captured in env.py comments
 
+## CAP-022 — OpenMetadata deploy: lean trio, Airflow-free, single-node search, reuse Postgres
+
+- **Date:** r27
+- **Status:** accepted (deploy decisions); DB-reuse wiring carries unverified
+  risk until the live run (see consequences)
+- **Context:** OpenMetadata is the catalog layer (CAP-018). It's the heaviest
+  component in the capstone — production specs sum to ~40 GiB across DB +
+  search + Airflow, far over the 24 GB / 16 CPU `capstone` profile. The deploy
+  must be trimmed to a demo footprint without losing the canonical shape.
+- **Decisions:**
+  - **Use the official charts** (`open-metadata/openmetadata` 1.12.8 and
+    `openmetadata-dependencies`), not hand-rolled manifests — canonical, and
+    the chart owns the server Deployment, the DB migration job, search index
+    bootstrap, and secret templating that we should not reimplement.
+  - **No Airflow.** Since 1.12 ingestion can run without Airflow. We set
+    `deployPipelinesConfig.enabled: false` and run ingestion as **one-off
+    Kubernetes Jobs** (the `openmetadata/ingestion` image running
+    `metadata ingest -c <yaml>`), not the K8sPipelineClient — simplest, most
+    legible, no RBAC/ServiceAccount machinery. Drops the entire Airflow tier
+    (api-server, scheduler, dag-processor, triggerer, statsd), the single
+    biggest footprint saving.
+  - **Single-node OpenSearch, no host kernel change.** Run OpenSearch in
+    single-node / development mode (`discovery.type=single-node`), which puts
+    it in development mode where the `vm.max_map_count` bootstrap check is a
+    non-fatal warning, not a startup blocker. This means **we never touch the
+    host's `vm.max_map_count`** — no `minikube ssh sysctl`, no `/etc/sysctl`,
+    no privileged sysctl init container. (Ephemeral `sysctl -w` would revert on
+    reboot anyway, but single-node mode avoids it entirely.) Heap trimmed to
+    ~1 GiB; storage trimmed from the 30 GiB default.
+  - **Reuse the CloudNativePG Postgres** as OpenMetadata's backend (a dedicated
+    `openmetadata` database in the existing cluster), not the chart's bundled
+    MySQL — keeps the all-Postgres, operator-managed story (CAP-003) and saves
+    a stateful service. OpenMetadata's own operational store is *not* a data
+    product; reusing the cluster for it is a deployment convenience, distinct
+    from the per-service data-product schemas.
+  - **Footprint:** server ~2 GiB + OpenSearch ~2 GiB + (backend ~0, reused) +
+    transient ingestion Job ≈ 4–5 GiB on top of the existing stack → ~12–16 GiB
+    of 24. No profile bump.
+- **Consequences:**
+  - (+) Canonical install, demo-sized, fits the profile, host kernel untouched
+  - (+) Ingestion is a legible one-off Job, no orchestrator to run
+  - (−) **DB-reuse is the verification risk.** Pointing the official chart at
+    our Postgres means overriding its `database` config + `dbScheme: postgresql`
+    + a credentials secret, and provisioning an `openmetadata` database/role in
+    CNPG. None of this is renderable offline; if the chart's DB keys or the
+    secret wiring are off, the server's migration job fails. Fallback if it
+    fights us: the chart's bundled MySQL (default, most-tested) — at the cost
+    of introducing MySQL. Decided to attempt PG-reuse first per the
+    all-Postgres preference, with bundled MySQL as the documented escape hatch.
+  - (−) Highest cluster-only uncertainty in the project so far — expect one or
+    two live fix cycles on the values files.
+
 ---
 
 ## Decisions inherited from r19 (PRD planning)
@@ -800,10 +852,48 @@ Restated here so the decision log is the single source of truth.
 
 ## Pending decisions (not yet resolved)
 
-- **Alembic introduction point** (follows from CAP-004) — which
-  iteration introduces real migrations. Tentatively r25.
+- **Alembic introduction point** (follows from CAP-004) — *resolved*:
+  introduced in r25c for notification-service via an init container
+  (CAP-021). Other services keep `create_all` until they need to evolve.
 - **GraphQL gateway scaling** — single replica assumed; revisit
   if demos need more.
 - **OpenMetadata ingestion mechanism** — official Apicurio
   connector vs OpenMetadata REST API ingestion. Resolve at r27
   when OpenMetadata lands.
+
+### r26 design intent — KEDA + Istio as data-mesh capabilities (not bolted on)
+
+Recorded now so the framing survives until r26 is built. r26 wires KEDA and
+Istio into the capstone, framed explicitly as serving data-mesh principles
+rather than as standalone feature demos (both already appear earlier — §12
+KEDA, mid-section Istio):
+
+- **KEDA = elastic data products.** Autoscale the notification consumer on
+  Kafka consumer-group lag (the §12 ScaledObject pattern, now applied to a
+  capstone data product), so a data product scales with the demand placed on
+  it and back to zero when idle. Maps to "data as a product": products own
+  their compute and scale independently.
+- **Istio = safe contract evolution + observable inter-product traffic.** The
+  headline demo (user-requested): take a single service's REST API through a
+  **v1 → v2 contract change**, deploy v2 alongside v1, and use Istio traffic
+  management (`VirtualService` + `DestinationRule` subsets) to **split live
+  traffic** between versions — a canary of a *data product's contract*, not
+  just a binary. This is the concrete demonstration of the data-mesh principle
+  that products evolve their interfaces without a flag-day break: Apicurio
+  holds both contract versions (OpenAPI v1 and v2), the registry can check
+  compatibility, OpenMetadata shows the lineage, and Istio controls *who sees
+  which version* during migration. Note the terminology distinction: Istio
+  *control-plane revisions* + revision tags are for canarying Istio upgrades
+  themselves (a secondary "even the mesh upgrades by canary" note); the
+  data-product-evolution story is **workload-version traffic shifting** via
+  VirtualService/DestinationRule subsets.
+- **Visual demonstration (stretch, user-requested):** make the traffic split
+  *visible* — e.g. a small live view (or Kiali's graph) showing the v1/v2
+  weight shifting, or a blue/green-style indicator, so the canary is legible
+  as it happens rather than only inferable from logs. Mechanism TBD at r26
+  (candidates: Kiali traffic graph; a tiny inline widget polling each version's
+  share; or a generated SVG of the weight split). Decide when r26 is built.
+- **Scope note:** keep it to a single API on one service (even a minimal REST
+  change — e.g. a renamed/added field, v1 vs v2 response shape) to keep the
+  example small and the principle clear.
+

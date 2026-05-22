@@ -762,6 +762,60 @@ ingesting all of this yet. That's the remaining step — the registry is now
 fully populated as its feedstock, which is exactly the ordering this section
 described: contracts first, catalog on top.
 
+## The catalog as a mesh requirement, not an add-on
+
+It's tempting to read a data catalog as monitoring or nice-to-have tooling
+bolted onto a working system. In a data mesh it is neither — it's the
+mechanism through which three of Dehghani's four principles are actually
+fulfilled. Worth being precise about why, because it determines what the
+catalog must do rather than what's merely convenient.
+
+The second principle, **data as a product**, sets a quality bar: a data
+product must be discoverable, addressable, understandable, and trustworthy.
+The discoverability clause is doing real work — a product that no one can find
+is, operationally, not a product. Independent teams can't depend on each
+other's data by reading each other's code or databases (that's exactly the
+coupling the mesh exists to break); they depend on a *published, discoverable*
+description. So "data as a product" implies a place where products are
+registered and browsed. That place is the catalog.
+
+The third principle, the **self-serve data platform**, says a consumer should
+be able to find, understand, and start using a data product without filing a
+ticket against the owning team. Self-service is impossible without a single
+surface that answers "what products exist, what shape is each one, who owns
+it, how fresh is it." Again: the catalog.
+
+The fourth principle, **federated computational governance**, is the one that
+makes the catalog load-bearing rather than ornamental. Governance in a mesh is
+*federated* (each domain governs its own products) but *computational* (the
+rules — ownership, classification, retention, compatibility, and above all
+lineage — are expressed as metadata that machines can act on, not as a wiki
+page humans are asked to keep current). Lineage is the keystone: the traceable
+chain showing that order-service produces `order.placed`, which is the Avro
+schema Apicurio holds, which notification-service consumes and persists. With
+that chain computable, you can answer the questions governance actually asks —
+if this schema changes, who breaks; if this field is sensitive, where does it
+flow; if this product is wrong, what's downstream — without a human
+reconstructing it from tribal knowledge. That is what turns a pile of
+independently-owned services into a *governed* mesh rather than a distributed
+mess.
+
+This is why the capstone treats the catalog as a required layer and builds it
+on the registry rather than instead of it. The two answer different questions
+and the canonical pattern layers them: Apicurio answers *what is the contract
+for X* (the precise, versioned, compatibility-checked shape of each boundary);
+OpenMetadata answers *what products exist, who owns them, and how does data
+flow between them* (discovery, ownership, and lineage across products). The
+catalog ingests *from* the contract registry — plus the Postgres schemas each
+service owns and the Kafka topics they exchange — so its picture is derived
+from ground truth, not hand-maintained. **OpenMetadata** is the capstone's
+catalog because it's open-source, runs on Kubernetes, speaks a pull-based
+ingestion model with first-class connectors for exactly our sources (Postgres,
+Kafka, and schema registries), and represents lineage as a first-class,
+queryable entity. Deploying it, pointing its ingestion at the mesh's sources,
+and declaring the cross-product lineage is the step that completes the
+architecture these two diagrams describe.
+
 ## What the capstone builds, and what's still ahead
 
 The capstone assembles a small but complete data mesh: five domain services
