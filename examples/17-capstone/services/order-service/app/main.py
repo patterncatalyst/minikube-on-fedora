@@ -59,6 +59,20 @@ async def health() -> dict[str, str]:
     return {"status": "ok", "service": settings.service_name}
 
 
+@app.get("/version", tags=["ops"])
+async def version() -> dict[str, str]:
+    # The canary signal (r26). v1 and v2 run the same image with different
+    # API_VERSION; the Istio VirtualService splits traffic between the two
+    # subsets, and this side-effect-free endpoint is how a caller (and the
+    # smoke) tells which version served the request. v2 advertises the
+    # additive contract change: a `currency` field on order responses — a
+    # backward-compatible evolution, exactly the kind you canary.
+    body = {"service": settings.service_name, "api_version": settings.api_version}
+    if settings.api_version == "v2":
+        body["currency"] = "USD"
+    return body
+
+
 @app.get("/healthz", tags=["ops"])
 async def healthz() -> dict[str, str]:
     if not await check_db():

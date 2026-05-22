@@ -1,0 +1,71 @@
+# routing.yaml — the Istio traffic-management resources for the order-service
+# canary (r26, CAP-024). Three objects:
+#
+#   Gateway          — exposes order-service through the istio-ingressgateway,
+#                      so external traffic (the smoke, or a browser) enters the
+#                      mesh and the VirtualService can shape it.
+#   VirtualService   — the canary control: splits HTTP traffic between the v1
+#                      and v2 subsets by weight. The weights carry placeholders
+#                      __W_V1__ / __W_V2__ that smoke-canary.sh substitutes, so
+#                      the same file drives 90/10, 50/50, 0/100, etc.
+#   DestinationRule  — names the two subsets (v1, v2) by the `version` pod
+#                      label, so the VirtualService can target them.
+#
+# VERIFY-POINTS (Istio API; confirm against the installed Istio version —
+# matches §11's 1.29.x — these are not renderable offline):
+#   * apiVersion networking.istio.io/v1 (v1beta1 also accepted on 1.29.x).
+#   * The Gateway selector `istio: ingressgateway` matches the default
+#     ingress-gateway install; the smoke port-forwards that Service.
+#   * Subset matching is by the `version` label set on the v1/v2 pods.
+---
+apiVersion: networking.istio.io/v1
+kind: Gateway
+metadata:
+  name: order-service-gateway
+  namespace: capstone
+spec:
+  selector:
+    istio: ingressgateway        # the default istio-ingressgateway in istio-system
+  servers:
+    - port:
+        number: 80
+        name: http
+        protocol: HTTP
+      hosts:
+        - "*"
+---
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  name: order-service
+  namespace: capstone
+spec:
+  hosts:
+    - "*"
+  gateways:
+    - order-service-gateway
+  http:
+    - route:
+        - destination:
+            host: order-service        # the ClusterIP Service (fronts both subsets)
+            subset: v1
+          weight: __W_V1__
+        - destination:
+            host: order-service
+            subset: v2
+          weight: __W_V2__
+---
+apiVersion: networking.istio.io/v1
+kind: DestinationRule
+metadata:
+  name: order-service
+  namespace: capstone
+spec:
+  host: order-service
+  subsets:
+    - name: v1
+      labels:
+        version: v1
+    - name: v2
+      labels:
+        version: v2

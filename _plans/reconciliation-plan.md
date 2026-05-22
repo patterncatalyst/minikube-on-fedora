@@ -2865,3 +2865,42 @@ final reader shouldn't see. Items:
   cycles) r27b needed no live fixes. Verified count → **127** ("catalog
   populated; cross-product lineage orders → order-placed → notifications
   browsable"). **r27c** follows: Apicurio ingestion + schema-registry linkage.
+- 🔲 **r26** (2026-05-22, built out of numeric order — after r27b) — Istio
+  v1→v2 canary on order-service (CAP-024), the "safe contract evolution" half of
+  the r26 design intent. (The KEDA half is CAP-025, deferred to r26b.) Ships:
+  order-service gains a side-effect-free `GET /version` endpoint and an
+  `API_VERSION` setting (v2 advertises an additive `currency` field — the
+  backward-compatible contract change being canaried); the order-service subchart
+  Deployment gains a `version: v1` subset label + selector and a
+  `sidecar.istio.io/inject` annotation. Under `examples/17-capstone/istio/`:
+  `order-service-v2.yaml` (the v2 subset — same image, `API_VERSION=v2`,
+  `version: v2`), `routing.yaml` (Gateway + VirtualService with `__W_V1__`/`__W_V2__`
+  weight placeholders + DestinationRule subsets by `version`), and
+  `render-split.py` (stdlib SVG of the observed split). Plus
+  `scripts/setup-istio.sh` (installs Istio `default` profile into the capstone
+  cluster, labels the namespace for injection) and `demos/smoke-canary.sh`
+  (deploys v2, asserts both subsets are meshed, applies a 90/10 split, drives 100
+  requests through the istio-ingressgateway and asserts the band, shifts to 50/50
+  and re-asserts, renders the SVG). §17 gained the "Evolving a contract in the
+  open: the v1→v2 canary" section; the closer updated (traffic management now in
+  place, KEDA autoscaling still ahead). CAP-024 + CAP-025 recorded.
+
+  **Validated statically** (Claude env — no helm/kubectl/istioctl, no network):
+  order-service `config.py`/`main.py` `py_compile`; both Istio overlay YAMLs parse
+  (Deployment; Gateway/VirtualService/DestinationRule) with disjoint v1/v2
+  selectors; the `sed` weight substitution yields valid YAML with integer weights
+  summing to 100; `render-split.py` compiles and emits well-formed SVG; both shell
+  scripts pass `bash -n`. CI (`gh run watch`) confirms the Jekyll site builds — the
+  new §17 prose carries no Go-template `{{ }}`.
+
+  **Cluster verification pending** (Fedora 44, user-run): `scripts/setup-istio.sh`
+  → one-time `kubectl delete deployment order-service` + `helm upgrade` (selector
+  immutability) → rebuild the order-service image so v1 carries `/version`
+  (`scripts/build-image.sh services/order-service order-service v1`) →
+  `demos/smoke-canary.sh`. **Expected cluster-only risk**: the Istio API/install
+  specifics (`networking.istio.io/v1` kinds, ingressgateway Service name,
+  subset-by-label routing, sidecar-injection timing), flagged `VERIFY-POINT` in
+  `istio/routing.yaml`. Promote to `verified (Fedora 44)` and bump the count to
+  **128** ("order-service v1→v2 canary: weighted Istio traffic split, observed and
+  shiftable") once the smoke passes. **r26b** follows: the KEDA dual-scaler
+  (Kafka-lag on notification, HTTP add-on on the gateway) per CAP-025.

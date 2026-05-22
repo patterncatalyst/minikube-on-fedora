@@ -12,11 +12,29 @@ spec:
   selector:
     matchLabels:
       app.kubernetes.io/name: order-service
+      # r26: the selector includes the subset so this Deployment owns ONLY its
+      # v1 pods, leaving the v2 overlay Deployment to own version=v2. NOTE:
+      # selector is an immutable field — enabling the canary on an already-
+      # deployed v1 requires deleting the old Deployment once before
+      # `helm upgrade` recreates it (smoke-canary.sh detects + instructs).
+      version: v1
   template:
     metadata:
       labels:
         app.kubernetes.io/name: order-service
         app.kubernetes.io/part-of: capstone
+        # r26: subset label for the Istio canary. The DestinationRule's `v1`
+        # subset matches version=v1; the v2 overlay Deployment carries
+        # version=v2. The Service selector keys on app.kubernetes.io/name, so
+        # it fronts BOTH versions — Istio decides the split by subset.
+        version: v1
+      annotations:
+        # r26: opt this workload into the mesh so Envoy enforces the canary
+        # routing (selective injection — we mesh order-service for the canary,
+        # not the whole namespace, to keep sidecars off the operator-managed
+        # infra pods). Harmless until Istio is installed and the namespace
+        # permits injection.
+        sidecar.istio.io/inject: "true"
     spec:
       containers:
         - name: order-service

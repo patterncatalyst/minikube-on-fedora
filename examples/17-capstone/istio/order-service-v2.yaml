@@ -1,0 +1,100 @@
+# order-service-v2.yaml — the canary's v2 subset (r26, CAP-024).
+#
+# Deployed ALONGSIDE the Helm-managed v1 order-service. Same image, same env;
+# the only differences are `API_VERSION=v2` (so GET /version reports v2 and
+# advertises the additive `currency` contract change) and the `version: v2`
+# pod label (which the DestinationRule's v2 subset matches). The shared Service
+# `order-service` fronts both subsets via its app.kubernetes.io/name selector;
+# the VirtualService decides the traffic split.
+#
+# Selector includes `version: v2` so this Deployment owns only its own pods,
+# disjoint from the v1 Deployment's `version: v1` selector.
+#
+# The env block is copied verbatim from the order-service subchart's v1
+# Deployment so v2 is a real, DB-backed order-service (its /healthz readiness
+# probe checks Postgres; without working DB env it would never become Ready and
+# Istio would route no traffic to it).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: order-service-v2
+  namespace: capstone
+  labels:
+    app.kubernetes.io/name: order-service
+    app.kubernetes.io/part-of: capstone
+    app.kubernetes.io/component: data-product
+    version: v2
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: order-service
+      version: v2
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: order-service
+        app.kubernetes.io/part-of: capstone
+        version: v2
+      annotations:
+        sidecar.istio.io/inject: "true"
+    spec:
+      containers:
+        - name: order-service
+          image: "localhost:5000/order-service:v1"   # same image as v1
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: API_VERSION
+              value: "v2"                              # the only behavioural diff
+            - name: SERVICE_SCHEMA
+              value: "orders"
+            - name: INVENTORY_GRPC_ADDR
+              value: "inventory-service:50051"
+            - name: KAFKA_BOOTSTRAP
+              value: "capstone-kafka-kafka-bootstrap:9092"
+            - name: KAFKA_ORDER_TOPIC
+              value: "order-placed"
+            - name: APICURIO_URL
+              value: "http://apicurio:8080"
+            - name: KAFKA_ORDER_SUBJECT
+              value: "order-placed-value"
+            - name: PG_HOST
+              value: "capstone-postgres-rw.capstone.svc.cluster.local"
+            - name: PG_PORT
+              value: "5432"
+            - name: PG_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: capstone-postgres-app
+                  key: dbname
+            - name: PG_USER
+              valueFrom:
+                secretKeyRef:
+                  name: capstone-postgres-app
+                  key: username
+            - name: PG_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: capstone-postgres-app
+                  key: password
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 256Mi
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5

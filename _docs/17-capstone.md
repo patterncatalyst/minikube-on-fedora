@@ -935,6 +935,46 @@ notifications. Open the topic's Lineage tab in the UI and the cross-product flow
 is drawn for you. That picture — assembled from the products' own ground truth,
 not hand-maintained — is what the contract-and-catalog arc was building toward.
 
+## Evolving a contract in the open: the v1→v2 canary
+
+A catalog tells you a product's contract exists and who depends on it. The next
+question a mesh has to answer is operational: how does a product *change* that
+contract without a flag-day break that strands its consumers? The answer the
+mesh offers is a canary — deploy the new version alongside the old, route a
+small slice of live traffic to it, watch, and shift more as confidence grows.
+Here that plays out on order-service, the REST product whose contract Apicurio
+already holds and whose lineage the catalog already draws.
+
+The change is deliberately small and backward-compatible: v2 adds a `currency`
+field to order responses — the kind of additive evolution that shouldn't break
+anyone, but that you'd still want to roll out gradually rather than all at once.
+v2 deploys next to v1 as a second workload sharing the same Service; what
+distinguishes them to the mesh is a `version` label. Istio's pieces then do the
+shaping: a `DestinationRule` names the two subsets by that label, and a
+`VirtualService` assigns each a weight. Send traffic through the ingress gateway
+and roughly that fraction reaches each version. Move the weights — 90/10, then
+50/50, then 0/100 — and the split moves with them. That is the whole canary: not
+a binary switch, but a dial.
+
+Two details earn a mention because they bite in practice. First, both versions
+need an Envoy sidecar for the routing to take effect, so order-service joins the
+mesh — but only order-service. Injecting the operator-managed infrastructure
+(the Postgres and Kafka pods, the catalog) is a different and riskier
+proposition, so the mesh here is scoped to the product being canaried; broader
+mTLS is left for later. Second, giving each version its own subset means the v1
+Deployment's selector has to name `version: v1` so it owns only its own pods —
+and a Deployment's selector is immutable, so an already-running v1 must be
+recreated once when you enable this. The script detects that situation and tells
+you the one-line fix rather than failing cryptically.
+
+`scripts/setup-istio.sh` installs the control plane and turns on injection;
+`demos/smoke-canary.sh` deploys v2, applies the routing, drives a hundred
+requests at 90/10, shifts to 50/50, and confirms the observed split each time —
+and renders a small SVG of it, so the dial is something you can see, not just
+infer from logs. The principle underneath: in a mesh, a product owns its own
+rollout, and changing a contract is a controlled, observable operation rather
+than a coordinated outage.
+
 ## What the capstone builds, and what's still ahead
 
 The capstone assembles a small but complete data mesh: five domain services
@@ -946,14 +986,16 @@ reads, and Kafka events for the asynchronous order→notification flow.
 Postgres is managed by the CloudNativePG operator and Kafka by the Strimzi
 operator, all running rootless on a dedicated minikube profile.
 
-Still ahead, layered on this foundation: autoscaling and traffic
-management (KEDA and Istio), an observability stack (OpenTelemetry,
-Prometheus, Grafana, Tempo), and scheduled cross-service orchestration
-(Prefect). The contract-and-catalog layer is now in place — a schema registry
-(Apicurio) gives every protocol's contract a versioned home, and the data
-catalog (OpenMetadata) turns the Postgres schemas and Kafka topics into
-browsable, lineage-bearing metadata. Each increment lands the same way: focused
-and independently verifiable — the rhythm the protocol work has followed.
+Still ahead, layered on this foundation: autoscaling that lets products scale
+to the demand on them and back to zero (KEDA — consumer-lag scaling for the
+event consumers, HTTP-load scaling for the synchronous gateway), an
+observability stack (OpenTelemetry, Prometheus, Grafana, Tempo), and scheduled
+cross-service orchestration (Prefect). The contract, catalog, and
+traffic-management layers are now in place — Apicurio versions every contract,
+OpenMetadata turns schemas and topics into browsable lineage, and Istio shifts
+live traffic between contract versions so a product can evolve its interface as
+a controlled canary. Each increment lands the same way: focused and
+independently verifiable — the rhythm the protocol work has followed.
 
 ## References
 

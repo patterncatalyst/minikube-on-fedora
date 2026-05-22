@@ -989,6 +989,102 @@ checks miss cluster-only failures" pattern: this time the cluster agreed with th
 offline-authored configs on the first run — the verify-point flags were
 appropriate caution, not a deferred bug.
 
+## CAP-024 — Istio canary: order-service v1→v2 contract evolution via weighted subset routing
+
+- **Date:** r26 (built after r27/r27b — see sequencing note)
+- **Status:** accepted (design + implementation); Istio API/install specifics
+  carry the usual cluster-only risk until the live run
+- **Context:** The r26 design intent framed Istio as "safe contract evolution +
+  observable inter-product traffic," with the headline being a data product
+  taking its REST API through a v1→v2 change and Istio splitting live traffic
+  between versions — a canary of a *contract*, not just a binary. r26 builds
+  exactly that on order-service (the REST/OpenAPI exemplar, whose contract
+  Apicurio already holds and whose lineage OpenMetadata now shows — r27b).
+- **Decisions:**
+  - **Target = order-service** (the only pure-REST service with a published
+    contract). The v2 change is additive and backward-compatible: GET /version
+    reports the subset, and v2 advertises a new `currency` field on order
+    responses — the canonical "evolve the contract without breaking clients"
+    move you'd actually canary.
+  - **One image, env-toggled subsets** (`API_VERSION=v1|v2`), not two image
+    builds. v1 and v2 run the same image with different env and a different
+    `version` pod label; Istio shifts traffic between them. This keeps the
+    demo's focus on the traffic-management mechanism rather than an image
+    pipeline. Documented as a demo simplification — in production v1/v2 are
+    distinct tags from distinct commits, and the Istio mechanism is identical.
+  - **Routing through the istio-ingressgateway**, not client-side. A `Gateway` +
+    a `VirtualService` (weighted route over v1/v2 subsets) + a `DestinationRule`
+    (subsets by the `version` label) — the §11 Bookinfo pattern, now first-party
+    on a capstone service. The smoke hits the gateway (port-forwarded under
+    rootless podman, the §11 Option A), so no client needs meshing.
+  - **Weights as `__W_V1__`/`__W_V2__` placeholders** in `istio/routing.yaml`;
+    `smoke-canary.sh` substitutes them, so the same file drives 90/10, 50/50,
+    0/100 — the progressive-canary operation is just re-applying the
+    VirtualService.
+  - **Selector immutability handled explicitly.** The v1 Deployment's selector
+    is narrowed to include `version: v1` so it owns only its subset, disjoint
+    from the v2 overlay's `version: v2`. Because a Deployment selector is
+    immutable, enabling the canary on an already-deployed v1 requires deleting
+    the old Deployment once before `helm upgrade` recreates it. The smoke
+    detects a stale selector and prints the one-line migration; the §17 prose
+    documents it.
+  - **Scoped meshing, mTLS deferred.** r26 meshes order-service for the canary
+    (sidecar via the inject annotation; the namespace is injection-labeled so
+    new/recreated pods join, while the already-running operator-managed infra
+    pods — Postgres, Kafka, Apicurio, OpenMetadata — keep running sidecar-less
+    and must not be restarted under the label). Mesh-wide mTLS and observable
+    inter-product traffic (PeerAuthentication STRICT, Kiali) are deliberately
+    *not* in r26: STRICT would break unmeshed callers, and injecting the
+    operator pods is hazardous. They belong with the observability iteration.
+- **Consequences:**
+  - (+) The "data products evolve their contracts without a flag-day break"
+    principle is concrete and demonstrable: deploy v2, shift 10% → 50% → 100%,
+    watch the response shape change. Leans on the now-verified Apicurio (holds
+    v1/v2 OpenAPI) and OpenMetadata (lineage) layers.
+  - (+) First-party Istio manifests on a capstone service; the §11 pattern
+    generalized off Bookinfo.
+  - (−) The selector-immutability one-time delete is a rough edge (mitigated:
+    detected + instructed).
+  - (−) Istio API/install specifics (the `networking.istio.io/v1` kinds, the
+    ingressgateway Service, subset-by-label routing, sidecar injection timing)
+    are not renderable offline — the cluster-only risk class. Flagged
+    `VERIFY-POINT` in `istio/routing.yaml`.
+  - (−) The env-toggle means "v2" is the same binary; honest about it, but a
+    purist canary would use two image tags.
+
+## CAP-025 — KEDA as elastic data products: dual scalers (Kafka lag + HTTP add-on), placed to avoid the canary
+
+- **Date:** r26 (decision locked); **implementation deferred to r26b**
+- **Status:** accepted (placement + scaler choice); built next
+- **Context:** The r26 design intent framed KEDA as "elastic data products" —
+  autoscaling a product on the demand placed on it, back to zero when idle. The
+  §17 platform-stack table promises *both* KEDA scaler types ("scale
+  order-service on HTTP load; scale Kafka consumers on lag"), but the intent
+  elaborated only the Kafka-lag path. This decision records both, and resolves
+  *which service gets which* so the scalers don't collide with the CAP-024
+  canary.
+- **Decisions:**
+  - **Kafka consumer-lag scaler → notification-service.** A `ScaledObject`
+    (kafka scaler, §12 Pattern A) scales the `order-placed` consumer on
+    consumer-group lag, to zero when idle. notification is a consumer — no
+    HTTP/Istio path to conflict with.
+  - **HTTP add-on scaler → graphql-gateway** (NOT order-service). The KEDA HTTP
+    interceptor and Istio's VirtualService both want to own a service's ingress
+    path; putting HTTP scaling on order-service would collide with the canary
+    there. The gateway is a natural synchronous-read load target and is not the
+    canary subject, so the two capabilities live on different services cleanly.
+    This means updating the §17 stack-table line from "order-service on HTTP
+    load" to "graphql-gateway on HTTP load" when r26b lands.
+  - **Both scale-to-zero**, the §12 building blocks reused as first-party
+    capstone manifests.
+- **Consequences:**
+  - (+) Both KEDA scaler types demonstrated, each idiomatic to its service; no
+    proxy-path collision with the canary.
+  - (−) KEDA HTTP interceptor + (if the gateway is later meshed) an Istio
+    sidecar on the same workload is a known interaction to validate — the r26b
+    cluster-only risk, by analogy to the verify-points elsewhere.
+  - (−) Implementation deferred to r26b to keep r26 to one concern (the canary).
+
 ---
 
 ## Decisions inherited from r19 (PRD planning)
