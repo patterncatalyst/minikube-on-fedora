@@ -14,9 +14,13 @@ cluster:
   database: capstone
   owner: capstone_app
   # Resource requests/limits for the Postgres pod itself.
+  # CAP-038: 512Mi was too tight — Postgres + the CNPG instance-manager + startup
+  # crash-recovery (WAL replay) OOM-killed at that ceiling, especially after an
+  # unclean restart. A database is not a tiny FastAPI service (the CAP-026
+  # service calibration does not apply here); give it real headroom.
   resources:
     requests:
       cpu: 200m
-      memory: 256Mi
-    limits:
       memory: 512Mi
+    limits:
+      memory: 2Gi

@@ -3455,3 +3455,17 @@ final reader shouldn't see. Items:
     kubectl rollout status deploy/order-service -n capstone --timeout=180s
   → 2/2 Ready through cold start; then resume Phase A
   (smoke-discovery → ingest-openmetadata → demo-add-data-product.sh up).
+
+- 🔲 **r38** (2026-05-23) — Fix: Postgres mesh-exclusion + sizing (CAP-038). order-
+  service's ConnectionResetError traced to Postgres crash-looping: (1) meshed under
+  namespace-wide injection, so Envoy broke CNPG's own TLS (postgres exit 2,
+  "HTTP communication issue"); (2) once unmeshed, OOMKilled at its 512Mi limit
+  during WAL-replay recovery. Chart now sets CNPG `inheritedMetadata` annotation
+  `sidecar.istio.io/inject:"false"` and raises resources (req 256→512Mi, lim
+  512Mi→2Gi). Offline-validated (yaml parse + structural render). **Live fix +
+  cluster-verify:**
+    kubectl patch cluster capstone-postgres -n capstone --type=merge \
+      -p '{"spec":{"resources":{"requests":{"memory":"512Mi"},"limits":{"memory":"2Gi"}}}}'
+    kubectl get pods -n capstone -l cnpg.io/cluster=capstone-postgres -w   # → 1/1 Ready, stable
+    kubectl get pods -n capstone -l app.kubernetes.io/name=order-service   # → 2/2 on its own
+  Phase C: make selective injection uniform across all operator-managed infra.

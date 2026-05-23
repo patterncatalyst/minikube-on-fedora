@@ -12,6 +12,18 @@ spec:
   imageName: {{ .Values.cluster.imageName }}
   {{- end }}
 
+  # Keep the operator-managed Postgres pods OUT of the Istio mesh (CAP-038).
+  # CNPG runs its own TLS on the instance-manager status/replication ports; an
+  # injected Envoy intercepts and re-wraps those connections, breaking CNPG's
+  # TLS handshakes — the postgres container crash-loops (exit 2) and the operator
+  # can't reach the instance status endpoint ("HTTP communication issue"). This
+  # is the selective-injection model the capstone documents: mesh only
+  # order-service for the canary, never the operator-managed infra. CNPG
+  # propagates inheritedMetadata onto the instance pods.
+  inheritedMetadata:
+    annotations:
+      sidecar.istio.io/inject: "false"
+
   # Bootstrap the application database and owner role on first init.
   # CloudNativePG generates a Secret named "<cluster>-app" holding the
   # owner's credentials; services read connection details from it.

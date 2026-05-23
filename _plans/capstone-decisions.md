@@ -1781,3 +1781,52 @@ startup; propagating it to the others is a noted follow-on, not done here.
 value is valid JSON; values.yaml parses (startup budget 120s); deployment.yaml
 annotations intact. Cluster-verify: rebuild order-service image, redeploy, and it
 reaches 2/2 Ready through a cold start without crash-looping; then resume Phase A.
+
+## CAP-038 — Postgres: exclude from mesh + size for crash-recovery
+
+**Status:** decided, shipped r38 (live-patched + chart fix; cluster-verify pending).
+
+**Context.** With order-service finally past its own startup race, its retry loop
+surfaced a persistent `ConnectionResetError` to `capstone-postgres-rw:5432` —
+because **Postgres itself was crash-looping**, for two stacked reasons:
+
+1. **It was meshed.** Namespace-wide injection put an istio-proxy on the CNPG
+   instance pod (`istio-init`/`istio-proxy`/`bootstrap-controller`/`postgres`,
+   `1/2`). CNPG runs its own TLS on the instance-manager status/replication
+   ports; the injected Envoy intercepted and re-wrapped those connections,
+   breaking CNPG's TLS — the `postgres` container exited 2 amid `crypto/tls`
+   read churn, and the operator reported "Instance Status Extraction Error: HTTP
+   communication issue" (it couldn't reach the manager). This is the same
+   namespace-wide-injection drift behind CAP-034 (ingestion Jobs) — operator-
+   managed infra must not be meshed, exactly as the order-service chart comment
+   always said.
+2. **It was undersized.** Once unmeshed (`1/1`), Postgres started but was
+   `OOMKilled` at its `512Mi` limit during startup crash-recovery (WAL replay
+   after the unclean restarts). 512Mi is the tiny-FastAPI budget from CAP-026; a
+   database with an instance-manager and recovery spikes needs real headroom.
+
+**Decision.**
+  * **Exclude Postgres from the mesh** via the CNPG Cluster `spec.inheritedMetadata`
+    (annotation `sidecar.istio.io/inject: "false"`), which CNPG propagates to the
+    instance pods. Persisted in `charts/capstone/charts/postgres/templates/cluster.yaml`
+    so a fresh bootstrap never meshes it.
+  * **Raise Postgres resources** (`charts/capstone/charts/postgres/values.yaml`):
+    request 256Mi→512Mi, limit 512Mi→**2Gi** — headroom for the instance-manager
+    plus WAL-replay recovery.
+
+**Broader model (the Phase C Istio decision, now decided in practice).** The
+"selective injection" the capstone always documented — mesh only order-service
+for the canary, keep sidecars off operator-managed infra — is the correct model,
+and namespace-wide injection has now demonstrably broken three things (ingestion
+Jobs, the order-service chase, Postgres). r38 opts Postgres out explicitly;
+Kafka/Apicurio/OpenMetadata currently tolerate their sidecars, so they are left
+as-is for now, but Phase C should opt all operator-managed infra out (or remove
+the namespace-wide label and rely on per-workload opt-in) to make the model
+uniform. Recorded so it is a conscious choice, not drift.
+
+**Consequences.** Live-patched the running cluster (inject:false already applied;
+resources patch to follow) and fixed the chart. Offline-validated: values.yaml
+parses (req 512Mi / lim 2Gi); cluster.yaml renders structurally with
+inheritedMetadata + resources intact. Cluster-verify: Postgres returns `1/1` and
+stays Ready (no OOM, no TLS crash), the CNPG cluster reports healthy, and
+order-service connects on its next retry and goes `2/2` — closing the bring-up.
