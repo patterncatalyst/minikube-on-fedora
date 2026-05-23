@@ -35,6 +35,13 @@ spec:
         # infra pods). Harmless until Istio is installed and the namespace
         # permits injection.
         sidecar.istio.io/inject: "true"
+        # r37 (CAP-037): order-service connects to Postgres, Kafka, and Apicurio
+        # during FastAPI startup. As a meshed pod, its outbound connections only
+        # work once istio-proxy has programmed its routes — so hold the app
+        # container until the proxy is ready, closing the startup race that
+        # otherwise makes the first DB connect fail and crash-loop. Paired with
+        # startup retry/backoff in db.py + events.py as belt-and-suspenders.
+        proxy.istio.io/config: '{"holdApplicationUntilProxyStarts": true}'
     spec:
       containers:
         - name: order-service

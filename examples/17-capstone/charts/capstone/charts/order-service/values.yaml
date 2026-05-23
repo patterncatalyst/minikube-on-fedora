@@ -50,7 +50,7 @@ probes:
   # 256Mi). 30 x 2s = 60s startup grace.
   startup:
     path: /health
-    failureThreshold: 30
+    failureThreshold: 60
     periodSeconds: 2
   liveness:
     path: /health

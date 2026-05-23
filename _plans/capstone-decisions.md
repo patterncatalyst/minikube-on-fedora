@@ -1674,3 +1674,110 @@ OpenMetadata left scaled to zero — was my earlier wrong-theory suggestion duri
 the etcd-wedge debugging. The node was already failing; that advice added churn.
 The lesson recorded: when the whole node is unhealthy, rebuild early rather than
 peel symptoms.
+## CAP-036 — Raise the node's PID ceiling (podman pids-limit default)
+
+**Status:** WITHDRAWN (superseded by CAP-037). The PID-ceiling diagnosis was
+WRONG. The 2048 we measured was the node's *root* cgroup; pods live in
+`kubepods.slice` whose `pids.max` is 509255 (0.3% used), so a PID cap never
+constrained the pods. The live root-cgroup write also fails on a rootless node
+(`Operation not permitted`). The r36 script edits were reverted. The true cause
+is the istio-proxy startup race — see CAP-037. Kept here as an honest record of
+a wrong turn: the lesson is to confirm *which* cgroup bounds the workload before
+treating a number as the limit.
+
+**Context.** On the freshly-bootstrapped node, the last service to start
+(order-service — the one meshed app pod) was stuck `RunContainerError`:
+`runc create failed: unable to start init: fork/exec /proc/self/fd/6: resource
+temporarily unavailable` (EAGAIN, exit 128). The app never ran — the runtime
+couldn't fork its init. Probes ruled out everything else: kubelet `podPidsLimit`
+unset (-1), no containerd pids cap, image CMD correct
+(`uvicorn app.main:app ...`), layers pulled fine, global `pid_max`=4194304 /
+`threads-max`=509255 huge. The smoking gun: the node container's **root cgroup
+`pids.max = 2048`** with **`live tasks: 1966`** (96% full). That 2048 is podman's
+default `--pids-limit` applied to the minikube node container — a cap on TOTAL
+processes across ALL pods on the node. The full capstone (CNPG, Kafka, KEDA,
+OpenMetadata+OpenSearch JVMs, Prometheus/Grafana/Tempo, six services, and — under
+namespace-wide injection — six Envoy sidecars) sits right under 2048, so the
+kubelet can't fork the next pod's init.
+
+**Decision.** Raise the node's PID ceiling. cgroup v2 `pids.max` is writable live,
+so:
+  * **Immediate (no rebuild):** `minikube ssh -p capstone -- 'echo max | sudo tee
+    /sys/fs/cgroup/pids.max'` then `kubectl rollout restart deploy/order-service`.
+  * **Durable (repo):** `setup-capstone-profile.sh` raises `pids.max` to `max`
+    right after `minikube start`; `cluster-up.sh` does the same after BOTH its
+    start and its auto-cycle restart (a stop/start resets podman's default, so it
+    must be re-applied every time the node container starts). Idempotent and
+    harmless if already raised.
+
+**Why not kubelet podPidsLimit / containerd config.** Both were unset; the cap
+originates from podman's container-creation default, which lands on the node's
+root cgroup. Writing the cgroup is the direct, driver-agnostic lever and needs no
+node recreate.
+
+**Related, deliberately NOT changed here (forces the Phase C Istio decision).**
+The capstone namespace is `istio-injection=enabled` (namespace-wide), which is a
+drift from the documented *selective* injection design — the order-service
+deployment comment explicitly says "we mesh order-service for the canary, not the
+whole namespace." Namespace-wide injection put an Envoy on all six services,
+~doubling sidecar process pressure and contributing to the 1966 task count (and it
+was the root of the r34 ingestion-Job sidecar problem too). Reverting to selective
+injection (mesh only order-service) would roughly halve sidecar pressure AND fix
+the Jobs class — but changing injection scope on a running cluster is disruptive
+(existing meshed pods must restart to drop sidecars; the webhook namespaceSelector
+mechanics need a cluster to verify), so it is recorded as the **Phase C Istio/mTLS
+decision**, now clearly justified. The pids.max raise is the correct durable fix
+regardless of which injection model is chosen.
+
+**Consequences.** Offline-validated: both scripts `bash -n` clean and raise
+pids.max (setup on start; cluster-up on start + cycle). Cluster-verify: after the
+live `echo max` + rollout restart, order-service reaches `2/2` Ready, completing
+the bring-up. Future bootstraps get the headroom automatically.
+
+## CAP-037 — order-service startup resilience (mesh proxy race + retry)
+
+**Status:** decided, shipped r37 (offline-validated; cluster-verify pending).
+
+**Context.** After the node rebuild, order-service crash-looped. Peeling the
+layers (and correcting several wrong theories along the way — image, then a PID
+ceiling): the app container *runs*, then exits with
+`socket.gaierror: [Errno -2] Name or service not known` raised inside asyncpg's
+`_create_ssl_connection` during FastAPI startup, followed by
+`Application startup failed. Exiting.` CoreDNS proved healthy
+(`capstone-postgres-rw.capstone.svc.cluster.local` → NOERROR) and the env was
+correct (`PG_HOST` = that FQDN). The failure is the **istio-proxy startup race**:
+order-service is the one meshed app pod, and its `lifespan` makes outbound
+connections (Postgres via `init_schema`, then Kafka+Apicurio via `start_producer`)
+the instant it starts — before Envoy has programmed routes, so the first connect
+fails. The app exited on first failure (no retry), so it crash-looped. This bites
+*now* because namespace-wide injection meshed order-service (the drift flagged in
+CAP-034/036); under the documented selective model it would still be meshed (it's
+the canary), so the fix is needed regardless.
+
+**Decision (defense in depth — both, since each is correct alone).**
+  1. **Hold the app until the proxy is ready.** Pod annotation
+     `proxy.istio.io/config: '{"holdApplicationUntilProxyStarts": true}'` on
+     order-service — Istio delays the app container until Envoy serves, closing
+     the race directly.
+  2. **Retry the startup connects with capped backoff.** `init_schema` (db.py)
+     and `start_producer` (events.py) now retry (≤30 attempts, delay capped 4s,
+     ~seconds in the common case) instead of exiting on first failure — robust
+     against a transient-unready dependency on any cold start, mesh or not. The
+     half-open Kafka producer is stopped between attempts.
+  3. **Startup-probe headroom.** order-service `probes.startup.failureThreshold`
+     30 → 60 (60s → 120s budget), since the app's HTTP server only serves after
+     `lifespan` completes; the retries must fit inside the probe window.
+
+**Why both.** With native sidecars the hold may be partly automatic, but the
+annotation makes intent explicit; the retry is the cause-agnostic safety net that
+also covers a slow Postgres/Kafka cold start. Neither alone is as robust as the
+pair.
+
+**Scope.** Applied to order-service (the failing, dependency-heavy, meshed
+service). The retry pattern is good practice for any service that connects at
+startup; propagating it to the others is a noted follow-on, not done here.
+
+**Consequences.** Offline-validated: db.py + events.py `py_compile`; annotation
+value is valid JSON; values.yaml parses (startup budget 120s); deployment.yaml
+annotations intact. Cluster-verify: rebuild order-service image, redeploy, and it
+reaches 2/2 Ready through a cold start without crash-looping; then resume Phase A.

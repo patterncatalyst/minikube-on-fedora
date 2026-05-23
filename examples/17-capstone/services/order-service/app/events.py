@@ -17,6 +17,7 @@ after the order is durably persisted (the dual-write caveat from CAP-017 and
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 import os
@@ -41,22 +42,53 @@ _producer: AIOKafkaProducer | None = None
 _serde: AvroRegistrySerde | None = None
 
 
-async def start_producer() -> None:
+async def start_producer(max_attempts: int = 30, max_delay: float = 4.0) -> None:
+    """Start the Kafka producer and register the Avro schema, with retry.
+
+    Same rationale as db.init_schema: on a cold cluster (and through the
+    meshed pod's istio-proxy) Kafka and Apicurio may not be reachable the
+    instant this service starts. Retry with capped backoff rather than exit on
+    first failure. The half-open producer is stopped between attempts so a
+    failed connect doesn't leak a client.
+    """
     global _producer, _serde
-    _producer = AIOKafkaProducer(bootstrap_servers=settings.kafka_bootstrap)
-    await _producer.start()
-    # Register the Avro schema with Apicurio and cache its id for encoding.
-    _serde = AvroRegistrySerde(
-        registry_url=settings.apicurio_url,
-        subject=settings.kafka_order_subject,
-        schema_dict=_ORDER_PLACED_SCHEMA,
-    )
-    schema_id = await _serde.register()
-    logger.info(
-        "kafka producer started; order.placed Avro schema registered id=%s (subject=%s)",
-        schema_id,
-        settings.kafka_order_subject,
-    )
+    last_exc: Exception | None = None
+    for attempt in range(1, max_attempts + 1):
+        producer = AIOKafkaProducer(bootstrap_servers=settings.kafka_bootstrap)
+        try:
+            await producer.start()
+            # Register the Avro schema with Apicurio and cache its id for encoding.
+            serde = AvroRegistrySerde(
+                registry_url=settings.apicurio_url,
+                subject=settings.kafka_order_subject,
+                schema_dict=_ORDER_PLACED_SCHEMA,
+            )
+            schema_id = await serde.register()
+            _producer = producer
+            _serde = serde
+            logger.info(
+                "kafka producer started%s; order.placed Avro schema registered "
+                "id=%s (subject=%s)",
+                f" after {attempt} attempt(s)" if attempt > 1 else "",
+                schema_id,
+                settings.kafka_order_subject,
+            )
+            return
+        except Exception as exc:  # noqa: BLE001 — startup tolerates any connect error
+            last_exc = exc
+            try:
+                await producer.stop()
+            except Exception:  # noqa: BLE001 — best-effort cleanup of half-open client
+                pass
+            delay = min(float(attempt), max_delay)
+            logger.warning(
+                "start_producer attempt %d/%d failed (%s); retrying in %.0fs",
+                attempt, max_attempts, exc.__class__.__name__, delay,
+            )
+            await asyncio.sleep(delay)
+    raise RuntimeError(
+        f"start_producer failed after {max_attempts} attempts"
+    ) from last_exc
 
 
 async def stop_producer() -> None:

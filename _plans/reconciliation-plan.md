@@ -3426,3 +3426,32 @@ final reader shouldn't see. Items:
   containerd panic → full crashloop) was **node-environment decay on a 21h-old
   single node**, not the Phase A feature work. Phase A resumes verification on the
   rebuilt node via demo-add-data-product.sh up.
+
+- ❌ **r36 WITHDRAWN** (2026-05-23) — PID-ceiling fix; diagnosis was wrong (pods live in kubepods.slice, pids.max=509255 — PID was never the constraint; root write fails on rootless). Script edits reverted. See CAP-036 note + r37. Original text: Fix: raise the node's PID ceiling (CAP-036). The
+  podman driver caps the minikube node container at 2048 PIDs (its --pids-limit
+  default) on the node root cgroup; the full meshed capstone runs ~1966 tasks, so
+  the kubelet hit EAGAIN forking the last pod (order-service stuck
+  RunContainerError, runc exit 128). cgroup v2 pids.max is writable live:
+  setup-capstone-profile.sh now raises it after `minikube start`, and cluster-up.sh
+  after both its start and auto-cycle. Offline-validated (bash -n; both raise
+  pids.max). **Immediate live fix + cluster-verify:**
+    minikube ssh -p capstone -- 'echo max | sudo tee /sys/fs/cgroup/pids.max'
+    kubectl rollout restart deploy/order-service -n capstone
+    kubectl rollout status  deploy/order-service -n capstone --timeout=180s
+  → order-service 2/2 Ready completes the r35 bring-up; resume Phase A
+  (smoke-discovery → ingest-openmetadata → demo-add-data-product.sh up).
+  Flagged for Phase C: namespace-wide istio injection (drift from selective) is a
+  major contributor to the PID pressure and should be revisited there.
+
+- 🔲 **r37** (2026-05-23) — Fix: order-service startup resilience (CAP-037). The
+  crash-loop was the istio-proxy startup race — the meshed order-service made its
+  first Postgres/Kafka/Apicurio connects in FastAPI `lifespan` before Envoy
+  programmed routes (gaierror in asyncpg SSL path), then exited with no retry.
+  Three changes: `holdApplicationUntilProxyStarts` annotation; retry+backoff in
+  init_schema (db.py) and start_producer (events.py); startupProbe budget 60s→120s.
+  Offline-validated (py_compile, JSON, yaml). **Cluster-verify:**
+    ./scripts/build-image.sh services/order-service order-service v1
+    helm upgrade --install order-service charts/capstone/charts/order-service -n capstone
+    kubectl rollout status deploy/order-service -n capstone --timeout=180s
+  → 2/2 Ready through cold start; then resume Phase A
+  (smoke-discovery → ingest-openmetadata → demo-add-data-product.sh up).
