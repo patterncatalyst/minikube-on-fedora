@@ -1830,3 +1830,50 @@ parses (req 512Mi / lim 2Gi); cluster.yaml renders structurally with
 inheritedMetadata + resources intact. Cluster-verify: Postgres returns `1/1` and
 stays Ready (no OOM, no TLS crash), the CNPG cluster reports healthy, and
 order-service connects on its next retry and goes `2/2` — closing the bring-up.
+
+## CAP-039 — Phase B: complete the v1→v2 canary (align v2 + repeatable demo)
+
+**Status:** decided, shipped r39 (offline-validated; cluster-verify pending).
+
+**Context.** The canary was scaffolded at r26 (CAP-024): `istio/routing.yaml`
+(Gateway + weighted VirtualService with `__W_V1__/__W_V2__` + DestinationRule
+v1/v2 subsets), `smoke-canary.sh` (deploys v2, drives 90/10→50/50, asserts the
+split), `istio/order-service-v2.yaml` (v2 = same image, `API_VERSION=v2`), and
+the `/version` canary signal (v2 reports `api_version=v2` + an additive
+`currency` field). Phase B's job was to make it actually run on the current
+cluster and give it a clean rollback.
+
+**Problem found.** `order-service-v2.yaml` predated tonight's order-service
+hardening, so v2 diverged from v1: no `holdApplicationUntilProxyStarts` (CAP-037),
+no startupProbe, and resources at 256Mi vs v1's 512Mi (CAP-026) — v2 would hit
+the same proxy-startup race v1 just got fixed for, and risked OOM. (v2 reuses the
+v1 image, so it inherits the db.py/events.py startup retry for free — but the pod
+annotations and resources are overlay-local and had to be brought into line.)
+
+**Decision.**
+  * **Align v2 with v1:** add the `proxy.istio.io/config`
+    `holdApplicationUntilProxyStarts` annotation, add the 120s startupProbe, and
+    raise resources to 192Mi/512Mi. v2's env was already correct (matches v1's
+    rendered chart env exactly).
+  * **Add `demos/demo-canary.sh up|shift|down`** — the presenter-facing,
+    repeatable, backable-out counterpart to the verification-facing
+    smoke-canary.sh. `up [w1 w2]` deploys v2 + opens the split (default 90/10);
+    `shift w1 w2` moves it (50/50, 0/100, …); `down` drains to v1, removes the
+    Gateway/VirtualService/DestinationRule and the v2 Deployment, restoring a
+    v1-only baseline. This is the "repeatable / backable-out" the roadmap asked
+    for and parallels Phase A's demo-add-data-product.sh up/down.
+
+**The drift lesson (ties to CAP-038's theme).** A hand-maintained v2 overlay will
+keep drifting from the v1 chart (this is the second time: it missed CAP-037/038).
+Noted option for later: parametrize the order-service chart so v2 is a second
+helm release (`--set version=v2,apiVersion=v2`) with the shared Service rendered
+once — eliminating the overlay. Deferred (it changes smoke-canary and revisits
+CAP-024's overlay choice); the alignment above is the right scope for tonight.
+
+**Consequences.** Offline-validated: v2 manifest parses with all three alignments;
+demo-canary.sh `bash -n` clean and its `down` targets exactly the objects
+routing.yaml creates; `/version` confirmed to emit v2 + currency. Cluster-verify:
+`./demos/smoke-canary.sh` lands the 90/10 and 50/50 splits in-band, and
+`demo-canary.sh up → shift → down` cycles cleanly. A+B together demonstrate the
+data-mesh value from the API/contract perspective (add a product, then evolve its
+contract under canary).

@@ -38,6 +38,11 @@ spec:
         version: v2
       annotations:
         sidecar.istio.io/inject: "true"
+        # r37 (CAP-037): v2 reuses the v1 image, so it inherits the db.py/events.py
+        # startup retry — but it hits the same istio-proxy startup race, so hold
+        # the app container until the proxy is ready, exactly as v1 does. Keeping
+        # v2 aligned with v1's chart is why this overlay must track CAP-037/038.
+        proxy.istio.io/config: '{"holdApplicationUntilProxyStarts": true}'
     spec:
       containers:
         - name: order-service
@@ -83,9 +88,17 @@ spec:
           resources:
             requests:
               cpu: 100m
-              memory: 128Mi
-            limits:
-              memory: 256Mi
+              memory: 192Mi          # match v1 (CAP-026); 128Mi risked OOM on a
+            limits:                   # Kafka+gRPC+asyncpg service
+              memory: 512Mi
+          # r37 (CAP-037): match v1's startup budget (120s) so the meshed cold
+          # start + DB-connect retry completes before liveness/readiness engage.
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            failureThreshold: 60
+            periodSeconds: 2
           livenessProbe:
             httpGet:
               path: /health

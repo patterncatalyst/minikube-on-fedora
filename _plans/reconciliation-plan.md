@@ -3469,3 +3469,17 @@ final reader shouldn't see. Items:
     kubectl get pods -n capstone -l cnpg.io/cluster=capstone-postgres -w   # → 1/1 Ready, stable
     kubectl get pods -n capstone -l app.kubernetes.io/name=order-service   # → 2/2 on its own
   Phase C: make selective injection uniform across all operator-managed infra.
+
+- 🔲 **r39** (2026-05-23) — Phase B: complete the v1→v2 canary (CAP-039). Aligned
+  `istio/order-service-v2.yaml` with the r37/r38 order-service hardening
+  (holdApplicationUntilProxyStarts, 120s startupProbe, 192Mi/512Mi resources — it
+  had drifted, predating CAP-037/038) and added `demos/demo-canary.sh up|shift|down`
+  (repeatable, backable-out; presenter counterpart to smoke-canary.sh). v2 env
+  already matched v1. Offline-validated (yaml parse, bash -n, object-name match,
+  /version emits v2+currency). **Cluster-verify (cluster is freshly green):**
+    ./demos/smoke-canary.sh                 # asserts 90/10 + 50/50 splits in-band
+    ./demos/demo-canary.sh up               # 90/10, observe, then:
+    ./demos/demo-canary.sh shift 50 50
+    ./demos/demo-canary.sh down             # back to v1-only baseline
+  Closes Phase B. Phase C next: §17 page restructure + narrative + diagrams +
+  the selective-injection decision.
