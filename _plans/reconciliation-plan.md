@@ -3371,3 +3371,24 @@ final reader shouldn't see. Items:
   Expected: probes + version OK, seeded rows, create/fetch/filter all ✓.
   On green, r32 → verified and part 2 (r33: Apicurio + OpenMetadata + up/down
   harness) follows.
+
+- ✅ **r32 VERIFIED** (2026-05-22) — review-service smoke green on first run:
+  build → deploy → Ready (no cold-start/OOM — the r28 calibration held) → all REST
+  assertions passed (probes, version, seeded rows, create id
+  44732ca4…, fetch-by-id, sku filter). The data product stands and serves.
+  Phase A part 1 done; proceeding to part 2 (Apicurio + OpenMetadata + up/down).
+
+- 🔲 **r33** (2026-05-22) — Phase A part 2: discovery + replayable demo (CAP-033).
+  `openmetadata/ingestion/reviews_lineage.py` (declare/remove the reviews->products
+  edge, separate from the permanent spine) and `demos/demo-add-data-product.sh
+  up|down` — up deploys review-service, publishes its OpenAPI to Apicurio,
+  re-ingests OpenMetadata (auto-catalogs the reviews schema), declares lineage, and
+  prints the three ways in; down removes lineage + catalog entry + artifact +
+  release + schema, back to baseline. Offline-validated: py_compile (helper + inline
+  publish), harness bash -n. **Cluster-verify:**
+    ./demos/demo-add-data-product.sh up      # product visible via REST, Apicurio, OM lineage
+    ./demos/demo-add-data-product.sh down     # baseline restored
+    ./demos/demo-add-data-product.sh up       # replay (idempotence)
+  **Verify-points (likely down-path tweaks):** OM lineage/schema delete API shapes;
+  CNPG primary exec (container `postgres`, user `postgres`); Apicurio v3 DELETE.
+  On a clean up→down→up, Phase A is complete.

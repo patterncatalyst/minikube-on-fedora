@@ -1547,3 +1547,45 @@ image build (the Containerfile's `poetry export` step needs it).
 **Consequences.** Offline-validated: `py_compile` all modules; values.yaml
 parses; deployment braces 24/24 with startupProbe; smoke `bash -n`. Cluster-verify:
 `./demos/smoke-reviews.sh` green against the running capstone.
+## CAP-033 — Phase A (part 2): discovery, catalog, and the replayable demo
+
+**Status:** decided, shipped r33 (offline-validated; cluster-verify pending).
+
+**Context.** Part 1 (r32) shipped the review-service product, verified. Part 2
+adds the discovery layer and wraps the whole thing in a replayable demo, per the
+Phase A intent (add → show → back out → repeat).
+
+**Decision.**
+- `openmetadata/ingestion/reviews_lineage.py` — declares/removes a single
+  lineage edge `inventory.stock -> reviews.reviews` (products referenced by
+  reviews). Mirrors the proven `lineage.py` (stdlib, OM_HOST/OM_JWT env) but is
+  SEPARATE from it so the temporary product never touches the permanent
+  orders->order-placed->notifications spine. `up` PUTs the edge, `down` DELETEs it.
+- `demos/demo-add-data-product.sh up|down` — the replayable harness:
+  - **up**: build+deploy review-service → publish its `/openapi.json` to Apicurio
+    as `review-service-openapi` (same v3 POST pattern as
+    publish-discovery-contracts.sh) → re-run `ingest-openmetadata.sh` (catalogs
+    the new reviews schema automatically — postgres.yaml ingests every schema) →
+    declare the reviews->products lineage → verify the catalog entry → print the
+    three "ways in" (REST, Apicurio contract, OpenMetadata catalog+lineage).
+  - **down**: remove the lineage edge → delete the reviews schema entity from the
+    catalog → delete the Apicurio artifact → `helm uninstall` → `DROP SCHEMA
+    reviews CASCADE` on the CNPG primary. Returns the mesh to baseline.
+- Reuses proven machinery (publish pattern, ingest-openmetadata.sh, get_token.py)
+  so the `up` path is low-risk.
+
+**VERIFY-POINTS (cluster-only; the `down` path's most likely to need a tweak,
+same class as the existing OM files' caveats):**
+  * OM lineage delete: `DELETE /api/v1/lineage/table/{fromId}/table/{toId}`.
+  * OM schema delete: `DELETE /api/v1/databaseSchemas/name/{fqn}?hardDelete=true&recursive=true`.
+  * Postgres drop: `kubectl exec <primary> -c postgres -- psql -U postgres -d capstone`
+    (CNPG primary container name + superuser).
+  * Apicurio v3 delete: `DELETE /apis/registry/v3/groups/default/artifacts/{id}`.
+The `down` steps are best-effort (warn, don't hard-fail) so a partial back-out
+still progresses and reports what to finish manually.
+
+**Consequences.** Offline-validated: `py_compile` reviews_lineage.py + the inline
+publish python; harness `bash -n`; usage/arg handling. Cluster-verify:
+`./demos/demo-add-data-product.sh up` lands the product through all three layers
+(REST + Apicurio + OpenMetadata lineage), then `down` returns to baseline; replay
+to confirm idempotence. This completes Phase A.
