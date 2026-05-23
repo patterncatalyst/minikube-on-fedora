@@ -3328,3 +3328,21 @@ final reader shouldn't see. Items:
   a synthetic span to Tempo :4318 and read it back — would have caught the export
   gap at the backend stage); instrument the remaining services for full
   multi-service traces (mechanical extension of the r29c gateway pattern).
+
+- 🔲 **r30** (2026-05-22) — Operational hardening (CAP-030). New
+  `scripts/cluster-up.sh` (idempotent bring-up: auto-cycles a wedged control
+  plane, rebuilds only registry-missing images, bounces stuck pods) and
+  `scripts/cluster-status.sh` (read-only one-shot health report). §17 gains an
+  "Operating the cluster" troubleshooting section documenting the etcd `:2380`
+  wedge (Exit 1, cure = node cycle) and the registry-image-loss-on-restart
+  (`not found`, cure = rebuild local images). Both directly encode the r29c
+  recovery so it isn't re-derived live. Offline-validated: `bash -n` both scripts;
+  liquid + cross-ref linters clean. **Cluster-verify:** from a stopped or wedged
+  state, `./scripts/cluster-up.sh` reaches green and `cluster-status.sh` agrees.
+
+- 🔲 **r29b.1** (2026-05-22) — `smoke-tracing.sh` upgraded from backend-standing
+  to end-to-end ingest proof: POST a synthetic OTLP/HTTP span to Tempo :4318 and
+  read it back via TraceQL on :3200 (CAP-028 addendum). Closes the gap that let
+  the r29c export bug slip past the backend smoke. Offline-validated: `bash -n`;
+  OTLP/JSON payload parses. **Cluster-verify:** `./demos/smoke-tracing.sh` ends
+  with the synthetic-trace readback ✓.

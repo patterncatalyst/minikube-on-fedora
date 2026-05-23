@@ -1108,6 +1108,71 @@ fire-and-forget over a batch processor — if Tempo is down, the gateway doesn't
 care, which is the right failure mode for telemetry but also why a missing trace
 points at the exporter config or Tempo, never at the request path.
 
+## Operating the cluster: bring-up and troubleshooting
+
+A long-lived single-node cluster that you stop, start, and redeploy against for
+days will eventually hit two failure modes that look alarming but have boring,
+repeatable fixes. Both are worth internalizing, because the instinct under a wall
+of red pods is to theorize about resources — and the faster path is almost always
+to read the failing component's own exit reason first.
+
+Two scripts encode the recovery so you don't debug it from scratch each time.
+`scripts/cluster-up.sh` brings the cluster up idempotently: it starts the profile,
+checks the control plane is genuinely healthy (cycling the node if it isn't),
+rebuilds only the locally-built images that are missing from the registry, and
+bounces any pods stuck pulling them. `scripts/cluster-status.sh` is a read-only
+one-shot report — profile state, control-plane health, which images are missing,
+and per-namespace pod health — that turns a ten-command diagnosis into one. Run
+`cluster-up.sh` to start a session and `cluster-status.sh` any time something
+looks off.
+
+### The control plane crashloops with "address already in use"
+
+Symptom: `kubectl` calls hang or fail, and `kubectl get pods -n kube-system`
+shows etcd, the scheduler, and the controller-manager all in `CrashLoopBackOff`.
+The tell is in etcd's own log:
+
+```bash
+kubectl logs -n kube-system etcd-capstone --previous --tail=20
+```
+
+If it ends in `bind: address already in use` on port 2380 and a fatal
+`discovery failed`, a previous etcd process never released its peer port, so the
+restarted static pod can't bind and exits 1. Crucially this is **exit code 1, a
+clean application error — not an OOM kill (137)**, so it is not a memory problem,
+no matter how much else is running. Everything else in the control plane
+crashloops only because it depends on etcd.
+
+The fix is to cycle the node, which clears the stuck port and preserves etcd's
+data directory:
+
+```bash
+minikube stop -p capstone && minikube start -p capstone
+```
+
+`cluster-up.sh` does this automatically when it detects an unhealthy control
+plane, so in practice you just run that.
+
+### Pods stuck in ImagePullBackOff after a restart
+
+Symptom: after `minikube stop`/`start`, services sit in `ImagePullBackOff`, and
+`kubectl describe pod` shows `failed to pull ... not found` for a
+`localhost:5000/...` image. Note the error is **`not found`, not "connection
+refused"** — the registry is up and answering; it simply has no image to serve.
+The in-cluster registry's storage does not survive a node cycle, so every image
+you built with `scripts/build-image.sh` is gone and must be rebuilt and pushed.
+
+Rebuild every locally-built image, not just the ones erroring first — the most
+recently pushed images are the first casualties of a restart, so a partial
+rebuild leaves a hidden gap:
+
+```bash
+./scripts/cluster-up.sh   # diffs the registry catalog and rebuilds only what's missing
+```
+
+The same diff is what `cluster-status.sh` reports under "In-cluster registry
+images," so you can see the gap before the pods do.
+
 ## What the capstone builds, and what's still ahead
 
 The capstone assembles a small but complete data mesh: five domain services
@@ -1164,7 +1229,7 @@ examples/17-capstone/
 │       └── kafka/             ← Strimzi KRaft cluster + topic
 ├── services/                  ← FastAPI service source (one dir per service)
 ├── proto/                     ← gRPC protobuf definitions
-├── scripts/                   ← profile + operator setup, codegen
+├── scripts/                   ← bring-up/recovery, profile + operator setup, codegen
 └── demos/                     ← smoke scripts (one per capability)
 ```
 

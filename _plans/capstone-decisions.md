@@ -1420,3 +1420,50 @@ KEDA, mid-section Istio):
   change — e.g. a renamed/added field, v1 vs v2 response shape) to keep the
   example small and the principle clear.
 
+## CAP-030 — Operational hardening: idempotent bring-up + recovery scripts
+
+**Status:** decided, shipped r30 (offline-validated; cluster-verify pending).
+
+**Context.** The r29c verification exposed two single-node-minikube failure modes
+that cost a long debugging session, neither caused by the work under test:
+(1) etcd crashlooping in place on `bind: address already in use` (:2380) after a
+long uptime, taking the whole control plane down — Exit 1, NOT an OOM; (2) the
+in-cluster registry losing all locally-built images across `minikube stop/start`,
+surfacing as `ImagePullBackOff: not found`. Recovery was ad-hoc and re-derived
+live.
+
+**Decision.** Encode recovery in two scripts and document the failure modes in §17.
+- `scripts/cluster-up.sh` — idempotent bring-up: starts the profile; probes
+  control-plane health and, if unhealthy, **auto-cycles the node** (stop/start)
+  to clear a wedged etcd; diffs the registry catalog (`/v2/<name>/tags/list`)
+  against `services/` and **rebuilds ONLY missing images** (per the user's
+  "faster, smarter" choice); bounces ImagePull-stuck pods; waits for settle;
+  prints the status report. Heals an already-provisioned cluster — does NOT
+  re-install operators (they survive a cycle).
+- `scripts/cluster-status.sh` — read-only one-shot: profile, control-plane
+  health (etcd-wedge aware), missing-image diff, per-namespace pod health, KEDA
+  HTTPScaledObject readiness, verdict. Turns the ten-command diagnosis into one.
+- §17 gains an "Operating the cluster: bring-up and troubleshooting" section with
+  both failure modes, framed diagnostic-first ("read the failing component's exit
+  reason before theorizing about resources" — Exit 1 ≠ 137; `not found` ≠
+  connection refused).
+
+**Why not re-run all setup-* every time.** The user chose "full capstone every
+run," but operators/CRDs/PVCs survive a node cycle; only registry images don't.
+So bring-up heals images + bounces pods rather than reinstalling operators
+(slow, order-dependent, unnecessary). First-time provisioning remains the
+setup-* sequence.
+
+**Consequences.** A reader who stops their cluster overnight runs one command to
+get back to green instead of debugging a wall of red. Validated offline: `bash -n`
+on both scripts; registry diff uses the same catalog API as build-image.sh.
+Cluster-verify: run `cluster-up.sh` from a stopped/wedged state and confirm green.
+
+  - **r29b.1 addendum (CAP-028).** Hardened `smoke-tracing.sh` from a "backend is
+    standing" check into an end-to-end ingest proof: it POSTs a synthetic OTLP/HTTP
+    JSON span to Tempo :4318 (random 16-byte trace id / 8-byte span id, ns
+    timestamps) and reads it back via TraceQL on :3200. This is the check whose
+    absence let the r29c export bug slip from the backend stage to the gateway —
+    with it, a future "no traces" is localized to the emitter, not the pipeline.
+    Hard-asserts both the POST (HTTP 200) and the readback (searchable within
+    ~60s). Validated offline: `bash -n`; OTLP/JSON payload parses.
