@@ -3405,3 +3405,24 @@ final reader shouldn't see. Items:
   three Jobs parse with inject=false + restartPolicy Never. **Cluster-verify:**
   re-run `./demos/demo-add-data-product.sh up`; ingestion Jobs complete unmeshed
   and the run proceeds to lineage + catalog verification (resumes the r33 verify).
+
+- 🔲 **r35** (2026-05-22) — `scripts/bootstrap-capstone.sh`: the one-command,
+  health-gated, idempotent full bring-up that was missing (CAP-035). Orders all
+  seven setup-* scripts + workload helm installs + scalers + seed, with a health
+  gate per tier; every command lifted from proven smokes. Built after a 21h node
+  degraded past recovery (clean rebuild required) exposed that no such script
+  existed. Validated: bash -n; all 19 referenced paths exist. Grounded but
+  untested offline — first real run is the rebuild. **Rebuild + verify:**
+    minikube delete -p capstone
+    cd examples/17-capstone && ./scripts/bootstrap-capstone.sh
+    # then: ./demos/smoke-discovery.sh ; ./scripts/ingest-openmetadata.sh ;
+    #       ./demos/demo-add-data-product.sh up   (resumes Phase A on a clean node)
+  Deferred to r36: cluster-up settle-check fix, cluster-status scaled-to-zero
+  flag, demo-harness OM pre-flight.
+
+- 📝 **Node-decay saga note** (2026-05-22) — r32 (review-service) and r33/r34
+  (discovery + Job inject-fix) are CODE-COMPLETE and were validated; the long
+  failure cascade that followed (etcd wedge → registry loss → OM scaled to zero →
+  containerd panic → full crashloop) was **node-environment decay on a 21h-old
+  single node**, not the Phase A feature work. Phase A resumes verification on the
+  rebuilt node via demo-add-data-product.sh up.

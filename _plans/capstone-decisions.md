@@ -1623,3 +1623,54 @@ either way. Tracked for the Phase C Istio/mTLS section.
 `inject=false` present; `restartPolicy: Never` intact. Cluster-verify: re-run
 `./demos/demo-add-data-product.sh up` — the ingestion Jobs now complete (`1/1
 Completed`, unmeshed), and the run proceeds to lineage + the catalog check.
+## CAP-035 — bootstrap-capstone.sh: one-command full bring-up
+
+**Status:** decided, shipped r35 (offline-grounded; first cluster run pending).
+
+**Context.** A 21-hour-old node degraded past recovery (full crashloop incl. the
+control plane; a containerd-shim panic; `cluster-up.sh`'s stop/start couldn't
+heal it). Disk was fine (11%), so the verdict was a clean rebuild
+(`minikube delete`). That exposed the real gap: **there is no one-command full
+bring-up.** The README froze at r20, and the actual order lived scattered across
+seven setup-* scripts, helm installs for kafka/apicurio/postgres/six services,
+`kubectl apply` for the KEDA scalers and Istio canary, plus seed + discovery +
+ingestion. Every recovery this session was manual archaeology because of it.
+
+**Decision.** `scripts/bootstrap-capstone.sh` — health-gated, idempotent, ordered
+full bring-up from a fresh node, with every command lifted verbatim from the
+proven smokes/setup scripts (not invented). Tiers, each gated before the next:
+profile+registry → Istio → CNPG operator → **Postgres CR** (OpenMetadata depends
+on it, so it precedes OM) → Kafka operator+CR (`kubectl wait kafka/capstone-kafka
+Ready`) → KEDA → OpenMetadata (scaled to 1 + rollout-waited, since a prior session
+can leave it at 0) → observability → images (build only-if-missing) → apicurio →
+six services (rollout-waited, skipping the KEDA-zero gateway) → scalers → seed one
+order. Catalog population (discovery + ingestion) and the canary are printed as
+explicit follow-ons rather than run inline (warm-server port-forwards; the canary
+is Phase B). Ends with a `cluster-status.sh` report.
+
+**Why printed follow-ons, not inline.** Discovery/ingestion need a warm OM and
+port-forwards and were the flaky bits all session; keeping them out of the
+critical bring-up path makes bootstrap reliable and the catalog step explicit.
+
+**This becomes Phase E step 1** ("stand the whole thing up") and the canonical
+answer to "how do I get a capstone from nothing."
+
+**Honest caveat.** Grounded but not run offline (no cluster in the authoring
+env); every individual step is proven, but ordering/gating get their first real
+exercise on the rebuild. Expect possibly one tweak on first run. Validated:
+`bash -n`; all 19 referenced charts/manifests/scripts exist.
+
+**Earned follow-ons (deferred to r36, not blocking the rebuild):**
+  * `cluster-up.sh` settle check waits on *core* workloads Ready, not all-pods-
+    Running (the false 4-min timeout: KEDA-zero + Completed jobs never let it reach
+    "no not-Running pods").
+  * `cluster-status.sh` flags **scaled-to-zero** expected workloads (an OM at
+    `0/0` showed no unhealthy pods, so it hid).
+  * `demo-add-data-product.sh` gets an OM-reachability pre-flight (scale/wait or
+    fail fast) instead of dying deep in ingestion.
+
+**Process note (owned).** Several blockers this session were node decay, but one —
+OpenMetadata left scaled to zero — was my earlier wrong-theory suggestion during
+the etcd-wedge debugging. The node was already failing; that advice added churn.
+The lesson recorded: when the whole node is unhealthy, rebuild early rather than
+peel symptoms.
