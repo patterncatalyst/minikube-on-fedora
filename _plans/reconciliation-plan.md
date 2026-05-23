@@ -3392,3 +3392,16 @@ final reader shouldn't see. Items:
   **Verify-points (likely down-path tweaks):** OM lineage/schema delete API shapes;
   CNPG primary exec (container `postgres`, user `postgres`); Apicurio v3 DELETE.
   On a clean up→down→up, Phase A is complete.
+
+- 🔲 **r34** (2026-05-22) — Fix: OpenMetadata ingestion Jobs opt out of Istio
+  injection (CAP-034). The capstone namespace is `istio-injection=enabled`, so the
+  ingestion Jobs got an istio-proxy sidecar (pod `0/2`) — the proxy races the
+  ingest container and prevents the Job from ever completing, so `om-ingest-*`
+  errored. Added `sidecar.istio.io/inject: "false"` to the pod templates of
+  job-postgres/job-kafka/job-lineage. (The pagila/sample text in the failing log
+  was the image's bundled example banner, not the mounted ConfigMap — config was
+  correct; single cause.) Also flagged: the namespace now has broad injection
+  (drift from selective) — a deliberate Phase C decision. Offline-validated: all
+  three Jobs parse with inject=false + restartPolicy Never. **Cluster-verify:**
+  re-run `./demos/demo-add-data-product.sh up`; ingestion Jobs complete unmeshed
+  and the run proceeds to lineage + catalog verification (resumes the r33 verify).

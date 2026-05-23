@@ -1589,3 +1589,37 @@ publish python; harness `bash -n`; usage/arg handling. Cluster-verify:
 `./demos/demo-add-data-product.sh up` lands the product through all three layers
 (REST + Apicurio + OpenMetadata lineage), then `down` returns to baseline; replay
 to confirm idempotence. This completes Phase A.
+## CAP-034 — Ingestion Jobs must opt out of Istio sidecar injection
+
+**Status:** decided, shipped r34 (offline-validated; cluster-verify pending).
+
+**Context.** Phase A's `demo-add-data-product.sh up` failed at the OpenMetadata
+ingestion step: the `om-ingest-postgres` Job pod ran `0/2` (istio-init +
+istio-proxy injected) and the `ingest` container exited 1. The capstone namespace
+was `istio-injection=enabled`, so the Job got a sidecar. A meshed Job is wrong:
+the istio-proxy starts as a peer container that races the ingest container at
+startup, and — fatally for a Job — the proxy never exits, so the pod can't reach
+`Completed`. (The `pagila`/`acmecorp_gold` text seen in the logs was the ingestion
+image's bundled SAMPLE config printed in its banner, NOT the mounted ConfigMap;
+the live ConfigMap was confirmed correct. So this was a single cause, not two.)
+
+**Decision.** Add `sidecar.istio.io/inject: "false"` to the pod-template
+annotations of all three ingestion Jobs (`job-postgres.yaml`, `job-kafka.yaml`,
+`job-lineage.yaml`). Ingestion Jobs are short-lived batch work talking directly
+to Postgres/Kafka/OpenMetadata; they should never be meshed.
+
+**Broader finding (not fixed here, flagged for a deliberate decision).** The
+capstone namespace is now labeled `istio-injection=enabled` (namespace-wide),
+whereas the documented state was *selective* injection (per earlier notes, only
+order-service was meshed). A node cycle appears to have left the namespace with
+broad injection, so now every capstone pod gets a sidecar (services show 2/2).
+Namespace-wide mTLS is defensible (arguably desirable for the mesh story), but
+it's a drift from the documented selective model and should be made a conscious
+choice — either embrace namespace-wide injection in the setup (and update the
+mesh narrative) or pin selective injection. The Job opt-out above is correct
+either way. Tracked for the Phase C Istio/mTLS section.
+
+**Consequences.** Offline-validated: all three Job manifests parse;
+`inject=false` present; `restartPolicy: Never` intact. Cluster-verify: re-run
+`./demos/demo-add-data-product.sh up` — the ingestion Jobs now complete (`1/1
+Completed`, unmeshed), and the run proceeds to lineage + the catalog check.

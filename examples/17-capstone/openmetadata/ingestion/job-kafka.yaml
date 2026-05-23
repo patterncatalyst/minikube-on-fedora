@@ -16,6 +16,14 @@ spec:
   backoffLimit: 2
   template:
     metadata:
+      annotations:
+        # Ingestion Jobs must NOT be meshed: short-lived batch work talking
+        # directly to Postgres/Kafka/OpenMetadata. An istio-proxy sidecar races
+        # the ingest container at startup AND prevents the Job pod from ever
+        # completing (the proxy keeps running). A node cycle re-enabled namespace
+        # injection (istio-injection=enabled), silently breaking these Jobs;
+        # this opts them out. (r34)
+        sidecar.istio.io/inject: "false"
       labels:
         app.kubernetes.io/part-of: capstone
         app.kubernetes.io/component: openmetadata-ingestion
