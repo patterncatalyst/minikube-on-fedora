@@ -3346,3 +3346,13 @@ final reader shouldn't see. Items:
   the r29c export bug slip past the backend smoke. Offline-validated: `bash -n`;
   OTLP/JSON payload parses. **Cluster-verify:** `./demos/smoke-tracing.sh` ends
   with the synthetic-trace readback ✓.
+
+- 🔲 **r31** (2026-05-22) — Presentation groundwork (CAP-031). Added repo-root
+  `presentation/` with the Data Mesh 101 deck + 15 paired SVG/Excalidraw diagrams
+  under `data-mesh-101/`, and a README capturing the Red Hat design system
+  (palette/fonts/layout) and the diagram→section mapping. Added
+  `_plans/capstone-roadmap.md` (phases A–E with the user's refinements: A/B as
+  backable-out demos, C as a one-page→section-set restructure, D as a deck reusing
+  the 101 design system, E's demo-vision acceptance criteria). No code/cluster
+  surface — groundwork only. Verify: site builds with the new `presentation/`
+  assets present (CI Jekyll build).

@@ -1467,3 +1467,42 @@ Cluster-verify: run `cluster-up.sh` from a stopped/wedged state and confirm gree
     with it, a future "no traces" is localized to the emitter, not the pipeline.
     Hard-asserts both the POST (HTTP 200) and the readback (searchable within
     ~60s). Validated offline: `bash -n`; OTLP/JSON payload parses.
+## CAP-031 — Presentation groundwork + phase roadmap (A–E)
+
+**Status:** decided, shipped r31 (assets in place; feature/content phases pending).
+
+**Context.** Post-observability, the remaining work is feature demos, a narrative
+that has outgrown one page, a presentation deck, and a replayable walkthrough. The
+user provided a "Data Mesh 101" deck and 15 paired SVG+Excalidraw diagrams to
+build from, and refined the plan.
+
+**Decisions.**
+- **Presentation lives at repo-root `presentation/`** (matches the root-dir
+  convention of `assets/`, `scripts/`, `onboarding/`). The 101 deck +
+  diagrams are under `presentation/data-mesh-101/`; `presentation/README.md` is
+  the design-system source of truth.
+- **Design system captured from the 101 deck:** Red Hat brand — accent
+  `#EE0000`, text `#151515`, muted `#5A5A5A`, white/off-white `#FFFFFF`/`#FBFAF7`,
+  warm `#E6E0D6`; headers Overpass SemiBold, body Red Hat Text (Calibri fallback
+  documented). Layout grammar: red title/section panels with a geometric motif,
+  white content slides with red ALL-CAPS eyebrow + bold dark title, Red Hat logo
+  footer. The new deck reuses this so both read as one family.
+- **Phases A & B are demonstrations, not permanent features** — add a new API /
+  bump v1→v2, walk the Apicurio + OpenMetadata + Istio-canary affordances, then
+  back out and replay. They show data-mesh value from the API/consumer
+  perspective, including the various ways to retrieve data and discover metadata.
+- **Phase C restructures the single capstone page into a section set** (overview
+  + dedicated sections per concept: data mesh, k8s value, Apicurio, OpenMetadata,
+  KEDA, Istio/mTLS, Kafka backbone, recoverability, observability+Kiali). Adopted
+  diagrams get promoted into `assets/diagrams/` under the `NN-name` convention.
+- **Phase E acceptance = the demo vision:** presenter replays with CLI narration
+  AND graphical views (live Tempo trace/spans, OpenMetadata lineage, Kiali canary
+  live-vs-after, correlated metrics).
+- Full plan recorded in `_plans/capstone-roadmap.md`.
+
+**Sequencing.** A → B → C → D → E (features → narrative → deck → walkthrough).
+**Next:** Phase A, scoped in detail at the next session start.
+
+**Consequences.** Roadmap and assets are committed and reviewable; the design
+system is pinned so Phase D doesn't re-derive it. No runtime/cluster surface in
+r31 — pure groundwork.
