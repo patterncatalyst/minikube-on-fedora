@@ -3356,3 +3356,18 @@ final reader shouldn't see. Items:
   the 101 design system, E's demo-vision acceptance criteria). No code/cluster
   surface — groundwork only. Verify: site builds with the new `presentation/`
   assets present (CI Jekyll build).
+
+- 🔲 **r32** (2026-05-22) — Phase A part 1: **review-service** data product
+  (CAP-032). New REST-only service (reviews/ratings keyed by product sku) with its
+  own `reviews` Postgres schema, scaffolded from the template + given a domain
+  surface (model/schemas/routes/seed), chart aligned to the r28 calibration
+  (192Mi/512Mi + startupProbe), and `demos/smoke-reviews.sh`. Intentionally a
+  *temporary* demo product (backed out in part 2). Offline-validated: py_compile,
+  values parse, deployment braces 24/24, smoke bash -n. **Build prereq:** run
+  `poetry lock` in services/review-service/ before the first build.
+  **Apply / verify:**
+    cd services/review-service && poetry lock && cd ../..
+    ./demos/smoke-reviews.sh
+  Expected: probes + version OK, seeded rows, create/fetch/filter all ✓.
+  On green, r32 → verified and part 2 (r33: Apicurio + OpenMetadata + up/down
+  harness) follows.

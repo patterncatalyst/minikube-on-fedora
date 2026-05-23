@@ -1,0 +1,6 @@
+apiVersion: v2
+name: review-service
+description: review-service data product — FastAPI service backed by the capstone Postgres (reviews schema). r22 ships the health skeleton; domain surface added later.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

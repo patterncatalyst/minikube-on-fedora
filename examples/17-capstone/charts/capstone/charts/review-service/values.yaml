@@ -1,0 +1,51 @@
+# review-service subchart values.
+
+replicas: 1
+
+image:
+  # In-cluster registry address (CAP-009). build-image.sh pushes to
+  # 127.0.0.1:<port>; the kubelet pulls from localhost:5000.
+  repository: localhost:5000/review-service
+  tag: v1
+  # Always: the :v1 tag is mutable during the dev loop, and the node caches
+  # images by tag — IfNotPresent would serve a stale cached :v1 after a
+  # rebuild. Local-registry pulls are cheap, so Always guarantees the pod
+  # runs what was just pushed (CAP-015).
+  pullPolicy: Always
+
+service:
+  port: 80
+  targetPort: 8080
+
+# Postgres connection. The CloudNativePG operator generates a Secret named
+# "<cluster>-app" holding the app user's credentials; we reference it by key.
+postgres:
+  clusterName: capstone-postgres
+  appSecret: capstone-postgres-app
+  schema: reviews
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 192Mi
+  limits:
+    memory: 512Mi
+
+# /health is liveness; /healthz is readiness (checks Postgres).
+probes:
+  # r28 calibration: a startupProbe gates liveness/readiness until the app has
+  # finished booting. Python services (imports + schema build + seed) can take
+  # 10-30s; a 5s liveness initialDelay alone would kill them mid-boot.
+  # 30 x 2s = 60s startup grace.
+  startup:
+    path: /health
+    failureThreshold: 30
+    periodSeconds: 2
+  liveness:
+    path: /health
+    initialDelaySeconds: 5
+    periodSeconds: 10
+  readiness:
+    path: /healthz
+    initialDelaySeconds: 5
+    periodSeconds: 5

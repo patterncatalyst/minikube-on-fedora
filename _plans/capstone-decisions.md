@@ -1506,3 +1506,44 @@ build from, and refined the plan.
 **Consequences.** Roadmap and assets are committed and reviewable; the design
 system is pinned so Phase D doesn't re-derive it. No runtime/cluster surface in
 r31 — pure groundwork.
+## CAP-032 — Phase A (part 1): review-service data product
+
+**Status:** decided, shipped r32 (offline-validated; cluster-verify pending).
+
+**Context.** Phase A demonstrates the add-a-data-product-to-the-mesh workflow,
+designed to be added and then backed out (a replayable demo). Decisions (user):
+a **new standalone service** (best "data as a product" demonstration; produces a
+new OpenMetadata lineage node; cleanly reversible as a whole product) with its
+**own Postgres schema** (idiomatic; ingestible by OpenMetadata).
+
+**Decision (part 1 — the product itself).**
+- New service **review-service**: product reviews/ratings, REST-only, minimal
+  deps (no Kafka/gRPC), scaffolded from the order-service template via
+  `scaffold-service.sh review reviews`, then given a domain surface.
+- Domain: `Review(id, sku, rating 1-5, reviewer, comment, created_at)` in its own
+  `reviews` schema. Reviews are keyed by product **`sku`** — the identifier the
+  inventory/product domain owns — which is the basis for the lineage edge
+  (reviews -> products) declared in part 2.
+- REST: `POST /reviews`, `GET /reviews` (+`?sku=` filter), `GET /reviews/{id}`,
+  plus `/version` (read by discovery) and the standard `/health`+`/healthz`.
+- Seeded with a few rows at startup (idempotent: only when empty) so the catalog
+  and lineage demo has data immediately.
+- Chart aligned with the **r28 calibration** (requests 192Mi / limit 512Mi +
+  startupProbe 30x2s) — the scaffolder predates r28, so the generated chart was
+  bumped to avoid repeating the cold-start/OOM class.
+- `demos/smoke-reviews.sh` asserts the full REST surface (probes, version, seeded
+  rows, create, fetch-by-id, sku filter).
+
+**Explicitly temporary.** review-service is a *demonstration* data product, not a
+permanent mesh member. Part 2 (r33) adds the discovery layer (publish OpenAPI to
+Apicurio, ingest into OpenMetadata with lineage) and a replayable `up`/`down`
+demo harness whose `down` removes the product entirely (helm uninstall + drop
+schema + delete Apicurio artifact + remove catalog entry), returning to baseline.
+
+**Build note.** review-service has no committed `poetry.lock` (the scaffolder
+defers it); run `poetry lock` in `services/review-service/` before the first
+image build (the Containerfile's `poetry export` step needs it).
+
+**Consequences.** Offline-validated: `py_compile` all modules; values.yaml
+parses; deployment braces 24/24 with startupProbe; smoke `bash -n`. Cluster-verify:
+`./demos/smoke-reviews.sh` green against the running capstone.
