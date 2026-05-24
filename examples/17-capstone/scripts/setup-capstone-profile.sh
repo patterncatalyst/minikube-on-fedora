@@ -64,17 +64,23 @@ fi
 # The node-container cgroup pids.max is NOT writable live on a rootless node
 # (Operation not permitted), so the only durable fix is at CREATION time: raise
 # podman's default via containers.conf before the node is built.
-pids_limit=$(podman info --format '{{.Host.Security.DefaultCapabilities}}' >/dev/null 2>&1; \
-    grep -hsE '^\s*pids_limit\s*=' \
+# Parse the effective podman default pids_limit from containers.conf (user first,
+# then system). The trailing `|| true` is ESSENTIAL: under `set -e` + `pipefail`,
+# a `var=$(...)` assignment aborts the whole script if the inner pipeline returns
+# non-zero — and this grep chain legitimately returns non-zero when a file is
+# absent or contains no match. That abort (not the arithmetic) was the real bug.
+pids_limit=$(
+    grep -hsE '^[[:space:]]*pids_limit[[:space:]]*=' \
         "${HOME}/.config/containers/containers.conf" \
-        /etc/containers/containers.conf 2>/dev/null | tail -1 | grep -oE '[0-9]+' | tail -1)
+        /etc/containers/containers.conf 2>/dev/null \
+        | tail -1 | grep -oE '[0-9]+' | tail -1 || true
+)
 pids_limit="${pids_limit:-2048}"
-# NB: under `set -e`, a bare `(( expr ))` that evaluates false returns exit 1 and
-# aborts the script — so compute the "too low" condition into a variable first and
-# branch on a string test, which never trips set -e.
 pids_too_low=0
-if [[ "$pids_limit" != "0" ]] && [[ "$pids_limit" =~ ^[0-9]+$ ]] && (( pids_limit < 8192 )); then
-    pids_too_low=1
+# Use `(( ))` only as an if-condition (set-e-exempt position) and only on a
+# verified-numeric value.
+if [[ "$pids_limit" != "0" ]] && [[ "$pids_limit" =~ ^[0-9]+$ ]]; then
+    if (( pids_limit < 8192 )); then pids_too_low=1; fi
 fi
 if [[ "$pids_too_low" == "1" ]]; then
     printf 'ERROR: podman default pids_limit is %s (need 0=unlimited or ≥ 8192).\n' "$pids_limit" >&2

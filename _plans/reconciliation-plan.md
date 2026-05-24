@@ -3528,3 +3528,16 @@ final reader shouldn't see. Items:
   script's, masking the real status; diagnose with an unpiped run + `echo $?`.)
   Verified the guard+display block flows through to minikube start under
   set -euo pipefail with pids_limit=0.
+
+- 🔲 **r40.3** (2026-05-24) — THE real guard fix (r40/r40.1/r40.2 missed it). The
+  failure was never the `(( ))` arithmetic — it was the `pids_limit=$(grep … |
+  grep -oE … )` assignment: under `set -euo pipefail`, when /etc/containers/
+  containers.conf is absent (normal — only the user file exists), a grep in the
+  pipeline returns non-zero, pipefail propagates it, and set -e aborts the whole
+  `var=$(…)` assignment (exit 2, no further output — exactly the observed
+  symptom; the value even computed but the pipeline's status killed it). Fix:
+  `… || true` inside the substitution + `${pids_limit:-2048}` default. Empirically
+  reproduced (original aborts before its 'after' echo; fixed reaches it) and
+  verified the full guard flows to `minikube start` under the real flags.
+  Lesson logged: reproduce a shell failure under its actual set-flags before
+  claiming a fix — three prior revisions theorized instead of reproducing.
