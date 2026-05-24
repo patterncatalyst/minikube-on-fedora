@@ -3519,3 +3519,12 @@ final reader shouldn't see. Items:
   and branch on a string test, which never trips set -e. Verified under set -e:
   pids_limit=0→PASS, 2048→BLOCK, 16384→PASS. Now the guard correctly passes a
   raised limit and the bootstrap proceeds.
+
+- 🔲 **r40.2** (2026-05-24) — Second guard fix. The CAP-041 "OK" line used
+  `printf ... "$( [[ x == 0 ]] && echo unlimited || echo x )"` — a command-sub
+  with `&& ... || ...` that is fragile under `set -e`. Replaced with a plain
+  if/else assigning `pids_display`. (Also note: a prior `bash -x ... | tail` run
+  reported exit=0 misleadingly — that was tail's exit through the pipe, not the
+  script's, masking the real status; diagnose with an unpiped run + `echo $?`.)
+  Verified the guard+display block flows through to minikube start under
+  set -euo pipefail with pids_limit=0.

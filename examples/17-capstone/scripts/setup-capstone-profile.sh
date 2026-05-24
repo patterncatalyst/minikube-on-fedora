@@ -85,8 +85,12 @@ if [[ "$pids_too_low" == "1" ]]; then
     printf 'Then re-run this script (a node recreate is needed to pick it up).\n' >&2
     exit 1
 fi
-printf '==> podman pids_limit OK (%s) — node will have PID headroom (CAP-040)\n' \
-    "$( [[ "$pids_limit" == "0" ]] && echo unlimited || echo "$pids_limit" )"
+if [[ "$pids_limit" == "0" ]]; then
+    pids_display="unlimited"
+else
+    pids_display="$pids_limit"
+fi
+printf '==> podman pids_limit OK (%s) — node will have PID headroom (CAP-040)\n' "$pids_display"
 
 # Warn (don't fail) if other minikube profiles are running. Capstone wants
 # the headroom.
