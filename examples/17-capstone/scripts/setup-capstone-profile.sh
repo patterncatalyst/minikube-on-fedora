@@ -53,6 +53,34 @@ if (( inotify_instances < 256 )); then
     exit 1
 fi
 
+# Confirm podman's default pids_limit is raised (CAP-040). The podman driver
+# creates the minikube node as a container whose ROOT cgroup pids.max is
+# podman's default (--pids-limit=2048) — a cap on TOTAL processes across ALL
+# pods on the node. The full meshed capstone (CNPG, Kafka, KEDA, OpenMetadata +
+# OpenSearch JVMs, observability, six services, and six Envoy sidecars under
+# namespace-wide injection) runs ~2000+ tasks and saturates 2048 — so the
+# kubelet can't fork the last pod's init (order-service: EAGAIN, runc exit 128,
+# "fork/exec ...: resource temporarily unavailable", CrashLoopBackOff/StartError).
+# The node-container cgroup pids.max is NOT writable live on a rootless node
+# (Operation not permitted), so the only durable fix is at CREATION time: raise
+# podman's default via containers.conf before the node is built.
+pids_limit=$(podman info --format '{{.Host.Security.DefaultCapabilities}}' >/dev/null 2>&1; \
+    grep -hsE '^\s*pids_limit\s*=' \
+        "${HOME}/.config/containers/containers.conf" \
+        /etc/containers/containers.conf 2>/dev/null | tail -1 | grep -oE '[0-9]+' | tail -1)
+pids_limit="${pids_limit:-2048}"
+if [[ "$pids_limit" != "0" ]] && (( pids_limit < 8192 )); then
+    printf 'ERROR: podman default pids_limit is %s (need 0=unlimited or ≥ 8192).\n' "$pids_limit" >&2
+    printf 'The capstone node would be capped at %s total PIDs and the last pod\n' "$pids_limit" >&2
+    printf 'would fail to fork (EAGAIN / runc exit 128). Raise it before creating the node:\n' >&2
+    printf '  mkdir -p ~/.config/containers\n' >&2
+    printf '  printf '\''[containers]\\npids_limit = 0\\n'\'' >> ~/.config/containers/containers.conf\n' >&2
+    printf 'Then re-run this script (a node recreate is needed to pick it up).\n' >&2
+    exit 1
+fi
+printf '==> podman pids_limit OK (%s) — node will have PID headroom (CAP-040)\n' \
+    "$( [[ "$pids_limit" == "0" ]] && echo unlimited || echo "$pids_limit" )"
+
 # Warn (don't fail) if other minikube profiles are running. Capstone wants
 # the headroom.
 running_profiles=$(minikube profile list -o json 2>/dev/null \

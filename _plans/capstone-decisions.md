@@ -1877,3 +1877,97 @@ routing.yaml creates; `/version` confirmed to emit v2 + currency. Cluster-verify
 `demo-canary.sh up → shift → down` cycles cleanly. A+B together demonstrate the
 data-mesh value from the API/contract perspective (add a product, then evolve its
 contract under canary).
+
+## CAP-040 — Idle-node decay: kube-proxy /dev loss wedges Service routing
+
+**Status:** documented (operational finding); recovery = node cycle.
+
+**Context.** Returning to the capstone after ~17h idle, the v1→v2 canary's v2 pod
+would not create: the sidecar-injection webhook call to the istiod ClusterIP
+`10.x:443` was refused. Diagnosis ruled out istiod (pod Ready, logged
+`webhook service at [::]:15017`, endpoints listed `https-webhook=15017`, and an
+in-cluster `nc` to the istiod POD IP `:15017` succeeded) — but `nc` to the istiod
+SERVICE ClusterIP `:443` failed. Service-IP refused while pod-IP open = a
+kube-proxy/Service-routing fault, not an Istio fault.
+
+Root cause: **kube-proxy was CrashLoopBackOff** with a node-level error —
+`runc create failed: error creating device nodes: mount src=/dev/bsg/0:0:0:0 ...
+no such file or directory`. A device node present at node creation had vanished
+from the rootless-podman node container's `/dev` during the idle period, so
+kube-proxy couldn't init. With kube-proxy down, ClusterIP routing was broken
+cluster-wide — which is why the istiod webhook ClusterIP refused AND why the
+whole capstone namespace was stuck `Init:1/2` (init containers couldn't reach
+Services). One root cause, many symptoms.
+
+**Lesson / guidance (tutorial-worthy).**
+  * **Symptom→cause shortcut:** "connection refused to a healthy Service's
+    ClusterIP, but the backing pod IP is reachable" = Service-routing/kube-proxy,
+    NOT the backing workload. The decisive test is `nc <svc> <port>` vs
+    `nc <podIP> <targetPort>` from an unmeshed throwaway pod — Service fails /
+    pod open pins it to kube-proxy.
+  * **Idle-node decay is real on single-node rootless minikube:** a node that
+    sat idle can lose `/dev` device nodes, wedging kube-proxy and thus all
+    Service routing. Piecemeal restarts (istiod, the deploy, even kube-proxy
+    itself) don't fix it because the node container's `/dev` is degraded.
+  * **Recovery:** cycle the node — `./scripts/cluster-up.sh` (detects the wedge,
+    stop/starts, rebuilds registry images, bounces stuck pods), then
+    `./scripts/cluster-status.sh`. A stop/start re-creates the node container
+    with fresh `/dev` + kube-proxy + Service rules. Full
+    `minikube delete && bootstrap-capstone.sh` if the cycle doesn't clear it.
+  * **Operational habit:** when resuming a capstone after a break, run
+    `cluster-up.sh` (or at least `cluster-status.sh`) BEFORE demoing — don't
+    assume the node is exactly as you left it. Worth stating in §17's
+    "Operating the cluster" section alongside the existing etcd-wedge and
+    registry-loss notes.
+
+**Phase C tie-in.** This was a kube-proxy fault, not Istio — but it again showed
+that namespace-wide injection couples every pod-create to the istiod webhook
+being routable. Selective injection would have let non-mesh infra keep deploying
+even with the istiod ClusterIP unreachable. Another point for that decision.
+
+## CAP-041 — Node PID ceiling: raise podman pids_limit at node creation
+
+**Status:** decided, shipped r40 (guard in profile script + host containers.conf).
+**Supersedes:** CAP-036 (withdrawn — that tried a live cgroup write, which fails
+on a rootless node). This is the correct, creation-time fix.
+
+**Context.** On every fresh bootstrap, seven tiers come up clean but order-service
+fails its rollout with `StartError` / exit 128 /
+`fork/exec /proc/self/fd/6: resource temporarily unavailable` (EAGAIN), crash-
+looping. Confirmed decisively this time: the node container's ROOT cgroup
+`pids.max=2048` (podman's `--pids-limit` default) with `pids.current=2043` —
+**99.8% full**. That 2048 caps TOTAL processes across all pods on the node; the
+full meshed capstone (CNPG, Kafka, KEDA, OpenMetadata+OpenSearch JVMs,
+observability, six services, six Envoy sidecars) runs ~2000+ tasks, so the
+kubelet can't fork the last/heaviest pod's init. order-service is the casualty
+because it's meshed (app + Envoy) and starts last. (kubepods.slice pids.max is
+huge — 509255 — which is why earlier I wrongly ruled PID out; the cap is on the
+node *root* cgroup, not the pods slice.)
+
+**Why CAP-036's approach failed.** It tried `echo max > /sys/fs/cgroup/pids.max`
+live on the running node — `Operation not permitted` on rootless (the node
+container's top-level pids.max is owned by the parent and locked from inside).
+
+**Decision.** Raise podman's default at CREATION time via host
+`~/.config/containers/containers.conf`:
+```
+[containers]
+pids_limit = 0          # 0 = unlimited (or a high number ≥ 8192)
+```
+Then recreate the node (`minikube delete -p capstone && bootstrap-capstone.sh`)
+so the node container is born without the 2048 cap. `setup-capstone-profile.sh`
+now GUARDS this: it reads the effective podman pids_limit and hard-fails with
+the exact fix if it's a low number (< 8192 and not 0), the same way it already
+guards fs.inotify limits. The repo can't set a user's host containers.conf, but
+it can refuse to build a node that would suffocate.
+
+**§1 prerequisite.** This belongs in the §1 prerequisites alongside the inotify
+sysctl tweak: rootless podman defaults to pids_limit=2048 per container, which is
+too low for a node hosting the whole capstone — set pids_limit=0 in
+containers.conf before first bring-up.
+
+**Consequences.** Offline-validated: guard parses `pids_limit = 0`→accept and
+`= 4096`→reject correctly; `bash -n` clean. Cluster-verify: set containers.conf
+pids_limit=0, `minikube delete && bootstrap-capstone.sh` → node root pids.max is
+no longer 2048, order-service forks and reaches 2/2, bootstrap hits a true 8/8
+for the first time. Then Phase B canary verification can finally run.

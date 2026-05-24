@@ -3483,3 +3483,30 @@ final reader shouldn't see. Items:
     ./demos/demo-canary.sh down             # back to v1-only baseline
   Closes Phase B. Phase C next: §17 page restructure + narrative + diagrams +
   the selective-injection decision.
+
+- 📝 **Idle-node decay note** (2026-05-23, CAP-040) — After ~17h idle, kube-proxy
+  CrashLooped on a vanished `/dev/bsg` device node, breaking ClusterIP routing
+  cluster-wide (manifested as the istiod injection-webhook ClusterIP refusing
+  connections → v2 canary pod couldn't be created → whole namespace stuck
+  Init:1/2). Not an Istio fault (istiod healthy; pod-IP:15017 open, Service-IP:443
+  refused = kube-proxy). Recovery: `./scripts/cluster-up.sh` to cycle the node,
+  then `cluster-status.sh`. Operational habit recorded: run cluster-up/status when
+  resuming after a break. Phase B canary verification resumes once the cycle
+  restores Service routing.
+
+- 🔲 **r40** (2026-05-23) — Fix (durable, correct): raise the node PID ceiling at
+  creation via podman containers.conf (CAP-041; supersedes the withdrawn r36).
+  Confirmed root cause of order-service's recurring StartError/exit-128/EAGAIN:
+  node root cgroup pids.max=2048, pids.current=2043 (99.8% full) — the full meshed
+  stack saturates podman's default per-container PID cap, so the kubelet can't fork
+  the last pod. Live cgroup write is blocked on rootless, so the fix is
+  creation-time: `pids_limit = 0` in ~/.config/containers/containers.conf, then a
+  node recreate. setup-capstone-profile.sh now guards this (hard-fail with the fix
+  if pids_limit < 8192 and ≠ 0), mirroring the inotify guard. Offline-validated
+  (bash -n; guard parse logic). **Cluster-verify:**
+    mkdir -p ~/.config/containers
+    printf '[containers]\npids_limit = 0\n' >> ~/.config/containers/containers.conf
+    minikube delete -p capstone
+    cd examples/17-capstone && ./scripts/bootstrap-capstone.sh   # true 8/8 — order-service forks
+  Then Phase B: ./demos/smoke-canary.sh. §1 prerequisites should add the
+  pids_limit note alongside the inotify tweak.
