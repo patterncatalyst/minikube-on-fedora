@@ -3510,3 +3510,12 @@ final reader shouldn't see. Items:
     cd examples/17-capstone && ./scripts/bootstrap-capstone.sh   # true 8/8 — order-service forks
   Then Phase B: ./demos/smoke-canary.sh. §1 prerequisites should add the
   pids_limit note alongside the inotify tweak.
+
+- 🔲 **r40.1** (2026-05-24) — Fix the r40 guard bug. The CAP-041 pids_limit guard
+  in setup-capstone-profile.sh aborted silently (exit 2, no output) even when
+  containers.conf was correctly set to 0: under `set -euo pipefail`, the bare
+  `(( pids_limit < 8192 ))` returns exit 1 when false, which set -e treats as fatal.
+  Rewrote to compute a `pids_too_low` flag (with an `=~ ^[0-9]+$` numeric guard)
+  and branch on a string test, which never trips set -e. Verified under set -e:
+  pids_limit=0→PASS, 2048→BLOCK, 16384→PASS. Now the guard correctly passes a
+  raised limit and the bootstrap proceeds.

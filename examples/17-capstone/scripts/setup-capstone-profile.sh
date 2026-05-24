@@ -69,7 +69,14 @@ pids_limit=$(podman info --format '{{.Host.Security.DefaultCapabilities}}' >/dev
         "${HOME}/.config/containers/containers.conf" \
         /etc/containers/containers.conf 2>/dev/null | tail -1 | grep -oE '[0-9]+' | tail -1)
 pids_limit="${pids_limit:-2048}"
-if [[ "$pids_limit" != "0" ]] && (( pids_limit < 8192 )); then
+# NB: under `set -e`, a bare `(( expr ))` that evaluates false returns exit 1 and
+# aborts the script — so compute the "too low" condition into a variable first and
+# branch on a string test, which never trips set -e.
+pids_too_low=0
+if [[ "$pids_limit" != "0" ]] && [[ "$pids_limit" =~ ^[0-9]+$ ]] && (( pids_limit < 8192 )); then
+    pids_too_low=1
+fi
+if [[ "$pids_too_low" == "1" ]]; then
     printf 'ERROR: podman default pids_limit is %s (need 0=unlimited or ≥ 8192).\n' "$pids_limit" >&2
     printf 'The capstone node would be capped at %s total PIDs and the last pod\n' "$pids_limit" >&2
     printf 'would fail to fork (EAGAIN / runc exit 128). Raise it before creating the node:\n' >&2
