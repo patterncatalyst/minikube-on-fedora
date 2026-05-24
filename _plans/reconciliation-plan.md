@@ -3541,3 +3541,15 @@ final reader shouldn't see. Items:
   verified the full guard flows to `minikube start` under the real flags.
   Lesson logged: reproduce a shell failure under its actual set-flags before
   claiming a fix — three prior revisions theorized instead of reproducing.
+
+- ✅ **Phase B VERIFIED** (2026-05-24) — order-service v1→v2 canary confirmed
+  end-to-end on a clean 8/8 bootstrap (uncapped node, pids_limit=65536 via CAP-041).
+  smoke-canary.sh: v2 rolled out clean (r39 alignment — proxy-hold + retry +
+  512Mi), both subsets meshed (2/2), 90/10 split observed v1=95/v2=5, 50/50 split
+  observed v1=46/v2=54 — both in band. demo-canary.sh up/shift/down available for
+  the repeatable/backable-out flow. Closes r39 / CAP-039. Also confirms the full
+  bootstrap (r35) reaches a true 8/8 with all of r34/r37/r38/r40.3 in effect:
+  order-service forks and becomes Ready for the first time through a clean bring-up.
+  Phase A (review-service add/back-out) remains available to verify via
+  smoke-discovery → ingest-openmetadata → demo-add-data-product.sh up. Next: Phase C
+  (§17 page restructure + narrative + diagrams + the selective-injection decision).
