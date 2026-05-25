@@ -12,7 +12,7 @@ titleSlide({
   subtitle: "From the four principles to a running platform — domains owning data as products, on the platform and governance that let them interoperate.",
   tagline: "A reference implementation",
   breadcrumb: "OpenShift · AMQ Streams · CloudNativePG · Service Mesh · KEDA · OpenMetadata",
-  notes: "Welcome. This is the implementation companion to the Data Mesh 101 deck. Where 101 made the conceptual case, today we build it — on OpenShift, principle by principle, with the real pieces and the code. Set expectations: a 1.5–3 hour walk through a reference architecture. For each principle I'll show the value it delivers and the OpenShift pieces that deliver it. Deep operational war-stories are saved for Appendix A — today is about the value of the whole.",
+  notes: "Welcome. This is the implementation companion to the Data Mesh 101 deck. Where 101 made the conceptual case, today we build it — on OpenShift, principle by principle, with the real pieces and the code. Set expectations: a 1.5–3 hour walk through a reference architecture. For each principle I'll show the value it delivers and the OpenShift pieces that deliver it. Today is about the value of the whole — the principles and the pieces that realize them.",
 });
 
 /* ============================ AGENDA ============================ */
@@ -26,9 +26,9 @@ L.agendaSlide({
   right: [
     { text: "04 · Federated computational governance" },
     { text: "05 · The whole picture" },
-    { text: "Appendix A · Operational gotchas", italic: true },
+    { text: "06 · Anti-patterns" },
   ],
-  notes: "The agenda. Six sections plus an appendix. The spine is the four data-mesh principles (01–04), bookended by an orientation section (00) and a synthesis (05). Point out the shape: each principle section follows the same rhythm — principle, pieces, code, value. Note that operational gotchas live in Appendix A, so the main talk stays on value. Roughly 1.5–3 hours depending on how deep you go on the code and diagrams.",
+  notes: "The agenda. Seven sections. The spine is the four data-mesh principles (01–04), bookended by an orientation section (00), a synthesis (05), and the anti-patterns (06) that close out the talk. Point out the shape: each principle section follows the same rhythm — principle, pieces, code, value. Roughly 1.5–3 hours depending on how deep you go on the code and diagrams.",
 });
 
 (() => {
@@ -41,10 +41,10 @@ L.agendaSlide({
     { head: true, text: "What this deck does" },
     { text: "Takes each of the four principles and shows the concrete OpenShift pieces that realize it — with the architecture and the code, not just the diagram." },
     { text: "Frames every piece by the value it delivers: why it earns its place in a production data mesh." },
-    { text: "Keeps the operational war-stories out of the main story — they live in Appendix A, so the through-line stays on value." },
+    { text: "Stays focused on value and the conceptual shape — the through-line is the four principles and how they're realized." },
   ], { x: 0.7, y: 1.95, w: PW - 1.4 });
   L.footer(s);
-  s.addNotes("Bridge from 101. If your audience saw the 101 deck, this is a quick recap; if not, it's the whole premise in four sentences. The key move: we are not going to argue for data mesh again — we're going to build one. Emphasize the last bullet: operational gotchas are deliberately in an appendix so the main narrative stays about value. If people want the gotchas, tell them Appendix A.");
+  s.addNotes("Bridge from 101. If your audience saw the 101 deck, this is a quick recap; if not, it's the whole premise in four sentences. The key move: we are not going to argue for data mesh again — we're going to build one. Emphasize the last bullet: the talk stays on value and the conceptual shape, closing with the anti-patterns that most often derail real efforts.");
 })();
 
 /* ====================== 00 · FROM PRINCIPLES TO PLATFORM ====================== */
@@ -102,9 +102,9 @@ contentSlide({ eyebrow: "How to read this deck", title: "Principle → pieces �
     { text: "The code where code is the lesson — Python for the APIs, the few manifests worth seeing.", lvl: 1 },
     { text: "A closing value picture: the principle's payoff and the pieces that deliver it.", lvl: 1 },
     { head: true, text: "A note on scope" },
-    { text: "The main narrative stays on value, and leans on diagrams over YAML. The operational gotchas — the sharp edges you hit running this — are gathered in Appendix A, so they inform without derailing." },
+    { text: "The main narrative stays on value and leans on diagrams over YAML. We close with the anti-patterns — the conceptual and organizational ways data-mesh efforts go wrong." },
   ],
-  notes: "Set the per-section rhythm: principle, pieces as diagrams, code only where it teaches, value-closer picture. Call out explicitly that we favor diagrams over YAML — most people don't want to read manifests off a slide, and the architecture is clearer as a picture. The Python API code we DO show, because seeing the implementation is valuable. Gotchas are in Appendix A." });
+  notes: "Set the per-section rhythm: principle, pieces as diagrams, code only where it teaches, value-closer picture. Call out explicitly that we favor diagrams over YAML — most people don't want to read manifests off a slide, and the architecture is clearer as a picture. The Python API code we DO show, because seeing the implementation is valuable. The deck closes with the anti-patterns section." });
 
 /* ====================== 01 · DOMAIN OWNERSHIP ====================== */
 divider({ num: "01", title: "Domain ownership", sub: "Each domain owns its data end to end — and the platform makes that boundary real.",
@@ -342,7 +342,7 @@ contentSlide({ eyebrow: "Self-serve platform", title: "Resilience: recoverabilit
     { text: "Don't hold critical state only in memory; come back to a known-good state after a crash; let the operator recover the systems it manages; let a downed consumer catch up on the backlog it missed.", },
     { text: "A product deployed this way is recoverable by construction — and that resilience is something the domain gets from the platform, not something it builds.", color: C.ink },
   ],
-  notes: "Resilience as the other half of the platform's value. Cloud-native doesn't prevent failure — it makes recovery cheap and automatic, and a mesh inherits that. List the reconciliation behaviors quickly. Then design guidance: build TOWARD recoverability — no critical in-memory-only state, known-good recovery, let operators recover what they manage, let consumers catch up. Payoff: recoverable by construction, from the platform. (Single-node caveats and recovery-sizing are in Appendix A.)" });
+  notes: "Resilience as the other half of the platform's value. Cloud-native doesn't prevent failure — it makes recovery cheap and automatic, and a mesh inherits that. List the reconciliation behaviors quickly. Then design guidance: build TOWARD recoverability — no critical in-memory-only state, known-good recovery, let operators recover what they manage, let consumers catch up. Payoff: recoverable by construction, from the platform." });
 
 diagramSlide({ eyebrow: "Self-serve platform", title: "Infrastructure domains consume, not operate",
   image: "17-value-self-serve",
@@ -396,9 +396,9 @@ contentSlide({ eyebrow: "Federated governance", title: "Mesh selectively — a d
     { text: "Batch jobs meant to finish — a sidecar that never exits keeps the job from ever completing.", lvl: 1 },
     { text: "Operator-managed infrastructure with its own TLS — a second TLS layer collides with the database's own.", lvl: 1 },
     { text: "Anything where the sidecar's cost buys nothing — resource overhead and a control-plane dependency for no benefit.", lvl: 1 },
-    { text: "Selective injection also contains blast radius: only workloads that need the mesh depend on its control plane being healthy. (The specific incidents are in Appendix A.)", color: C.ink },
+    { text: "Selective injection also contains blast radius: only workloads that need the mesh depend on its control plane being healthy.", color: C.ink },
   ],
-  notes: "An important DESIGN DECISION, framed as value not war-story. The convenient default — namespace-wide injection — is wrong for a platform that holds more than just services. Opt workloads INTO the mesh instead. Three categories that don't belong: finish-and-terminate jobs (sidecar never exits, job hangs), operator-managed infra with its own TLS (collision), anything where the sidecar buys nothing. Plus the systemic argument: selective injection contains blast radius. State it as a principle here; the specific incidents that taught us are in Appendix A — point there, don't tell the stories now.\n\nDefinitions:\n• Sidecar — a proxy container (Envoy) injected next to your app container; carries the mesh's traffic, security, and telemetry.\n• Istio — the service mesh project underlying OpenShift Service Mesh; injects sidecar proxies and controls traffic/security.\n• Admission control — the API-server gate that validates or rejects resources as they're created; where computational governance runs." });
+  notes: "An important DESIGN DECISION, framed as value not war-story. The convenient default — namespace-wide injection — is wrong for a platform that holds more than just services. Opt workloads INTO the mesh instead. Three categories that don't belong: finish-and-terminate jobs (sidecar never exits, job hangs), operator-managed infra with its own TLS (collision), anything where the sidecar buys nothing. Plus the systemic argument: selective injection contains blast radius. State it as a principle here — the reasoning matters more than the war stories.\n\nDefinitions:\n• Sidecar — a proxy container (Envoy) injected next to your app container; carries the mesh's traffic, security, and telemetry.\n• Istio — the service mesh project underlying OpenShift Service Mesh; injects sidecar proxies and controls traffic/security.\n• Admission control — the API-server gate that validates or rejects resources as they're created; where computational governance runs." });
 
 diagramSlide({ eyebrow: "Federated governance", title: "Observability — the mesh emits, the platform collects",
   image: "17-observability-stack",
@@ -471,15 +471,80 @@ contentSlide({ eyebrow: "The whole picture", title: "Adoption: start small",
   ],
   notes: "Practical adoption advice — the natural next question is 'where do I start?' Answer: not all at once. One domain, one product, with a Project, a contract, and an owner. Add platform pieces as products need them. Introduce governance once there are products to govern. Meta-point: each piece is independently verifiable, so build incrementally and let reality correct the design — exactly how the reference implementation was built." });
 
-contentSlide({ eyebrow: "The whole picture", title: "When a mesh is the wrong choice",
+/* ====================== 06 · ANTI-PATTERNS ====================== */
+divider({ num: "06", title: "Anti-patterns", sub: "How data-mesh efforts go wrong — the conceptual and organizational failure modes, so you can spot them early.",
+  notes: "Final section before we close. Everything so far was what to build and how. This section is what goes WRONG — and deliberately NOT the implementation potholes (those are operational and a different kind of lesson); these are the CONCEPTUAL and ORGANIZATIONAL failure modes that show up again and again. The framing to open with: a data mesh is a socio-technical system, and the literature is nearly unanimous that these efforts fail for organizational reasons far more than technical ones. Most of these are invisible at the architecture-diagram level and only become obvious months in, once they've calcified. Each anti-pattern: the trap, the tell, and the fix." });
+
+contentSlide({ eyebrow: "Anti-patterns", title: "The architecture diagram is the easy part",
   bullets: [
-    { text: "Honesty closes the value story: a data mesh is not for every organization, and saying so protects the ones it would only burden.", },
-    { text: "It earns its complexity with many domains, many consumers, and the organizational maturity to operate products and standards across teams.", lvl: 1 },
-    { text: "For a small organization, the overhead of decentralization can cost more than the bottleneck it removes.", lvl: 1 },
-    { head: true, text: "Adopt principles, not fashion" },
-    { text: "Sometimes a single principle — self-serve platform infrastructure, say — delivers most of the value without the full paradigm. Weigh data size, organizational complexity, existing tooling, and culture before committing.", },
+    { text: "A data mesh is a socio-technical system. The technical pieces — registry, catalog, streams, autoscaling — are the concrete, runnable part this deck spent most of its time on.", },
+    { text: "But the literature is nearly unanimous: data-mesh efforts fail for organizational reasons far more often than technical ones.", color: C.ink },
+    { head: true, text: "Why these are worth knowing before you start" },
+    { text: "Most are invisible on the architecture diagram. They only become obvious months in — once they've calcified into how teams work.", },
+    { text: "Each of the next slides: the trap, the tell that reveals it, and the fix the literature points to.", },
   ],
-  notes: "The honest slide — builds credibility with a skeptical enterprise audience. A mesh is not for everyone. It earns its complexity at scale: many domains, many consumers, organizational maturity. For a small org, decentralization overhead can exceed the bottleneck it removes. And you can adopt a single principle — usually the self-serve platform — without the whole paradigm. Telling people when NOT to do this makes them trust you on when to. Weigh the four factors first." });
+  notes: "Set up the section. The key reframe for a technical audience that just sat through 40 slides of architecture: the diagram was the easy part. The parts that aren't on the diagram — who owns what, how governance is enforced, whether the loop is closed, whether the org needed a mesh at all — are where efforts actually succeed or fail. These anti-patterns are drawn from practitioners who've watched many of these efforts up close. They're stated generally; I'll note where each touched our own build." });
+
+(() => {
+  // each anti-pattern: trap (what it is) + tell (the symptom) + fix
+  const items = [
+    { h: "\u201cThe tool will solve it\u201d",
+      trap: "Treating data mesh as something you buy or install — adopt a catalog, relabel the lake's tables as \u201cdata products,\u201d declare victory. But the principles are about how teams work, not which software runs.",
+      tell: "A project plan that's entirely a tooling rollout, with no mention of team boundaries, ownership, or incentives.",
+      fix: "Change the operating model first; let tools support the principles rather than substitute for them.",
+      n: "The most common trap, and practitioners put it first. A data mesh is an operating-model change; no tool delivers that on its own. The tell is a plan that's all tooling and no team-structure change — if the only thing changing is the software, you end up with the old centralized model plus a new dashboard. In our build, every component (Apicurio, OpenMetadata, KEDA, Istio) is deliberately a substrate the domains build on, not a turnkey mesh." },
+    { h: "Centralization wearing a new name",
+      trap: "Recreating the central-team bottleneck under new vocabulary: a \u201cplatform team\u201d that's still the only group that can ship a product; governance as a manual approval gate; or domains spinning up shadow data teams.",
+      tell: "Decisions still funnel through one team — for control, for \u201cconsistency,\u201d for governance — and the old lead times quietly return.",
+      fix: "Push real ownership and the ability to ship to the domains; make governance automated and policy-driven, not approval-driven.",
+      n: "Data mesh exists to break the single-central-team bottleneck; the failure is rebuilding it under new words. Three shapes: the central team stays the proxy for every domain; governance re-centralizes as a review board; or domains build shadow data teams and you get silos again. Decentralization is the whole point — anything that funnels decisions back through one team reintroduces the original problem. In our build, the namespace-and-operator model gives each domain a place to own its slice with no central team in the loop." },
+    { h: "Data products that are \u201cdumb\u201d",
+      trap: "Stripping a data product down to a renamed table or a catalog row. A real product serves its data, governs it, describes itself, and is discoverable; a dumb one is a static dataset with a label.",
+      tell: "A \u201cdata product\u201d you can't deploy, version, or call — you can only query the table it points at.",
+      fix: "Give every product ports, a versioned contract, an owner, and a lifecycle. Autonomy is what lets governance live inside it.",
+      n: "The failure the principle's own author warns about most sharply. Lose product autonomy and you lose the governance model with it — because there's nowhere to embed governance in a renamed table, federated computational governance gets dropped too. The downgrade cascades. In our build, each service IS its data product: owns its schema, publishes a versioned contract, emits its own events, exposes its own API." },
+    { h: "Governance as an afterthought — or as bureaucracy",
+      trap: "Governance fails in two opposite directions: bolted on from outside (it never fits — quality and access become things done TO a product), or over-corrected into a heavyweight approval bureaucracy (centralization again).",
+      tell: "Either a free-for-all where nothing joins up, or a bottleneck where nothing ships.",
+      fix: "Federated computational governance: a small set of global rules the platform enforces automatically, embedded in each product — not administered by a committee.",
+      n: "The interesting design question for any mesh is which rules are GLOBAL (so products interoperate — shared identifiers, contract formats, lineage conventions) versus left to domains. Get that line wrong either way and you get the free-for-all or the bottleneck. In our build, contracts live in a registry and lineage is recorded in the catalog automatically as part of deploying, not as a separate review step." },
+    { h: "No clear owner, or fuzzy domain boundaries",
+      trap: "Two related failures: the ownership vacuum (a dataset nobody is responsible for, so quality drifts and trust erodes), and fuzzy boundaries (the same concept modeled three ways by three teams).",
+      tell: "Consumers get conflicting versions of nominally the same data, and changes ripple across services that should have been independent.",
+      fix: "Bounded contexts — the same discipline that makes microservices work. Map the domains, name an owner per product, revisit boundaries as the org changes.",
+      n: "A mesh is only as good as the clarity of who owns what. Both failures come down to bounded contexts. Without clear, agreed domain boundaries and an explicit owner per product, the mesh degrades into the distributed mess the principles were meant to prevent. The remedy is unglamorous: actually map the domains and write down who owns each product. In our build, each domain is a service with a single clear responsibility and an owner by construction." },
+    { h: "The open loop — no feedback",
+      trap: "Static analytical products built downstream from a lake, disconnected from the operational systems that produce the data and from the consumers who use them. No operational-to-analytical loop, no consumer-feedback loop.",
+      tell: "A data product nobody monitors for use and nobody updates in response to how it's consumed — published once, then frozen.",
+      fix: "Close the loop by domain: react to operational events as they happen, and track whether products are actually useful to their consumers.",
+      n: "Data mesh is meant to close the loop between operational systems and analytical uses, organized by domain. The degraded version is an open loop — products go stale, the lead time between an app change and its analytical impact never shrinks, and the mesh delivers little more than the warehouse it replaced. In our build, the async spine means analytical consumers react to operational events as they happen rather than to a nightly extract." },
+    { h: "Hype-driven and wrong-fit adoption",
+      trap: "Adopting a mesh because it's fashionable. It earns its complexity in large orgs with many domains, many consumers, and the maturity to operate products and standards across teams — for a small org, the overhead can cost more than the bottleneck it removes.",
+      tell: "Chasing more data products as an end in itself; months of planning the perfect mesh instead of shipping one real product; adopting the whole paradigm when one principle would do.",
+      fix: "Weigh data size, organizational complexity, existing tooling, and culture. Be willing to conclude a full mesh — or only some of its principles — is the right fit.",
+      n: "Less about HOW you build a mesh and more about WHETHER you should. This is the honest slide — and it builds credibility. A mesh is not for every organization. Sometimes a single principle, usually the self-serve platform, delivers most of the value without the full paradigm. Telling people when NOT to do this makes them trust you on when to. In our build, the capstone is deliberately a learning implementation — sized to teach the shape, not to argue everyone should run a mesh in production." },
+  ];
+  items.forEach((it) => {
+    const s = pres.addSlide();
+    s.background = { color: C.white };
+    L.head(s, "Anti-patterns", it.h, { titleH: 1.0 });
+    L.addBullets(s, [
+      { head: true, text: "The trap" }, { text: it.trap },
+      { head: true, text: "The tell" }, { text: it.tell },
+      { head: true, text: "The fix" }, { text: it.fix, color: C.ink },
+    ], { x: 0.7, y: 1.95, w: PW - 1.4, fontSize: 15 });
+    L.footer(s);
+    s.addNotes(it.n);
+  });
+})();
+
+contentSlide({ eyebrow: "Anti-patterns", title: "Recognizing them early",
+  bullets: [
+    { text: "None of these are exotic. They're the predictable result of taking a paradigm about ownership, autonomy, and feedback — and implementing only its visible technical surface.", },
+    { text: "The recurring lesson across everyone who's written about failed efforts is the same:", color: C.ink },
+    { text: "The architecture diagram is the easy part. Who owns what, how governance is enforced, whether the loop is closed, whether the organization needed a mesh at all — the parts that aren't on the diagram are where efforts actually succeed or fail.", lvl: 1 },
+  ],
+  notes: "Section close. Tie the seven together: each is what happens when you implement the technical surface of a paradigm that's fundamentally about ownership, autonomy, and feedback — and skip the rest. The single sentence to leave them with: the architecture diagram is the easy part. That's a strong setup for the conclusion, which reframes the whole deck as having built exactly the parts that ARE on the diagram, while naming what isn't. Then go to the closing slide." });
 
 (() => {
   const s = pres.addSlide();
@@ -491,43 +556,8 @@ contentSlide({ eyebrow: "The whole picture", title: "When a mesh is the wrong ch
   const lw = 1.25, lh = lw / L.LOGO_AR;
   s.addImage({ path: L.LOGO_LIGHT, x: PW - 0.6 - lw, y: PH - 0.3 - lh, w: lw, h: lh });
   L.pageNumOnly(s, { dark: true });
-  s.addNotes("Closing. The one-sentence definition that ties the talk together: a mesh is the network of products PLUS the platform and standards that let them interoperate — every word of which we built today. End on OpenShift as the home for all four principles. Open for questions, and point anyone hungry for operational detail to Appendix A.");
-})();
-
-/* ====================== APPENDIX A · GOTCHAS ====================== */
-divider({ num: "A", title: "Appendix A — Gotchas", sub: "What we learned running it. Operational sharp edges, kept out of the value story on purpose.",
-  notes: "Appendix — only if there's time or questions go there. Operational potholes from actually running the reference implementation. Here, not in the main deck, deliberately: the main story is value; these are a different kind of lesson. Each is symptom → cause → fix. Pull them up if someone asks 'what bit you?'" });
-
-contentSlide({ eyebrow: "Appendix A · Gotchas", title: "Why these live in an appendix",
-  bullets: [
-    { text: "The main narrative is about the value each piece delivers. These are the operational potholes you hit making the pieces work together — a different kind of lesson: specific, technical, and best learned before you trip on them.", },
-    { text: "Some are particular to a constrained learning cluster; the ones below generalize to any real deployment. Each is symptom → cause → fix.", color: C.ink },
-  ],
-  notes: "Framing for the appendix. Reiterate why separated: value story in the main deck, operational lessons here. Some gotchas were specific to a constrained learning cluster (single node, rootless), but the four below generalize to any real deployment. Format is symptom → cause → fix." });
-
-(() => {
-  const items = [
-    { h: "A meshed batch job never completes", c: "A Job pod gets a sidecar that never exits; the pod sits at 1/2 forever and the Job hangs. Catalog ingestion jobs hit this.", f: "Opt jobs out of injection (sidecar.istio.io/inject: \"false\"), or run them in an unmeshed namespace. A run-and-terminate workload can't carry a run-and-stay sidecar.",
-      n: "Gotcha 1 — the meshed-job trap, the most common selective-meshing casualty. The sidecar is designed to run and stay; a Job is designed to run and terminate. Together, the pod never reaches Completed, so the Job hangs forever. We hit this with the catalog's ingestion jobs. Fix: opt jobs out of injection, or run them unmeshed. This is the concrete incident behind the selective-meshing decision in section 04." },
-    { h: "Operator-managed database crash-loops under the mesh", c: "A managed Postgres runs its own TLS on its internal ports; an injected sidecar re-wraps those connections and breaks the database's own TLS. It exits and restarts repeatedly.", f: "Exclude operator-managed infrastructure with its own TLS from the mesh. Selective injection, not namespace-wide.",
-      n: "Gotcha 2 — the double-TLS collision. CloudNativePG runs its own TLS on its instance-manager ports. An injected Envoy intercepts and re-wraps those connections, breaking the database's own TLS, and Postgres crash-loops. The second category from the selective-meshing decision: operator-managed infra with its own TLS doesn't want a second TLS layer. Fix: exclude it from the mesh explicitly." },
-    { h: "Everything in a namespace depends on the mesh control plane", c: "With namespace-wide injection, every pod creation goes through the injection webhook. If the control plane has a bad moment, you can't start a database pod or a job either.", f: "Mesh selectively so only workloads that need it depend on it — contain the blast radius.",
-      n: "Gotcha 3 — the blast-radius coupling, the systemic argument for selective meshing. With namespace-wide injection, EVERY pod creation goes through the injection webhook — so if istiod has a bad moment, you can't start a database pod or a job that have nothing to do with the mesh. Selective injection contains the blast radius: only workloads that need the mesh depend on its health." },
-    { h: "Stateful workloads need headroom to recover", c: "A database sized only to run can be OOM-killed during crash-recovery (e.g. WAL replay), turning a brief blip into a crash loop.", f: "Size stateful workloads for their recovery path, not just steady state. Give the operator room to bring them back.",
-      n: "Gotcha 4 — size for recovery, not just steady state. A database sized just to run can be OOM-killed during crash recovery — WAL replay needs more memory than steady state — turning a brief blip into a crash loop. The lesson generalizes: size stateful workloads for their recovery path; give the operator headroom to bring them back. Ties to the recoverability discussion in section 03." },
-  ];
-  items.forEach((it) => {
-    const s = pres.addSlide();
-    s.background = { color: C.white };
-    L.head(s, "Appendix A · Gotchas", it.h, { titleH: 1.1 });
-    L.addBullets(s, [
-      { head: true, text: "Symptom" }, { text: it.c },
-      { head: true, text: "Fix" }, { text: it.f },
-    ], { x: 0.7, y: 2.1, w: PW - 1.4, fontSize: 17 });
-    L.footer(s);
-    s.addNotes(it.n);
-  });
+  s.addNotes("Closing. The one-sentence definition that ties the talk together: a mesh is the network of products PLUS the platform and standards that let them interoperate — every word of which we built today. And, per the anti-patterns we just covered, the platform and standards are exactly the parts teams skip. End on OpenShift as the home for all four principles. Open for questions.");
 })();
 
 /* ============================ WRITE ============================ */
-pres.writeFile({ fileName: "Data_Mesh_on_OpenShift.pptx\n\nDefinitions:\n• Sidecar — a proxy container (Envoy) injected next to your app container; carries the mesh's traffic, security, and telemetry." }).then((f) => console.log("WROTE", f));
+pres.writeFile({ fileName: "Data_Mesh_on_OpenShift.pptx" }).then((f) => console.log("WROTE", f));
