@@ -224,3 +224,54 @@ lands in the right place.
 Net: the (A)/(B) call is now better informed — (B) is lowest-risk and the `order:`
 integer scheme mildly favors it; (A) is viable since nothing external links in.
 Still the author's call, but I'd lead with (B) unless separate pages are wanted.
+
+## FINAL decisions (author-confirmed, resume-ready)
+
+- **Numbering: `17.N` fractional.** Child pages `17.1`–`17.9`, descriptive names
+  (`17.1-concepts-and-principles.md` … `17.9-anti-patterns.md`). Verified: YAML
+  parses `order: 17.1` as float; the layout's `sort: "order"` is numeric, so the
+  nav/prev-next chain is `17 (landing) → 17.1 → … → 17.9 → 18` with no wiring.
+  Permalink `:name` gives `/docs/17.1-concepts-and-principles/` etc.
+- **Page 1 framing:** brief 101 recap, then dive into implementation (don't
+  re-teach the 101 deck — link to it and move on).
+- **Selective-injection appears twice by design (confirmed good):** design-decision
+  framing on page 6 (Istio), cautionary-gotcha framing in deck Appendix A. The
+  repetition reinforces from both directions.
+- **Front-matter fields the layout uses:** `title`, `description`, `duration`
+  (renders as ⏱ chip), `order` (renders as "Section N.N"). Child pages set all four.
+
+## Scaffold built (this session)
+
+The landing page rewrite + nine child-page skeletons are generated as
+`minikube-on-fedora-phase-c-scaffold` (separate tar). Each child page has: correct
+front matter, a one-line "what this page covers," a **prose-source pointer** (the
+line range in the OLD 17-capstone.md to relocate), the **diagram(s)** to embed, and
+a stub body marked `<!-- DRAFT: ... -->`. Nothing is deleted from the old page yet —
+the scaffold is additive so the relocation can be checked section-by-section before
+removing the originals. Writing order suggestion: 17.9 (anti-patterns; source
+synthesis already done) → 17.6 (Istio + selective-injection; we have the material) →
+then 17.1→17.8 in order.
+
+## How to activate the scaffold (on resume — explicit, reversible)
+
+The scaffold is ADDITIVE. The nine `_docs/17.N-*.md` child pages are live Jekyll
+pages immediately (they'll appear in the nav as Sections 17.1-17.9, each a DRAFT
+stub). The landing rewrite is staged as `_docs/17-capstone.md.NEW` and does NOT
+render (Jekyll ignores non-.md extensions), so the current long `17-capstone.md`
+stays live until you swap:
+
+    # when ready to make the short landing live (after sanity-checking it):
+    cd _docs
+    cp 17-capstone.md 17-capstone.md.OLD     # keep the full original as backup
+    mv 17-capstone.md.NEW 17-capstone.md      # activate the short landing
+    # the OLD content's prose is the source for the child pages; once all nine are
+    # written and verified, delete 17-capstone.md.OLD.
+
+Until that swap, the site shows BOTH the full old §17 AND the nine new stub pages —
+fine for drafting, but don't push to the live site in that half-state (or do, since
+it's a personal tutorial — author's call). Suggested: keep the swap until at least
+17.9 and 17.6 are drafted, so the landing links don't point at empty stubs.
+
+**Writing order (recap):** 17.9 (anti-patterns — synthesis done) → 17.6 (Istio +
+selective-injection — material in hand) → 17.1-17.8 in sequence, relocating prose
+from 17-capstone.md.OLD per each page's PROSE SOURCE pointer.

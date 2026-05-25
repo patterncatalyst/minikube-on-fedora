@@ -1,0 +1,81 @@
+---
+title: "Capstone: a data mesh on minikube"
+order: 17
+description: A working data-mesh implementation that exercises everything from §1–§12 in one coherent system — six Python/FastAPI services across REST, gRPC, GraphQL, and Kafka, deployed via helm to a dedicated minikube profile, with contracts, a catalog, progressive delivery, autoscaling, and full observability.
+duration: multi-session
+---
+
+This is the section where everything converges. The earlier
+sections introduced the building blocks individually — minikube
+profiles, kubectl, helm, Istio, KEDA, Strimzi. §17 puts them
+together into a single coherent system that demonstrates *when,
+how, and why* each one earns its place. It's the largest section
+in the tutorial by far, and the one that justifies the time
+invested in §1–§12.
+
+The system we'll build is a **data mesh**: a domain of services
+modeling order-placement-through-shipment, with each service
+owning its data, its API surface, and its operational lifecycle.
+The services communicate through a deliberate mix of REST, gRPC,
+GraphQL, and Kafka — not because we couldn't pick one protocol,
+but because each protocol's strengths show up in different
+contexts, and the capstone is the place to make those contexts
+visible.
+
+Because the capstone is so much larger than the other sections,
+it's split into a set of focused pages rather than one long read.
+Each page stands on its own — read them in order for the full
+build, or jump to the one concept you came for. This landing page
+is just the map.
+
+<!-- DRAFT: tighten the prose above to ~3 short paragraphs of scenario-setting
+     once the child pages exist. Pull the one-paragraph "what you'll end up with"
+     summary from the old page's "What the capstone builds" section (old lines
+     1176-1198). Add the data-mesh-overview diagram here as the single orienting
+     visual. -->
+
+![Data mesh overview]({{ '/assets/diagrams/17-capstone-data-mesh.svg' | relative_url }})
+
+## The pages
+
+The capstone is organized as nine pages, grouped by concept:
+
+1. **[Concepts &amp; principles]({{ '/docs/17.1-concepts-and-principles/' | relative_url }})** —
+   what a data mesh is, operational vs. analytical data, and the four
+   principles. The conceptual grounding before any commands.
+2. **[Kubernetes as the substrate]({{ '/docs/17.2-kubernetes-substrate/' | relative_url }})** —
+   why Kubernetes is a natural fit, and how the four principles map onto
+   namespaces, operators, and platform primitives.
+3. **[Services &amp; data products]({{ '/docs/17.3-services-and-data-products/' | relative_url }})** —
+   the services, the order-service template, and the anatomy of a data product
+   (ports, transformation, the image build).
+4. **[Contracts &amp; the catalog]({{ '/docs/17.4-contracts-and-catalog/' | relative_url }})** —
+   versioned contracts in Apicurio and discovery/lineage in OpenMetadata, and why
+   the catalog is a mesh requirement rather than an add-on.
+5. **[The data planes]({{ '/docs/17.5-data-planes/' | relative_url }})** —
+   the async backbone (Kafka events) and the read layer (GraphQL composing
+   REST/gRPC), and when to reach for each.
+6. **[Progressive delivery &amp; mTLS]({{ '/docs/17.6-progressive-delivery-mtls/' | relative_url }})** —
+   the v1→v2 canary with Istio, and the decision to mesh *selectively* rather
+   than namespace-wide.
+7. **[Elastic &amp; resilient]({{ '/docs/17.7-elastic-and-resilient/' | relative_url }})** —
+   scaling to demand and to zero with KEDA, and the cloud-native recoverability
+   the platform provides.
+8. **[Observability]({{ '/docs/17.8-observability/' | relative_url }})** —
+   metrics, traces, and logs, how to correlate them, and seeing the mesh live
+   with Kiali.
+9. **[Anti-patterns]({{ '/docs/17.9-anti-patterns/' | relative_url }})** —
+   the conceptual and organizational ways data-mesh efforts go wrong, drawn from
+   the literature — so you can recognize them early.
+
+<!-- DRAFT: confirm permalinks once the child files are named. The links above
+     assume permalink :name → /docs/17.1-concepts-and-principles/ etc. If the
+     collection permalink differs, regenerate these. -->
+
+## Running it
+
+<!-- DRAFT: relocate the one-command bring-up pointer here from the old page —
+     bootstrap-capstone.sh (CAP-035) and the prerequisites pointer (old lines
+     176-291). Keep this section short: "one command brings the whole thing up;
+     §1 covers the host prerequisites including the pids_limit and inotify tweaks."
+     Full prerequisite detail goes on 17.2 or stays in §1. -->
