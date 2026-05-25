@@ -24,7 +24,7 @@ Because the capstone is so much larger than the other sections,
 it's organized as its own set of pages with its own reading order,
 rather than one long section here.
 
-**→ [Start the capstone: a data mesh on minikube]({{ '/capstone/data-mesh/00-index/' | relative_url }})**
+[**Start the capstone: a data mesh on minikube →**]({{ '/capstone/data-mesh/00-index/' | relative_url }})
 
 <!-- DRAFT: keep this §17 page short — it's the hand-off from the main tutorial
      chain into the capstone collection. The real content lives in
