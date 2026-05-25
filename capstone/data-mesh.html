@@ -1,0 +1,98 @@
+---
+layout: default
+title: "Capstone: a data mesh on minikube"
+description: "A working data-mesh implementation on minikube — services across REST, gRPC, GraphQL, and Kafka, deployed via helm, with contracts, a catalog, progressive delivery, autoscaling, and full observability. Read as its own set."
+permalink: /capstone/data-mesh/
+---
+
+<section class="hero hero--compact">
+    <div class="container">
+        <span class="hero__eyebrow">Capstone · Data mesh</span>
+        <h1>A data mesh on minikube.</h1>
+        <p class="hero__lead">
+            The capstone puts every building block from §1–§12 together
+            into one coherent system: a domain of services modeling
+            order-placement-through-shipment, each owning its data, its
+            API surface, and its operational lifecycle, communicating
+            through a deliberate mix of REST, gRPC, GraphQL, and Kafka.
+        </p>
+        <p class="hero__lead">
+            It's organized as its own set of pages with its own reading
+            order — read straight through for the full build, or jump to
+            the concept you came for.
+        </p>
+        <div class="hero__cta">
+            <a class="btn btn--primary"
+               href="{{ '/capstone/data-mesh/00-index/' | relative_url }}">
+                Start with the index →
+            </a>
+            <a class="btn btn--secondary"
+               href="{{ '/capstone/data-mesh/01-concepts/' | relative_url }}">
+                Skip to concepts
+            </a>
+        </div>
+    </div>
+</section>
+
+<section class="section">
+    <div class="container">
+        <h2 class="section-heading">The set</h2>
+        <p class="section-sub">
+            Read in order the first time. The conceptual pages
+            (<a href="{{ '/capstone/data-mesh/01-concepts/' | relative_url }}">concepts</a>,
+            <a href="{{ '/capstone/data-mesh/02-kubernetes-substrate/' | relative_url }}">Kubernetes substrate</a>)
+            ground the implementation pages that follow; the
+            <a href="{{ '/capstone/data-mesh/09-anti-patterns/' | relative_url }}">anti-patterns</a>
+            page closes the set with the failure modes to watch for.
+        </p>
+
+        <div class="cards">
+            {%- assign capstone_docs = site.capstone
+                  | where_exp: "doc", "doc.path contains 'data-mesh/'"
+                  | where_exp: "doc", "doc.order != nil"
+                  | sort: "order" -%}
+            {%- for doc in capstone_docs -%}
+                {%- assign two_digit = doc.order | prepend: '0' | slice: -2, 2 -%}
+                {%- if doc.order == 0 -%}
+                    {%- assign card_eyebrow = "Index" -%}
+                {%- elsif doc.order == 9 -%}
+                    {%- assign card_eyebrow = "Anti-patterns" -%}
+                {%- else -%}
+                    {%- assign card_eyebrow = "Page " | append: two_digit -%}
+                {%- endif -%}
+                <a class="card" href="{{ doc.url | relative_url }}">
+                    <div class="card__eyebrow">{{ card_eyebrow }}</div>
+                    <h3 class="card__title">
+                        <span class="card__num">{{ two_digit }}</span>
+                        {{ doc.title }}
+                    </h3>
+                    <p class="card__desc">{{ doc.description }}</p>
+                </a>
+            {%- endfor -%}
+        </div>
+    </div>
+</section>
+
+<section class="section-tight">
+    <div class="container">
+        <h2 class="section-heading">Where this fits in the tutorial</h2>
+        <p>
+            This capstone is §17 of the
+            <a href="{{ '/docs/00-outline/' | relative_url }}">main tutorial</a>.
+            The earlier sections introduced the building blocks
+            individually —
+            <a href="{{ '/docs/09-helm/' | relative_url }}">helm</a>,
+            <a href="{{ '/docs/11-istio/' | relative_url }}">Istio</a>,
+            <a href="{{ '/docs/12-keda/' | relative_url }}">KEDA</a>,
+            and the rest. The capstone is where they converge into a
+            single running system, and the section that justifies the
+            time invested in §1–§12.
+        </p>
+        <p>
+            One command brings the whole thing up; the host
+            prerequisites (including the rootless-podman and kernel
+            tweaks) are covered in
+            <a href="{{ '/docs/01-prerequisites/' | relative_url }}">§1</a>.
+        </p>
+    </div>
+</section>

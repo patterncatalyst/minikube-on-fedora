@@ -5,30 +5,10 @@ description: A working data-mesh implementation that exercises everything from �
 duration: multi-session
 ---
 
-This is the section where everything converges. The earlier
-sections introduced the building blocks individually — minikube
-profiles, kubectl, helm, Istio, KEDA, Strimzi. §17 puts them
-together into a single coherent system that demonstrates *when,
-how, and why* each one earns its place. It's the largest part of
-the tutorial by far, and the one that justifies the time invested
-in §1–§12.
+This is the section where everything converges. The earlier sections introduced the building blocks individually — minikube profiles, kubectl, helm, Istio, KEDA, Strimzi. §17 puts them together into a single coherent system that demonstrates *when, how, and why* each one earns its place. It's the largest part of the tutorial by far, and the one that justifies the time invested in §1–§12.
 
-The system we build is a **data mesh**: a domain of services
-modeling order-placement-through-shipment, with each service
-owning its data, its API surface, and its operational lifecycle.
-The services communicate through a deliberate mix of REST, gRPC,
-GraphQL, and Kafka — each protocol's strengths showing up in a
-different context.
+The system we build is a **data mesh**: a domain of services modeling order-placement-through-shipment, with each service owning its data, its API surface, and its operational lifecycle. The services communicate through a deliberate mix of REST, gRPC, GraphQL, and Kafka — each protocol's strengths showing up in a different context.
 
-Because the capstone is so much larger than the other sections,
-it's organized as its own set of pages with its own reading order,
-rather than one long section here.
+Because the capstone is so much larger than the other sections, it's organized as its own set of pages with its own reading order, rather than one long section here.
 
-[**Start the capstone: a data mesh on minikube →**]({{ '/capstone/data-mesh/00-index/' | relative_url }})
-
-<!-- DRAFT: keep this §17 page short — it's the hand-off from the main tutorial
-     chain into the capstone collection. The real content lives in
-     _capstone/data-mesh/ (00-index + 01..09). Once that set is written and the
-     swap is made (17-capstone.md.NEW → 17-capstone.md), delete 17-capstone.md.OLD.
-     Optionally list the nine sub-pages here too, but the canonical list is the
-     set's own 00-index. -->
+<p><a class="btn btn--primary" href="{{ '/capstone/data-mesh/' | relative_url }}">Start the capstone: a data mesh on minikube →</a></p>
