@@ -7,10 +7,28 @@ const code = (s) => s.replace(/\t/g, "  ");
 
 /* ============================ TITLE ============================ */
 titleSlide({
+  eyebrow: "Data Mesh · Implementation",
   title: "Data Mesh on OpenShift",
-  subtitle: "A reference implementation — the four principles, realized in pieces you can deploy, secure, scale, and observe.",
-  author: "Robert Sedor · Chief Architect",
+  subtitle: "From the four principles to a running platform — domains owning data as products, on the platform and governance that let them interoperate.",
+  tagline: "A reference implementation",
+  breadcrumb: "OpenShift · AMQ Streams · CloudNativePG · Service Mesh · KEDA · OpenMetadata",
   notes: "Welcome. This is the implementation companion to the Data Mesh 101 deck. Where 101 made the conceptual case, today we build it — on OpenShift, principle by principle, with the real pieces and the code. Set expectations: a 1.5–3 hour walk through a reference architecture. For each principle I'll show the value it delivers and the OpenShift pieces that deliver it. Deep operational war-stories are saved for Appendix A — today is about the value of the whole.",
+});
+
+/* ============================ AGENDA ============================ */
+L.agendaSlide({
+  left: [
+    { text: "00 · From principles to platform" },
+    { text: "01 · Domain ownership" },
+    { text: "02 · Data as a product" },
+    { text: "03 · Self-serve data platform" },
+  ],
+  right: [
+    { text: "04 · Federated computational governance" },
+    { text: "05 · The whole picture" },
+    { text: "Appendix A · Operational gotchas", italic: true },
+  ],
+  notes: "The agenda. Six sections plus an appendix. The spine is the four data-mesh principles (01–04), bookended by an orientation section (00) and a synthesis (05). Point out the shape: each principle section follows the same rhythm — principle, pieces, code, value. Note that operational gotchas live in Appendix A, so the main talk stays on value. Roughly 1.5–3 hours depending on how deep you go on the code and diagrams.",
 });
 
 (() => {
@@ -460,12 +478,14 @@ contentSlide({ eyebrow: "The whole picture", title: "When a mesh is the wrong ch
 
 (() => {
   const s = pres.addSlide();
-  s.background = { color: C.red };
-  s.addText("The mesh is the network of products —", { x: 1.0, y: 2.5, w: PW - 2, h: 0.9, fontSize: 30, color: "FFFFFF", fontFace: F.head, bold: true, valign: "top", margin: 0 });
-  s.addText("plus the platform and standards that let them interoperate.", { x: 1.0, y: 3.4, w: PW - 2, h: 1.2, fontSize: 30, color: "FFD9D9", fontFace: F.head, bold: true, valign: "top", margin: 0 });
-  s.addText("OpenShift is where all four principles find a home.", { x: 1.0, y: 4.9, w: PW - 2, h: 0.6, fontSize: 16, color: "FFFFFF", fontFace: F.body, valign: "top", margin: 0 });
-  L.pageNum(s, { dark: true });
-  s.addText("Thank you", { x: PW - 3.0, y: PH - 0.55, w: 2.5, h: 0.35, fontSize: 13, color: "FFFFFF", fontFace: F.head, bold: true, align: "right", margin: 0 });
+  s.addImage({ path: L.ILLUS, x: 0, y: 0, w: PW, h: PH, sizing: { type: "cover", w: PW, h: PH } });
+  const rx = PW * 0.42, rw = PW - rx - 0.7;
+  s.addText("The mesh is the network of products —", { x: rx, y: 2.5, w: rw, h: 0.9, fontSize: 28, color: "FFFFFF", fontFace: F.head, bold: true, valign: "top", margin: 0 });
+  s.addText("plus the platform and standards that let them interoperate.", { x: rx, y: 3.35, w: rw, h: 1.2, fontSize: 28, color: "FFD9D9", fontFace: F.head, bold: true, valign: "top", margin: 0 });
+  s.addText("OpenShift is where all four principles find a home.", { x: rx, y: 4.85, w: rw, h: 0.6, fontSize: 15, color: "FFFFFF", fontFace: F.body, italic: true, valign: "top", margin: 0 });
+  const lw = 1.25, lh = lw / L.LOGO_AR;
+  s.addImage({ path: L.LOGO_LIGHT, x: PW - 0.6 - lw, y: PH - 0.3 - lh, w: lw, h: lh });
+  L.pageNumOnly(s, { dark: true });
   s.addNotes("Closing. The one-sentence definition that ties the talk together: a mesh is the network of products PLUS the platform and standards that let them interoperate — every word of which we built today. End on OpenShift as the home for all four principles. Open for questions, and point anyone hungry for operational detail to Appendix A.");
 })();
 

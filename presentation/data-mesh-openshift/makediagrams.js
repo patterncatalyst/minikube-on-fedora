@@ -3,7 +3,11 @@ const { SVG } = require("./svglib.js");
 const fs = require("fs");
 const OUT = "newsvg";
 if (!fs.existsSync(OUT)) fs.mkdirSync(OUT);
-const save = (name, svg) => { fs.writeFileSync(`${OUT}/${name}.svg`, svg.render()); console.log("wrote", name); };
+const save = (name, svg) => {
+  fs.writeFileSync(`${OUT}/${name}.svg`, svg.render());
+  fs.writeFileSync(`${OUT}/${name}.excalidraw`, svg.excalidraw());
+  console.log("wrote", name, "(svg + excalidraw)");
+};
 
 /* ========== 1. SERVICE MESH INTERNALS ========== */
 (() => {
