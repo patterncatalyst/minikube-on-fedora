@@ -1,0 +1,62 @@
+{
+  "analytical-data-composition": {
+    "w": 3278,
+    "h": 1444
+  },
+  "central-team-bottleneck": {
+    "w": 3000,
+    "h": 1750
+  },
+  "contract-flow": {
+    "w": 3278,
+    "h": 1667
+  },
+  "contracts-registry-catalog": {
+    "w": 3278,
+    "h": 1833
+  },
+  "data-mesh-overview": {
+    "w": 3278,
+    "h": 1389
+  },
+  "data-product-anatomy": {
+    "w": 3278,
+    "h": 1500
+  },
+  "decentralization-checklist": {
+    "w": 3111,
+    "h": 1444
+  },
+  "federated-governance-model": {
+    "w": 3278,
+    "h": 1444
+  },
+  "four-principles": {
+    "w": 3278,
+    "h": 1500
+  },
+  "ingestion-streaming-sourcing": {
+    "w": 3278,
+    "h": 1222
+  },
+  "logical-mesh-architecture": {
+    "w": 3278,
+    "h": 1722
+  },
+  "monolith-to-mesh": {
+    "w": 3278,
+    "h": 1500
+  },
+  "operational-vs-analytical": {
+    "w": 3278,
+    "h": 1278
+  },
+  "platform-planes": {
+    "w": 3278,
+    "h": 1444
+  },
+  "reference-data-mesh-architecture": {
+    "w": 3333,
+    "h": 2139
+  }
+}
