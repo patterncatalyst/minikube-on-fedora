@@ -1,8 +1,8 @@
-// Build the Data Mesh on OpenShift implementation deck.
+// Build the Data Mesh on OpenShift implementation deck — v2.
+// Diagrams-forward (YAML replaced by diagrams where it doesn't teach); Python API
+// examples kept; per-section value-closer diagrams; speaker notes on every slide.
 const L = require("./deck-lib.js");
 const { pres, C, F, PW, PH, titleSlide, divider, contentSlide, diagramSlide, codeSlide } = L;
-
-// helper for code text as a single string (mono panel)
 const code = (s) => s.replace(/\t/g, "  ");
 
 /* ============================ TITLE ============================ */
@@ -10,6 +10,7 @@ titleSlide({
   title: "Data Mesh on OpenShift",
   subtitle: "A reference implementation — the four principles, realized in pieces you can deploy, secure, scale, and observe.",
   author: "Robert Sedor · Chief Architect",
+  notes: "Welcome. This is the implementation companion to the Data Mesh 101 deck. Where 101 made the conceptual case, today we build it — on OpenShift, principle by principle, with the real pieces and the code. Set expectations: a 1.5–3 hour walk through a reference architecture. For each principle I'll show the value it delivers and the OpenShift pieces that deliver it. Deep operational war-stories are saved for Appendix A — today is about the value of the whole.",
 });
 
 (() => {
@@ -20,19 +21,22 @@ titleSlide({
     { text: "The Data Mesh 101 deck made the case: centralized data platforms stall, and the answer is to decentralize ownership — domains own their data as products on a shared, self-serve platform under federated, automated governance.", },
     { text: "That deck ended by pointing at implementation. This deck is the implementation.", color: C.ink },
     { head: true, text: "What this deck does" },
-    { text: "Takes each of the four principles and shows the concrete OpenShift pieces that realize it — with the code and the architecture, not just the diagram." },
+    { text: "Takes each of the four principles and shows the concrete OpenShift pieces that realize it — with the architecture and the code, not just the diagram." },
     { text: "Frames every piece by the value it delivers: why it earns its place in a production data mesh." },
     { text: "Keeps the operational war-stories out of the main story — they live in Appendix A, so the through-line stays on value." },
   ], { x: 0.7, y: 1.95, w: PW - 1.4 });
   L.footer(s);
+  s.addNotes("Bridge from 101. If your audience saw the 101 deck, this is a quick recap; if not, it's the whole premise in four sentences. The key move: we are not going to argue for data mesh again — we're going to build one. Emphasize the last bullet: operational gotchas are deliberately in an appendix so the main narrative stays about value. If people want the gotchas, tell them Appendix A.");
 })();
 
 /* ====================== 00 · FROM PRINCIPLES TO PLATFORM ====================== */
-divider({ num: "00", title: "From principles to platform", sub: "The four principles, the reference architecture, and how to read what follows." });
+divider({ num: "00", title: "From principles to platform", sub: "The four principles, the reference architecture, and how to read what follows.",
+  notes: "Section 0 is orientation: the four principles in one diagram, the reference architecture we build toward, the domain we model, and the rhythm each section follows. Keep it brisk — the map, not the territory." });
 
 diagramSlide({ eyebrow: "The four principles", title: "Four principles — and how they map in practice",
   image: "four-principles",
-  caption: "The tools are expressions of the pattern, not the pattern itself. Each principle below maps to concrete platform pieces." });
+  caption: "The tools are expressions of the pattern, not the pattern itself. Each principle below maps to concrete platform pieces.",
+  notes: "Straight from the 101 deck, deliberately, so the decks connect. Walk left to right: domain ownership, data as a product, self-serve platform, federated governance. The bottom row of each card already names the Kubernetes/OpenShift primitive — that's the whole structure of today's talk in one slide. The four interlock: implement one without the others and you get a distributed mess, not a mesh." });
 
 (() => {
   const s = pres.addSlide();
@@ -48,11 +52,13 @@ diagramSlide({ eyebrow: "The four principles", title: "Four principles — and h
     { text: "The rest of this deck is that mapping, principle by principle, with the code that makes it real.", color: C.ink },
   ], { x: 0.7, y: 1.95, w: PW - 1.4 });
   L.footer(s);
+  s.addNotes("The thesis slide. A data mesh fails for organizational reasons far more than technical ones, so the platform's job is to make the right thing the easy thing. OpenShift earns its place because each principle has a home in primitives the audience already knows. Don't dwell on each bullet — they're a preview; we spend a section on each. Payoff line: this whole deck is that mapping.");
 })();
 
 diagramSlide({ eyebrow: "Reference architecture", title: "The data mesh, at a glance",
   image: "reference-data-mesh-architecture",
-  caption: "The centerpiece: domain data products, the platform planes beneath them, and the governance and observability that span them. We assemble this piece by piece." });
+  caption: "The centerpiece: domain data products, the platform planes beneath them, and the governance and observability that span them. We assemble this piece by piece.",
+  notes: "The centerpiece — we return to it assembled at the end. Now, just orient: top is external clients, the middle band is the meshed domain services, the bottom is the self-serve platform, and observability spans the whole. Don't explain every box yet — promise that by the end every piece here will have been built and they'll recognize all of it." });
 
 (() => {
   const s = pres.addSlide();
@@ -67,21 +73,24 @@ diagramSlide({ eyebrow: "Reference architecture", title: "The data mesh, at a gl
     { text: "The protocols vary by fitness: REST at the edge, gRPC between services, GraphQL for composition, events for everything asynchronous.", },
   ], { x: 0.7, y: 1.95, w: PW - 1.4 });
   L.footer(s);
+  s.addNotes("Introduce the worked example. Order fulfillment is deliberately mundane so the architecture stays the focus. Five domain products plus a gateway = six deployable things. Stress the distinction: five DOMAIN products (each owns data) plus one gateway (composes reads, owns nothing). The production-framing line matters: five Projects across teams, not a toy.");
 })();
 
 contentSlide({ eyebrow: "How to read this deck", title: "Principle → pieces → code → value",
   bullets: [
     { text: "Each of the next four sections takes one principle and follows the same rhythm:", },
     { text: "The principle, recapped in a sentence — the 101 deck has the full argument.", lvl: 1 },
-    { text: "The pieces that realize it on OpenShift, with the architecture diagram.", lvl: 1 },
-    { text: "The code: real, production-shaped manifests and definitions — not laptop specifics.", lvl: 1 },
-    { text: "The value: what the principle buys you, and what breaks without it.", lvl: 1 },
+    { text: "The pieces that realize it on OpenShift, shown as architecture diagrams.", lvl: 1 },
+    { text: "The code where code is the lesson — Python for the APIs, the few manifests worth seeing.", lvl: 1 },
+    { text: "A closing value picture: the principle's payoff and the pieces that deliver it.", lvl: 1 },
     { head: true, text: "A note on scope" },
-    { text: "The main narrative stays on value. The operational gotchas — the sharp edges you hit running this — are gathered in Appendix A, so they inform without derailing." },
-  ] });
+    { text: "The main narrative stays on value, and leans on diagrams over YAML. The operational gotchas — the sharp edges you hit running this — are gathered in Appendix A, so they inform without derailing." },
+  ],
+  notes: "Set the per-section rhythm: principle, pieces as diagrams, code only where it teaches, value-closer picture. Call out explicitly that we favor diagrams over YAML — most people don't want to read manifests off a slide, and the architecture is clearer as a picture. The Python API code we DO show, because seeing the implementation is valuable. Gotchas are in Appendix A." });
 
 /* ====================== 01 · DOMAIN OWNERSHIP ====================== */
-divider({ num: "01", title: "Domain ownership", sub: "Each domain owns its data end to end — and the platform makes that boundary real." });
+divider({ num: "01", title: "Domain ownership", sub: "Each domain owns its data end to end — and the platform makes that boundary real.",
+  notes: "Principle 1 of 4. Throughline: ownership is only real if the boundary is enforced by the platform, not just agreed in a meeting. We see the bottleneck it removes, the monolith-to-mesh shift, then the OpenShift pieces — Projects, RBAC, quotas, a database per domain — and close with the value picture." });
 
 contentSlide({ eyebrow: "Domain ownership", title: "The principle, in one slide",
   bullets: [
@@ -90,15 +99,18 @@ contentSlide({ eyebrow: "Domain ownership", title: "The principle, in one slide"
     { head: true, text: "Why it matters" },
     { text: "The central data team that owns all the data but understands none of the domains is the bottleneck a mesh exists to remove.", },
     { text: "Ownership without an enforced boundary is just a wish. The platform's job is to make the boundary structural — so ownership is the default, not a convention people remember to honor.", },
-  ] });
+  ],
+  notes: "One-slide principle recap — don't re-teach the 101 argument, just land it. The line to hammer: 'ownership without an enforced boundary is just a wish.' That's the bridge to platform primitives. If someone owns data but anyone can reach in and change it, they don't really own it." });
 
 diagramSlide({ eyebrow: "Domain ownership", title: "The bottleneck it removes",
   image: "central-team-bottleneck",
-  caption: "When every domain's data flows through one central team, that team becomes the constraint on the entire organization's data velocity." });
+  caption: "When every domain's data flows through one central team, that team becomes the constraint on the entire organization's data velocity.",
+  notes: "The problem diagram. Every domain routing through one central data team makes that team the constraint, no matter how good they are — they own all the data but understand none of the domains. Ask: how long does a schema change take in your org today? That lead time is the bottleneck this principle removes." });
 
 diagramSlide({ eyebrow: "Domain ownership", title: "From monolith to a mesh of products",
   image: "monolith-to-mesh",
-  caption: "The same refactor microservices applied to applications, applied to data: bounded contexts, each owned by the domain team that knows it best." });
+  caption: "The same refactor microservices applied to applications, applied to data: bounded contexts, each owned by the domain team that knows it best.",
+  notes: "The solution shape, by analogy. Everyone lived the monolith-to-microservices refactor for applications. Data mesh is that same move for data: break the monolithic data platform into bounded data products, each owned by the domain team that knows it. The analogy does a lot of work — lean on it." });
 
 (() => {
   const s = pres.addSlide();
@@ -114,6 +126,7 @@ diagramSlide({ eyebrow: "Domain ownership", title: "From monolith to a mesh of p
     { text: "ResourceQuota and LimitRange — the budget the domain lives within.", lvl: 1 },
   ], { x: 0.7, y: 1.95, w: PW - 1.4 });
   L.footer(s);
+  s.addNotes("The OpenShift mapping. The Project IS the ownership boundary. The repository analogy lands: a domain team owns its Project like a microservice team owns its repo. Walk the four things a Project carries — identities, permissions, security context, budget — each enforces ownership in a different dimension. Next slides show the actual code.");
 })();
 
 codeSlide({ eyebrow: "Domain ownership", title: "The domain's Project and identity",
@@ -132,7 +145,7 @@ kind: ServiceAccount
 metadata:
   name: order-service
   namespace: order`),
-});
+  notes: "One of the few manifests worth showing — the labels carry meaning. Point at istio-injection: enabled — we OPT this domain INTO the mesh explicitly. That's a deliberate choice justified in section 04: selective meshing, not cluster-wide. The ServiceAccount is the workload identity that mesh mTLS and authorization policies key off — remember it for section 04." });
 
 codeSlide({ eyebrow: "Domain ownership", title: "The domain owns its access",
   lang: "YAML · OpenShift",
@@ -159,88 +172,16 @@ roleRef:
   kind: Role
   name: order-owner
   apiGroup: rbac.authorization.k8s.io`),
-});
+  notes: "The enforcement. RBAC is namespace-scoped — the order team has full rights inside the order Project and none outside it, enforced on every request by the API server. This is 'structural, not a convention' made concrete: ownership isn't remembered, it's a rule that runs. Don't read line by line — point at the Role verbs and the Group binding and move on." });
 
-codeSlide({ eyebrow: "Domain ownership", title: "The domain lives within its budget",
-  lang: "YAML · OpenShift",
-  note: "A quota makes the ownership boundary enforceable in resource terms: a domain uses what it owns and no more, so one domain can't starve another. A companion LimitRange sets per-container defaults. The platform team sets the envelope; the domain governs itself inside it.",
-  code: code(`apiVersion: v1
-kind: ResourceQuota
-metadata:
-  name: order-quota
-  namespace: order
-spec:
-  hard:
-    requests.cpu: "8"
-    requests.memory: 16Gi
-    limits.cpu: "16"
-    limits.memory: 32Gi
-    persistentvolumeclaims: "10"
-    services.loadbalancers: "2"
-    count/deployments.apps: "20"`),
-});
-
-codeSlide({ eyebrow: "Domain ownership", title: "A data product is a Deployment + Service",
-  lang: "YAML · OpenShift",
-  note: "The product's runtime and its stable address — the two primitives that make a data product a first-class, deployable thing rather than a row in a catalog. A Route (not shown) publishes it outside the cluster when it serves external consumers.",
-  code: code(`apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: order-service
-  namespace: order
-  labels:
-    app: order-service
-    data-mesh/product: orders
-spec:
-  replicas: 2
-  selector:
-    matchLabels: { app: order-service }
-  template:
-    metadata:
-      labels: { app: order-service, version: v1 }
-    spec:
-      serviceAccountName: order-service
-      containers:
-        - name: order-service
-          image: .../order/order-service:1.4.0
-          ports: [{ containerPort: 8080 }]`),
-});
-
-codeSlide({ eyebrow: "Domain ownership", title: "The product owns its data: a schema per domain",
-  lang: "YAML · CloudNativePG",
-  note: "Each domain owns a Postgres cluster (or a schema within a managed one) declared as a custom resource. The operator runs it; the domain owns it. Ownership of data is literal — the order domain's data lives in the order domain's database, governed by the order domain.",
-  code: code(`apiVersion: postgresql.cnpg.io/v1
-kind: Cluster
-metadata:
-  name: order-db
-  namespace: order
-spec:
-  instances: 3              # HA by default in production
-  storage:
-    size: 20Gi
-    storageClass: ocs-storagecluster-ceph-rbd
-  bootstrap:
-    initdb:
-      database: orders
-      owner: order
-  monitoring:
-    enablePodMonitor: true  # metrics to the platform
-  resources:
-    requests: { cpu: 500m, memory: 1Gi }
-    limits:   { cpu: "2",  memory: 2Gi }`),
-});
-
-contentSlide({ eyebrow: "Domain ownership", title: "What the principle buys you",
-  bullets: [
-    { text: "Velocity. A domain ships changes to its data product without waiting on a central team — the boundary is its own Project, and it owns everything inside it.", },
-    { text: "Accountability. There is always a clear owner for every product, with the access and the budget to be responsible for it.", },
-    { text: "Isolation. Quotas and project-scoped RBAC mean one domain's mistakes stay contained — no shared mutable state to corrupt across domains.", },
-    { head: true, text: "What breaks without it" },
-    { text: "Fuzzy boundaries and ownership vacuums: data nobody is responsible for, modeled three different ways by three teams. The platform-enforced Project boundary is what keeps that from happening by default.", },
-  ] });
+diagramSlide({ eyebrow: "Domain ownership", title: "The domain owns its data, end to end",
+  image: "17-value-domain-ownership",
+  caption: "Each domain ships its data product on its own — clear owner, enforced boundary, no central team in the path.",
+  notes: "SECTION VALUE-CLOSER for domain ownership — the slide that should stick. Value banner up top is the payoff; the callout pills are the reference-implementation pieces (Project, RBAC, SCCs, ResourceQuota); the red band is what breaks without it — fuzzy boundaries and ownership vacuums. Recap the whole section in 60 seconds against this picture, then move to data as a product." });
 
 /* ====================== 02 · DATA AS A PRODUCT ====================== */
-divider({ num: "02", title: "Data as a product", sub: "Discoverable, addressable, trustworthy, self-describing — held to the standard of any software product." });
+divider({ num: "02", title: "Data as a product", sub: "Discoverable, addressable, trustworthy, self-describing — held to the standard of any software product.",
+  notes: "Principle 2 — the big section: contracts, catalog, protocols, APIs. Throughline: a data product is an autonomous unit, not a renamed table, and autonomy makes the rest of the mesh possible. We see the anatomy, the four protocol APIs and their Python implementations, the contracts (runtime vs discovery), the catalog — then the value-closer." });
 
 contentSlide({ eyebrow: "Data as a product", title: "The principle, in one slide",
   bullets: [
@@ -249,23 +190,53 @@ contentSlide({ eyebrow: "Data as a product", title: "The principle, in one slide
     { head: true, text: "Why it matters" },
     { text: "A 'data product' that is really just a renamed table can't serve itself, enforce its own policies, or describe itself — and federated governance has nowhere to live in it.", },
     { text: "Autonomy is what makes the rest of the mesh possible. Lose it, and you lose the governance model with it.", },
-  ] });
+  ],
+  notes: "Principle recap. Land the phrase 'architectural quantum' — the smallest independently deployable unit that carries everything it needs. The warning is the most-cited failure in the literature: calling a renamed table a 'data product.' If it can't serve, govern, and describe itself, it's not a product, and you've lost the governance model too." });
 
 diagramSlide({ eyebrow: "Data as a product", title: "Anatomy of a data product",
   image: "data-product-anatomy",
-  caption: "Input ports, output ports, the transformation between them, and the metadata and policies that make it discoverable and governed. Not a dataset — a product." });
+  caption: "Input ports, output ports, the transformation between them, and the metadata and policies that make it discoverable and governed. Not a dataset — a product.",
+  notes: "The anatomy. Input ports, output ports, transformation logic, metadata/policies wrapped around it — a real data product is self-contained. Contrast again with the renamed table, which has none of this. In our build, each domain service IS this picture: owns data, serves APIs, emits events, publishes a contract." });
 
-diagramSlide({ eyebrow: "Data as a product", title: "Every protocol is a contract",
-  image: "contracts-registry-catalog",
-  caption: "REST, gRPC, GraphQL, and events each carry a contract. One registry holds them all; the catalog makes the products discoverable and their lineage visible." });
+diagramSlide({ eyebrow: "Data as a product", title: "Four protocols, four contracts — each by fitness",
+  image: "17-api-implementations",
+  caption: "REST at the edge, gRPC between services, GraphQL to compose, events to decouple — and the Python that implements each.",
+  notes: "NEW diagram — the APIs and their implementations. Walk the four cards: REST (FastAPI, OpenAPI) at the edge; gRPC (grpcio, Protobuf) between services; GraphQL (Strawberry, SDL) to compose reads; events (aiokafka, Avro) to decouple. The middle band names the Python library for each — this audience wants to know what actually implements it. Bottom band: the gateway composing one query across REST + gRPC. Key message: not one protocol everywhere — each earns its place by fitness. Next slide shows the gateway code." });
+
+codeSlide({ eyebrow: "Data as a product", title: "The gateway composes — in Python",
+  lang: "Python · Strawberry + clients",
+  note: "The gateway exposes one GraphQL graph; its resolvers fetch each piece from the owning product over that product's existing interface — order over REST, stock over gRPC — and GraphQL assembles the shaped response. One query, multiple backends, no GraphQL added to the domain services.",
+  code: code(`import strawberry
+
+@strawberry.type
+class Order:
+    id: str
+    total: float
+    currency: str
+    # nested field resolved from a DIFFERENT product:
+    @strawberry.field
+    async def stock(self) -> int:
+        # gRPC call to inventory-service
+        reply = await inventory.GetStock(sku=self.sku)
+        return reply.available
+
+@strawberry.type
+class Query:
+    @strawberry.field
+    async def order(self, id: str) -> Order:
+        # REST call to order-service
+        data = await rest.get(f"/orders/{id}")
+        return Order(**data)`),
+  notes: "Real Python — the kind of code the audience wants. Strawberry defines the GraphQL types; resolvers call out to the owning products. Point at the two resolver bodies: order() makes a REST call to order-service; the nested stock field makes a gRPC call to inventory-service. One query, two backends, two protocols, composed by the gateway — and the domain services were NOT changed; they keep their REST and gRPC interfaces. This is gateway orchestration; true subgraph federation is the production alternative worth a mention." });
 
 diagramSlide({ eyebrow: "Data as a product", title: "Two jobs the registry does",
   image: "contract-flow",
-  caption: "A runtime contract is load-bearing on the hot path — the event won't serialize without it. A discovery contract describes the product for humans, CI, and the catalog." });
+  caption: "A runtime contract is load-bearing on the hot path — the event won't serialize without it. A discovery contract describes the product for humans, CI, and the catalog.",
+  notes: "The conceptual heart of contracts. Two jobs, very different coupling. RUNTIME contract: the event schema — producer/consumer serialize against it, so the event won't encode/decode without it; the registry is in the hot path, which is why it can REJECT a breaking change at publish time. DISCOVERY contract: OpenAPI and SDL — source of truth for humans, CI, and the catalog, but nothing fails at runtime if absent. Don't conflate them. Most useful idea in the contracts story." });
 
 codeSlide({ eyebrow: "Data as a product", title: "The runtime contract: a registered schema",
   lang: "Avro · schema registry",
-  note: "The event schema is load-bearing: producer and consumer serialize against it, so the registry can reject an incompatible change at publish time — governance enforced computationally, before a single consumer breaks.",
+  note: "The event schema is load-bearing: producer and consumer serialize against it, so the registry can reject an incompatible change at publish time — governance enforced computationally, before a single consumer breaks. v2 adds currency additively, with a default that keeps v1 consumers working.",
   code: code(`{
   "type": "record",
   "namespace": "com.acme.order",
@@ -276,82 +247,28 @@ codeSlide({ eyebrow: "Data as a product", title: "The runtime contract: a regist
     { "name": "customer", "type": "string" },
     { "name": "total",    "type": "double" },
     {
-      "name": "currency",        // v2: additive, backward-compatible
+      "name": "currency",        // v2: additive, compatible
       "type": "string",
-      "default": "USD"           // default keeps v1 consumers working
-    },
-    { "name": "placedAt", "type":
-      { "type": "long", "logicalType": "timestamp-millis" } }
+      "default": "USD"           // default keeps v1 working
+    }
   ]
 }
+# registry compatibility: BACKWARD`),
+  notes: "Show the contract because the contract IS the lesson. This is the v2 evolution we canary in section 04: currency added with a default, so backward-compatible — old consumers keep working. The registry is set to BACKWARD compatibility, so it rejects any change that would break consumers, at publish time. Federated governance made computational: the rule runs automatically. Tie forward to the canary." });
 
-# compatibility: BACKWARD  (registry rejects breaking changes)`),
-});
+diagramSlide({ eyebrow: "Data as a product", title: "Discovery and lineage — the catalog",
+  image: "contracts-registry-catalog",
+  caption: "Contracts live in one registry; the catalog ingests them — plus schemas and topics — to make products discoverable and their lineage visible.",
+  notes: "The catalog story. The registry holds contract SHAPES; the catalog (OpenMetadata) answers which products exist, who owns them, who consumes whom, and lineage. The load-bearing argument: a mesh's premise is consumers finding and trusting products WITHOUT a central team. Without a usable catalog, they fall back to asking the central team — and you've rebuilt the bottleneck. So the catalog is a requirement, not an add-on. Ties back to ownership and forward to the anti-patterns." });
 
-codeSlide({ eyebrow: "Data as a product", title: "Discovery contracts: published, not enforced at runtime",
-  lang: "Protobuf · gRPC",
-  note: "The gRPC contract and the REST OpenAPI document describe the product's synchronous surface. They're the source of truth for consumers, CI breaking-change checks, and catalog ingestion — published as artifacts, not serialized on the hot path.",
-  code: code(`syntax = "proto3";
-package acme.inventory.v1;
-
-// inventory-service: the synchronous read surface
-service Inventory {
-  rpc GetStock(StockRequest) returns (StockReply);
-  rpc Reserve(ReserveRequest) returns (ReserveReply);
-}
-
-message StockRequest {
-  string sku = 1;
-}
-
-message StockReply {
-  string sku       = 1;
-  int32  available = 2;
-  int32  reserved  = 3;
-}`),
-});
-
-diagramSlide({ eyebrow: "Data as a product", title: "Operational vs. analytical — two planes, by domain",
-  image: "operational-vs-analytical",
-  caption: "A mesh reorganizes the operational/analytical split by domain rather than by technology layer — each domain owns both sides and closes the loop between them." });
-
-codeSlide({ eyebrow: "Data as a product", title: "The async backbone: a domain event",
-  lang: "YAML + Python · AMQ Streams",
-  note: "When an order is placed, the order product emits an event; interested domains consume it on their own schedule. The producer doesn't know who's listening — consumers are added without touching it. This is the plane that keeps the operational/analytical loop closed.",
-  code: code(`# KafkaTopic — declared, operator-managed (AMQ Streams)
-apiVersion: kafka.strimzi.io/v1beta2
-kind: KafkaTopic
-metadata:
-  name: order.placed
-  namespace: platform
-  labels: { strimzi.io/cluster: mesh-kafka }
-spec:
-  partitions: 6
-  replicas: 3
-  config: { retention.ms: 604800000 }
----
-# producer (order-service) — emit on state change
-await producer.send(
-    "order.placed",
-    key=order.id.encode(),
-    value=avro.encode(OrderPlaced(
-        orderId=order.id, customer=order.customer,
-        total=order.total, currency=order.currency,
-        placedAt=now_millis())))`),
-});
-
-contentSlide({ eyebrow: "Data as a product", title: "Why the catalog is a requirement, not an add-on",
-  bullets: [
-    { text: "The whole premise of a mesh is that domains own data independently and others consume it without a central team brokering access.", },
-    { text: "That only works if products are discoverable and their contracts trustworthy. Without discovery infrastructure, consumers fall back to asking the central team — and the bottleneck returns.", },
-    { head: true, text: "The catalog (OpenMetadata) provides" },
-    { text: "Discovery: which products exist, their schemas, their owners.", lvl: 1 },
-    { text: "Lineage: the who-produces-and-who-consumes graph across domains — answer 'if this schema changes, what's downstream?' without reading code.", lvl: 1 },
-    { text: "So discovery is load-bearing structure, not decoration. A mesh without a usable catalog degrades into the proxy anti-pattern, even if every other piece is in place.", color: C.ink },
-  ] });
+diagramSlide({ eyebrow: "Data as a product", title: "Products others can find and trust",
+  image: "17-value-data-product",
+  caption: "Discoverable, addressable, trustworthy, self-describing — consumers depend on products without a broker in the middle.",
+  notes: "SECTION VALUE-CLOSER for data as a product. Payoff: products others can find and depend on without a broker. Pills: Deployment+Service, schema registry, OpenMetadata, CRDs. Failure mode in the red band: 'dumb' data products — renamed tables that can't serve or govern themselves. Recap against this picture, then move to the platform that provides the shared infrastructure." });
 
 /* ====================== 03 · SELF-SERVE DATA PLATFORM ====================== */
-divider({ num: "03", title: "Self-serve data platform", sub: "Shared infrastructure domains consume — so they don't each build Kafka, a registry, a catalog, or observability." });
+divider({ num: "03", title: "Self-serve data platform", sub: "Shared infrastructure domains consume — so they don't each build Kafka, a registry, a catalog, or observability.",
+  notes: "Principle 3. Throughline: the self-serve platform is what lets domain ownership SCALE — many domains, one platform, no central team in the critical path. Hero concept: the operator. We cover operators/OperatorHub, elasticity with KEDA (as diagrams), recoverability, then the value-closer with OpenShift specifics." });
 
 contentSlide({ eyebrow: "Self-serve platform", title: "The principle, in one slide",
   bullets: [
@@ -360,11 +277,13 @@ contentSlide({ eyebrow: "Self-serve platform", title: "The principle, in one sli
     { head: true, text: "Why it matters" },
     { text: "Without a self-serve platform, every domain reinvents the same infrastructure, badly, and ownership fragments into shadow platform teams.", },
     { text: "The self-serve layer is what lets domain ownership scale: many domains, one platform, no central team in the critical path.", },
-  ] });
+  ],
+  notes: "Principle recap. The one-liner that lands: 'a domain that needs Kafka asks for a topic — it does not learn to operate Kafka.' Without this layer, every domain reinvents infrastructure badly, and you get shadow platform teams — re-fragmented ownership. The self-serve platform lets ownership actually scale." });
 
 diagramSlide({ eyebrow: "Self-serve platform", title: "The three planes of the platform",
   image: "platform-planes",
-  caption: "The infrastructure plane, the data-product developer-experience plane, and the mesh-experience plane — what a domain consumes to ship a product without operating the substrate." });
+  caption: "The infrastructure plane, the data-product developer-experience plane, and the mesh-experience plane — what a domain consumes to ship a product without operating the substrate.",
+  notes: "The platform-planes model. Three planes: raw infrastructure at the bottom, the developer-experience plane in the middle (how a domain declares a product), the mesh-experience plane (discovery, governance across products). The audience needn't memorize the names — the point is 'platform' is layered, and domains interact with the higher planes by declaration, not raw infrastructure." });
 
 (() => {
   const s = pres.addSlide();
@@ -379,61 +298,18 @@ diagramSlide({ eyebrow: "Self-serve platform", title: "The three planes of the p
     { text: "The result: a domain declares what it wants; the platform delivers the operational behavior.", color: C.ink },
   ], { x: 0.7, y: 1.95, w: PW - 1.4 });
   L.footer(s);
+  s.addNotes("The hero concept: the operator. Define it clearly — an operator encodes the operational knowledge of running a complex system into a controller that turns a declarative request into a running system. On OpenShift, OperatorHub + OLM curate and lifecycle these; GitOps makes the whole mesh reproducible from Git; the integrated registry/Routes/Service Mesh complete the substrate. Payoff: the domain declares what it wants; the platform delivers the behavior. We deliberately DON'T show operator YAML — the next slides show the value as diagrams.");
 })();
 
-codeSlide({ eyebrow: "Self-serve platform", title: "Kafka, consumed by declaration",
-  lang: "YAML · AMQ Streams (Strimzi)",
-  note: "The platform runs one Kafka cluster as a custom resource; domains get topics by declaring KafkaTopic objects. No domain operates a broker — they consume the streaming plane the platform provides.",
-  code: code(`apiVersion: kafka.strimzi.io/v1beta2
-kind: Kafka
-metadata:
-  name: mesh-kafka
-  namespace: platform
-spec:
-  kafka:
-    replicas: 3
-    listeners:
-      - name: tls
-        port: 9093
-        type: internal
-        tls: true
-    storage:
-      type: persistent-claim
-      size: 100Gi
-      class: ocs-storagecluster-ceph-rbd
-    config:
-      offsets.topic.replication.factor: 3
-      transaction.state.log.replication.factor: 3
-      min.insync.replicas: 2
-  entityOperator:
-    topicOperator: {}      # enables declarative KafkaTopic`),
-});
+diagramSlide({ eyebrow: "Self-serve platform", title: "Elastic products: scale on lag, even to zero",
+  image: "17-keda-lag",
+  caption: "An event consumer's real demand is the backlog waiting for it — KEDA scales notification-service on Kafka lag, down to zero when idle.",
+  notes: "NEW KEDA diagram — shown as a diagram, not a ScaledObject YAML, on purpose. Walk left to right: the topic's consumer lag is the signal; KEDA reads it via the Kafka scaler; it scales notification-service from zero up to ten. The 'why not CPU' callout is the teaching point — a consumer idling at 0% CPU with a 10,000-message backlog SHOULD scale up, and CPU can't see that, but lag can. Scale-to-zero makes 'elastic data product' real economics: it costs nothing while idle." });
 
-diagramSlide({ eyebrow: "Self-serve platform", title: "Elastic products: scale to demand, and to zero",
-  image: "decentralization-checklist",
-  caption: "Decentralize everything except the platform's shared capabilities — elasticity among them. A product that costs nothing while idle can exist without justifying a standing footprint." });
-
-codeSlide({ eyebrow: "Self-serve platform", title: "KEDA: scaling on real signals",
-  lang: "YAML · KEDA",
-  note: "Standard autoscaling watches CPU; a data product's real demand is requests or event lag. KEDA scales on those — including down to zero. The consumer scales on Kafka lag; the read gateway scales on HTTP volume.",
-  code: code(`apiVersion: keda.sh/v1alpha1
-kind: ScaledObject
-metadata:
-  name: notification-consumer
-  namespace: notification
-spec:
-  scaleTargetRef:
-    name: notification-service
-  minReplicaCount: 0        # scale to zero when idle
-  maxReplicaCount: 10
-  triggers:
-    - type: kafka
-      metadata:
-        bootstrapServers: mesh-kafka-bootstrap.platform:9093
-        consumerGroup: notification
-        topic: order.placed
-        lagThreshold: "50"   # one replica per ~50 lagging msgs`),
-});
+diagramSlide({ eyebrow: "Self-serve platform", title: "Elastic reads: the KEDA HTTP add-on",
+  image: "17-keda-http",
+  caption: "A read gateway's demand is request volume — the HTTP add-on scales it on traffic, and deliberately not on the canaried service.",
+  notes: "Second KEDA diagram, also a picture. The gateway scales on HTTP request volume via the add-on's interceptor. The DESIGN point is the red band: HTTP scaling goes on the gateway, NOT order-service — because order-service carries the canary, and HTTP-scaling a service whose traffic is split by weight would have the two mechanisms fight over the same pods. 'Fit the mechanism to the workload.' The 'unknown at rest' note pre-empts a question: a scaled-to-zero workload reports unknown until the first request — expected." });
 
 contentSlide({ eyebrow: "Self-serve platform", title: "Resilience: recoverability as a platform property",
   bullets: [
@@ -442,19 +318,17 @@ contentSlide({ eyebrow: "Self-serve platform", title: "Resilience: recoverabilit
     { head: true, text: "Design products toward recoverability" },
     { text: "Don't hold critical state only in memory; come back to a known-good state after a crash; let the operator recover the systems it manages; let a downed consumer catch up on the backlog it missed.", },
     { text: "A product deployed this way is recoverable by construction — and that resilience is something the domain gets from the platform, not something it builds.", color: C.ink },
-  ] });
+  ],
+  notes: "Resilience as the other half of the platform's value. Cloud-native doesn't prevent failure — it makes recovery cheap and automatic, and a mesh inherits that. List the reconciliation behaviors quickly. Then design guidance: build TOWARD recoverability — no critical in-memory-only state, known-good recovery, let operators recover what they manage, let consumers catch up. Payoff: recoverable by construction, from the platform. (Single-node caveats and recovery-sizing are in Appendix A.)" });
 
-contentSlide({ eyebrow: "Self-serve platform", title: "What the principle buys you — the OpenShift value",
-  bullets: [
-    { text: "Leverage. One platform team's work — an operator, a GitOps pipeline, a mesh — is consumed by every domain, instead of re-solved per domain.", },
-    { text: "Consistency. Every product is deployed, scaled, secured, and observed the same way, because the platform provides the mechanism.", },
-    { text: "Focus. Domain teams spend their time on their data and their logic, not on operating infrastructure.", },
-    { head: true, text: "OpenShift specifically" },
-    { text: "OperatorHub/OLM curate and lifecycle the capabilities; GitOps makes the whole mesh reproducible from Git; the integrated registry, Routes, and Service Mesh mean the substrate is there to consume, not assemble.", },
-  ] });
+diagramSlide({ eyebrow: "Self-serve platform", title: "Infrastructure domains consume, not operate",
+  image: "17-value-self-serve",
+  caption: "Streaming, databases, scaling, and the mesh — declared, not operated. One platform team's work, leveraged by every domain.",
+  notes: "SECTION VALUE-CLOSER for self-serve platform. Payoff: leverage — one platform team's work consumed by every domain — plus consistency and focus. Pills: OperatorHub/OLM, AMQ Streams/CNPG, KEDA, GitOps. Failure mode: every domain reinventing infrastructure, shadow platform teams. This is where the OpenShift value is most concrete: OperatorHub curates capabilities, GitOps makes it reproducible, the integrated substrate is there to consume, not assemble. Then to governance." });
 
 /* ====================== 04 · FEDERATED COMPUTATIONAL GOVERNANCE ====================== */
-divider({ num: "04", title: "Federated computational governance", sub: "Standards enforced computationally by the platform — not by meetings and policy documents." });
+divider({ num: "04", title: "Federated computational governance", sub: "Standards enforced computationally by the platform — not by meetings and policy documents.",
+  notes: "Principle 4 — the one that holds the others together. Throughline: encode the few global rules so the platform RUNS them, and ownership stays decentralized while standards hold. We cover the governance model, the canary (contract evolution + selective-meshing decision), the mesh and mTLS as a diagram, admission policy framing, and observability as governance — then the value-closer." });
 
 contentSlide({ eyebrow: "Federated governance", title: "The principle, in one slide",
   bullets: [
@@ -463,25 +337,23 @@ contentSlide({ eyebrow: "Federated governance", title: "The principle, in one sl
     { head: true, text: "Why it matters" },
     { text: "Bolt governance on from outside and it never fits; over-correct into an approval bureaucracy and you've rebuilt the central bottleneck.", },
     { text: "Computational governance is the resolution: encode the global rules so the platform runs them, and ownership stays decentralized while standards hold.", },
-  ] });
+  ],
+  notes: "Principle recap. The tension: governance fails in two opposite directions — bolted on from outside (never fits) or over-corrected into an approval bureaucracy (the bottleneck returns). Computational governance resolves it: encode the few global rules, let the platform enforce them automatically. 'Federated' = domains own local rules, platform enforces global ones. This is the principle that lets all the others coexist." });
 
-diagramSlide({ eyebrow: "Federated governance", title: "The governance model",
+diagramSlide({ eyebrow: "Federated governance", title: "Global rules, local autonomy",
   image: "federated-governance-model",
-  caption: "Global rules the platform enforces, local rules the domains own. The line between them is the central design decision of a mesh's governance." });
+  caption: "A few global rules the platform enforces; the rest left to domains. Where that line falls is the central governance design decision.",
+  notes: "The governance-model diagram. The design question every mesh faces: which rules are GLOBAL (so products interoperate — shared identifiers, contract formats, lineage conventions) versus LOCAL (left to domains). Wrong toward global and you have a bottleneck; wrong toward local and nothing joins up. The platform enforces the global few automatically. Judgment, not a formula — but the diagram frames the decision." });
 
-codeSlide({ eyebrow: "Federated governance", title: "Progressive delivery: canary a contract",
+diagramSlide({ eyebrow: "Federated governance", title: "The service mesh: secure by default, shiftable on demand",
+  image: "17-service-mesh",
+  caption: "Sidecars beside every product establish mTLS automatically and let the platform shift traffic by weight — both without application code.",
+  notes: "NEW service-mesh diagram — replaces PeerAuthentication YAML, because the mesh's shape is far clearer as a picture. Walk it: every product has a sidecar (Envoy) beside the app container; sidecar-to-sidecar traffic is mutual TLS, automatic, no app code; istiod is the control plane issuing identities and pushing routing/policy. Bottom band: the canary — weights shift 90/10 → 50/50 → 0/100, mesh splits live traffic, no client change. Two capabilities, one mechanism: security and traffic management as platform properties. The one piece of mesh code worth seeing — the canary weights — is next." });
+
+codeSlide({ eyebrow: "Federated governance", title: "Canary a contract — the one mesh manifest worth seeing",
   lang: "YAML · OpenShift Service Mesh",
-  note: "The interesting thing to canary in a mesh isn't a new binary — it's a new version of the contract. v2 adds the currency field; the mesh shifts live traffic by weight, so the contract evolves under controlled traffic. Shifting the canary is a one-line weight change: 90/10 → 50/50 → 0/100.",
+  note: "The interesting thing to canary in a mesh isn't a new binary — it's a new version of the contract. v2 adds the currency field from section 02; the mesh shifts live traffic by weight. Shifting the canary is a one-line weight change: 90/10 → 50/50 → 0/100.",
   code: code(`apiVersion: networking.istio.io/v1beta1
-kind: DestinationRule
-metadata: { name: order-service, namespace: order }
-spec:
-  host: order-service
-  subsets:
-    - { name: v1, labels: { version: v1 } }
-    - { name: v2, labels: { version: v2 } }
----
-apiVersion: networking.istio.io/v1beta1
 kind: VirtualService
 metadata: { name: order-service, namespace: order }
 spec:
@@ -491,36 +363,8 @@ spec:
         - destination: { host: order-service, subset: v1 }
           weight: 90
         - destination: { host: order-service, subset: v2 }
-          weight: 10`),
-});
-
-codeSlide({ eyebrow: "Federated governance", title: "mTLS for free",
-  lang: "YAML · OpenShift Service Mesh",
-  note: "When products are in the mesh, the sidecars establish mutual TLS automatically — each service proves its identity and the traffic is encrypted, with no application code. 'Traffic between products is authenticated and encrypted' becomes a platform property, not a per-team checklist.",
-  code: code(`apiVersion: security.istio.io/v1beta1
-kind: PeerAuthentication
-metadata:
-  name: default
-  namespace: istio-system
-spec:
-  mtls:
-    mode: STRICT          # require mTLS mesh-wide
----
-# authorization: only the gateway may call order-service
-apiVersion: security.istio.io/v1beta1
-kind: AuthorizationPolicy
-metadata:
-  name: order-service-callers
-  namespace: order
-spec:
-  selector: { matchLabels: { app: order-service } }
-  action: ALLOW
-  rules:
-    - from:
-        - source:
-            principals:
-              - cluster.local/ns/gateway/sa/graphql-gateway`),
-});
+          weight: 10        # move 90/10 → 50/50 → 0/100`),
+  notes: "We show this ONE manifest because the weights ARE the lesson — everything else about the mesh was a diagram. Connect to section 02: v2 is the contract that added the currency field. The canary isn't canarying a new binary, it's canarying a CONTRACT CHANGE — the data-mesh-specific insight. Shifting the rollout is changing two numbers and re-applying; rolling back is the same in reverse. In the reference implementation: 90/10 produced ~95/5, 50/50 produced ~46/54 — both in band." });
 
 contentSlide({ eyebrow: "Federated governance", title: "Mesh selectively — a design decision",
   bullets: [
@@ -529,47 +373,23 @@ contentSlide({ eyebrow: "Federated governance", title: "Mesh selectively — a d
     { text: "Batch jobs meant to finish — a sidecar that never exits keeps the job from ever completing.", lvl: 1 },
     { text: "Operator-managed infrastructure with its own TLS — a second TLS layer collides with the database's own.", lvl: 1 },
     { text: "Anything where the sidecar's cost buys nothing — resource overhead and a control-plane dependency for no benefit.", lvl: 1 },
-    { text: "Selective injection also contains blast radius: only workloads that need the mesh depend on its control plane being healthy. (The specific incidents behind this are in Appendix A.)", color: C.ink },
-  ] });
+    { text: "Selective injection also contains blast radius: only workloads that need the mesh depend on its control plane being healthy. (The specific incidents are in Appendix A.)", color: C.ink },
+  ],
+  notes: "An important DESIGN DECISION, framed as value not war-story. The convenient default — namespace-wide injection — is wrong for a platform that holds more than just services. Opt workloads INTO the mesh instead. Three categories that don't belong: finish-and-terminate jobs (sidecar never exits, job hangs), operator-managed infra with its own TLS (collision), anything where the sidecar buys nothing. Plus the systemic argument: selective injection contains blast radius. State it as a principle here; the specific incidents that taught us are in Appendix A — point there, don't tell the stories now." });
 
-codeSlide({ eyebrow: "Federated governance", title: "Policy at the boundary",
-  lang: "YAML · Kyverno",
-  note: "Global rules become admission policy the platform enforces as resources are created — every data product must declare an owner, must carry a contract label, must not run privileged. Governance is computational: the rule runs, rather than being remembered.",
-  code: code(`apiVersion: kyverno.io/v1
-kind: ClusterPolicy
-metadata:
-  name: data-product-standards
-spec:
-  validationFailureAction: Enforce
-  rules:
-    - name: require-owner-and-contract
-      match:
-        any:
-          - resources:
-              kinds: [Deployment]
-              selector:
-                matchLabels: { "data-mesh/product": "*" }
-      validate:
-        message: "data products must declare owner + contract"
-        pattern:
-          metadata:
-            labels:
-              data-mesh/owner: "?*"
-              data-mesh/contract: "?*"`),
-});
+diagramSlide({ eyebrow: "Federated governance", title: "Observability — the mesh emits, the platform collects",
+  image: "17-observability-stack",
+  caption: "Sidecars emit metrics and traces; Prometheus, Tempo, and Kiali collect them — most of it without touching application code.",
+  notes: "NEW observability diagram — replaces config YAML. Walk the flow: products with sidecars emit metrics and traces over OTLP; the OTEL Collector fans out to Prometheus (metrics), Tempo (traces), Kiali (live topology); Grafana unifies into dashboards. Headline: because the sidecars already measure the traffic they carry, most of this is observability you get FROM THE PLATFORM, not code you write. That 'for free from the mesh' property is the self-serve principle showing up inside governance." });
 
-contentSlide({ eyebrow: "Federated governance", title: "Observability is governance you can see",
-  bullets: [
-    { text: "In a system of independently-owned products talking to each other, the interesting behavior lives between products — where no single product's logs can see it. Observability is how anyone understands it.", },
-    { head: true, text: "Three signals, each with a job" },
-    { text: "Metrics — the mesh sidecars emit request rates, errors, and latencies for free; Prometheus scrapes them, Grafana shows the autoscaler responding and the canary split landing.", lvl: 1 },
-    { text: "Traces — instrument the gateway and one GraphQL query produces an HTTP span, a REST client span, and a gRPC client span: all three protocols cooperating, in one trace.", lvl: 1 },
-    { text: "Kiali — the live topology of products and the traffic between them, canary split and all.", lvl: 1 },
-  ] });
+diagramSlide({ eyebrow: "Federated governance", title: "Three signals, correlated across a domain",
+  image: "17-three-signals",
+  caption: "Metrics say something is wrong, traces say where, logs say what — tied together by a shared trace id across products.",
+  notes: "NEW three-signals diagram — explains WHY you need all three, correlated. Top: one request becomes one trace whose spans cross three products. The three columns: metrics answer 'is it slow/failing and is the platform reacting,' traces answer 'WHERE in the path,' logs answer 'exactly WHAT happened.' The red correlation band is the punchline: the same trace id on all three, so you jump from a latency spike to the slow trace to the exact log line — across the whole domain. Why it matters in a mesh: the interesting behavior lives BETWEEN products, where no single product's logs can see it. The slide that makes observability click." });
 
-codeSlide({ eyebrow: "Federated governance", title: "A trace span across products",
+codeSlide({ eyebrow: "Federated governance", title: "A trace span across products — in Python",
   lang: "Python · OpenTelemetry",
-  note: "The gateway is the entry point for the federated read path, so instrumenting it yields the most instructive trace in the system. A single query becomes a connected tree of spans crossing three products and three protocols — the composition made visible.",
+  note: "Instrument the gateway and one GraphQL query becomes a connected tree of spans — an HTTP server span, a REST client span to order-service, a gRPC client span to inventory-service — stitched into one distributed trace. One well-chosen instrumentation point illuminates the whole read path.",
   code: code(`from opentelemetry import trace
 tracer = trace.get_tracer("graphql-gateway")
 
@@ -583,35 +403,27 @@ async def resolve_order(info, order_id: str):
         # gRPC client span → inventory-service
         stock = await inventory.GetStock(sku=order["sku"])
 
-        return compose(order, stock)
-# one query → HTTP server span + REST span + gRPC span,
-# stitched into a single distributed trace in Tempo`),
-});
+        return compose(order, stock)`),
+  notes: "Python again — the audience wants to see how tracing attaches. The gateway is the entry point for the federated read path, so instrumenting it yields the most instructive trace. One query produces an HTTP server span plus a REST client span plus a gRPC client span — the composition from section 02, now visible as a span tree in Tempo. Instrument-the-entry-point-first is the same incremental discipline as the rest of the build. This produces the trace in the previous diagram." });
+
+diagramSlide({ eyebrow: "Federated governance", title: "Standards that hold, ownership that stays put",
+  image: "17-value-governance",
+  caption: "Global rules enforced by the platform automatically — decentralization preserved, interoperability guaranteed.",
+  notes: "SECTION VALUE-CLOSER for federated governance. Payoff: standards hold WITHOUT re-centralizing — the platform enforces the global rules automatically, so ownership stays decentralized. Pills: Service Mesh mTLS, progressive delivery, admission policy, the observability stack. Failure mode: governance bolted on from outside, or re-centralized into an approval bottleneck — the mesh's own anti-pattern. This closes the four principles; next we assemble the whole picture." });
 
 /* ====================== 05 · THE WHOLE PICTURE ====================== */
-divider({ num: "05", title: "The whole picture", sub: "The four principles, realized — and what the assembled platform lets you see it do." });
+divider({ num: "05", title: "The whole picture", sub: "The four principles, realized — and what the assembled platform lets you see it do.",
+  notes: "Synthesis section. Return to the reference architecture assembled, show the principles-to-pieces closer, describe what you can SEE it do (the acceptance vision), give adoption guidance, the honest 'when not to,' and close. Bring the energy up — this is where it lands." });
 
 diagramSlide({ eyebrow: "The whole picture", title: "The reference architecture, assembled",
   image: "reference-data-mesh-architecture",
-  caption: "Every piece in its place: domain products owning their data, the platform planes beneath, governance and observability spanning the whole — the mesh, complete." });
+  caption: "Every piece in its place: domain products owning their data, the platform planes beneath, governance and observability spanning the whole — the mesh, complete.",
+  notes: "Callback to the centerpiece from section 0 — now the audience has built every box. Walk it once more, quickly, naming the principle each layer serves: domain products (ownership + product), the platform planes (self-serve), the mesh and observability spanning everything (governance). The promise from the start is kept: you recognize all of it. The 'it all fits' moment." });
 
-(() => {
-  const s = pres.addSlide();
-  s.background = { color: C.white };
-  L.head(s, "The whole picture", "The four principles, realized on OpenShift");
-  const rows = [
-    [{ text: "Principle", options: { bold: true, color: "FFFFFF", fill: { color: C.red }, fontFace: F.head } },
-     { text: "Realized by", options: { bold: true, color: "FFFFFF", fill: { color: C.red }, fontFace: F.head } }],
-    ["Domain ownership", "Projects · project-scoped RBAC · SCCs · ResourceQuota · a database per domain"],
-    ["Data as a product", "Deployments + Services + Routes · schema registry contracts · OpenMetadata catalog + lineage"],
-    ["Self-serve platform", "OperatorHub/OLM · GitOps · AMQ Streams · CloudNativePG · KEDA · integrated registry"],
-    ["Federated governance", "Service Mesh mTLS + canary · Kyverno admission policy · Prometheus/Tempo/Kiali"],
-  ];
-  s.addTable(rows, { x: 0.7, y: 2.0, w: PW - 1.4, colW: [3.3, PW - 1.4 - 3.3], rowH: [0.45, 0.95, 0.95, 0.95, 0.95],
-    fontFace: F.body, fontSize: 13, color: C.ink, valign: "middle", border: { type: "solid", pt: 1, color: "E2E2E2" },
-    fill: { color: "FBFAF7" } });
-  L.footer(s);
-})();
+diagramSlide({ eyebrow: "The whole picture", title: "The four principles, realized on OpenShift",
+  image: "17-principles-to-pieces",
+  caption: "One picture to leave with: each principle, the pieces that deliver it, on the OpenShift substrate that gives all four a home.",
+  notes: "THE closing picture — replaces the old table, because a picture sticks and a table doesn't. Four color-coded columns, one per principle, each stacking its implementing pieces, all on the black OpenShift substrate bar. If the audience remembers one slide, make it this one. Read down each column, then land on the base: OpenShift is where all four principles find a home. The takeaway image." });
 
 contentSlide({ eyebrow: "The whole picture", title: "What you can see it do",
   bullets: [
@@ -622,7 +434,8 @@ contentSlide({ eyebrow: "The whole picture", title: "What you can see it do",
     { text: "The catalog shows the lineage of which products feed which.", lvl: 1 },
     { text: "Kiali shows the live topology, canary split and all.", lvl: 1 },
     { text: "These are the instruments through which you understand a system too distributed for any single vantage point.", color: C.ink },
-  ] });
+  ],
+  notes: "The acceptance vision — what a live demo would show. If you're doing a live demo (the walkthrough), this slide is your script: the trace across products, the autoscaler reacting, the canary shifting, the lineage graph, the Kiali topology. Even without a live demo, it paints 'done looks like this.' Closing line is the observability thesis: instruments for a system too distributed to see from any one place." });
 
 contentSlide({ eyebrow: "The whole picture", title: "Adoption: start small",
   bullets: [
@@ -632,7 +445,8 @@ contentSlide({ eyebrow: "The whole picture", title: "Adoption: start small",
     { text: "Introduce computational governance once you have products to govern — the registry before the catalog, mTLS before policy.", lvl: 1 },
     { head: true, text: "Let the architecture correct against reality" },
     { text: "Each piece is verifiable on its own. Stand one up, confirm it, then add the next — the same incremental discipline the reference implementation followed.", },
-  ] });
+  ],
+  notes: "Practical adoption advice — the natural next question is 'where do I start?' Answer: not all at once. One domain, one product, with a Project, a contract, and an owner. Add platform pieces as products need them. Introduce governance once there are products to govern. Meta-point: each piece is independently verifiable, so build incrementally and let reality correct the design — exactly how the reference implementation was built." });
 
 contentSlide({ eyebrow: "The whole picture", title: "When a mesh is the wrong choice",
   bullets: [
@@ -641,7 +455,8 @@ contentSlide({ eyebrow: "The whole picture", title: "When a mesh is the wrong ch
     { text: "For a small organization, the overhead of decentralization can cost more than the bottleneck it removes.", lvl: 1 },
     { head: true, text: "Adopt principles, not fashion" },
     { text: "Sometimes a single principle — self-serve platform infrastructure, say — delivers most of the value without the full paradigm. Weigh data size, organizational complexity, existing tooling, and culture before committing.", },
-  ] });
+  ],
+  notes: "The honest slide — builds credibility with a skeptical enterprise audience. A mesh is not for everyone. It earns its complexity at scale: many domains, many consumers, organizational maturity. For a small org, decentralization overhead can exceed the bottleneck it removes. And you can adopt a single principle — usually the self-serve platform — without the whole paradigm. Telling people when NOT to do this makes them trust you on when to. Weigh the four factors first." });
 
 (() => {
   const s = pres.addSlide();
@@ -651,23 +466,30 @@ contentSlide({ eyebrow: "The whole picture", title: "When a mesh is the wrong ch
   s.addText("OpenShift is where all four principles find a home.", { x: 1.0, y: 4.9, w: PW - 2, h: 0.6, fontSize: 16, color: "FFFFFF", fontFace: F.body, valign: "top", margin: 0 });
   L.pageNum(s, { dark: true });
   s.addText("Thank you", { x: PW - 3.0, y: PH - 0.55, w: 2.5, h: 0.35, fontSize: 13, color: "FFFFFF", fontFace: F.head, bold: true, align: "right", margin: 0 });
+  s.addNotes("Closing. The one-sentence definition that ties the talk together: a mesh is the network of products PLUS the platform and standards that let them interoperate — every word of which we built today. End on OpenShift as the home for all four principles. Open for questions, and point anyone hungry for operational detail to Appendix A.");
 })();
 
 /* ====================== APPENDIX A · GOTCHAS ====================== */
-divider({ num: "A", title: "Appendix A — Gotchas", sub: "What we learned running it. Operational sharp edges, kept out of the value story on purpose." });
+divider({ num: "A", title: "Appendix A — Gotchas", sub: "What we learned running it. Operational sharp edges, kept out of the value story on purpose.",
+  notes: "Appendix — only if there's time or questions go there. Operational potholes from actually running the reference implementation. Here, not in the main deck, deliberately: the main story is value; these are a different kind of lesson. Each is symptom → cause → fix. Pull them up if someone asks 'what bit you?'" });
 
 contentSlide({ eyebrow: "Appendix A · Gotchas", title: "Why these live in an appendix",
   bullets: [
     { text: "The main narrative is about the value each piece delivers. These are the operational potholes you hit making the pieces work together — a different kind of lesson: specific, technical, and best learned before you trip on them.", },
     { text: "Some are particular to a constrained learning cluster; the ones below generalize to any real deployment. Each is symptom → cause → fix.", color: C.ink },
-  ] });
+  ],
+  notes: "Framing for the appendix. Reiterate why separated: value story in the main deck, operational lessons here. Some gotchas were specific to a constrained learning cluster (single node, rootless), but the four below generalize to any real deployment. Format is symptom → cause → fix." });
 
 (() => {
   const items = [
-    { h: "A meshed batch job never completes", c: "A Job pod gets a sidecar that never exits; the pod sits at 1/2 forever and the Job hangs. Catalog ingestion jobs hit this.", f: "Opt jobs out of injection (sidecar.istio.io/inject: \"false\"), or run them in an unmeshed namespace. A run-and-terminate workload can't carry a run-and-stay sidecar." },
-    { h: "Operator-managed database crash-loops under the mesh", c: "A managed Postgres runs its own TLS on its internal ports; an injected sidecar re-wraps those connections and breaks the database's own TLS. It exits and restarts repeatedly.", f: "Exclude operator-managed infrastructure with its own TLS from the mesh. Selective injection, not namespace-wide." },
-    { h: "Everything in a namespace depends on the mesh control plane", c: "With namespace-wide injection, every pod creation goes through the injection webhook. If the control plane has a bad moment, you can't start a database pod or a job either.", f: "Mesh selectively so only workloads that need it depend on it — contain the blast radius." },
-    { h: "Stateful workloads need headroom to recover", c: "A database sized only to run can be OOM-killed during crash-recovery (e.g. WAL replay), turning a brief blip into a crash loop.", f: "Size stateful workloads for their recovery path, not just steady state. Give the operator room to bring them back." },
+    { h: "A meshed batch job never completes", c: "A Job pod gets a sidecar that never exits; the pod sits at 1/2 forever and the Job hangs. Catalog ingestion jobs hit this.", f: "Opt jobs out of injection (sidecar.istio.io/inject: \"false\"), or run them in an unmeshed namespace. A run-and-terminate workload can't carry a run-and-stay sidecar.",
+      n: "Gotcha 1 — the meshed-job trap, the most common selective-meshing casualty. The sidecar is designed to run and stay; a Job is designed to run and terminate. Together, the pod never reaches Completed, so the Job hangs forever. We hit this with the catalog's ingestion jobs. Fix: opt jobs out of injection, or run them unmeshed. This is the concrete incident behind the selective-meshing decision in section 04." },
+    { h: "Operator-managed database crash-loops under the mesh", c: "A managed Postgres runs its own TLS on its internal ports; an injected sidecar re-wraps those connections and breaks the database's own TLS. It exits and restarts repeatedly.", f: "Exclude operator-managed infrastructure with its own TLS from the mesh. Selective injection, not namespace-wide.",
+      n: "Gotcha 2 — the double-TLS collision. CloudNativePG runs its own TLS on its instance-manager ports. An injected Envoy intercepts and re-wraps those connections, breaking the database's own TLS, and Postgres crash-loops. The second category from the selective-meshing decision: operator-managed infra with its own TLS doesn't want a second TLS layer. Fix: exclude it from the mesh explicitly." },
+    { h: "Everything in a namespace depends on the mesh control plane", c: "With namespace-wide injection, every pod creation goes through the injection webhook. If the control plane has a bad moment, you can't start a database pod or a job either.", f: "Mesh selectively so only workloads that need it depend on it — contain the blast radius.",
+      n: "Gotcha 3 — the blast-radius coupling, the systemic argument for selective meshing. With namespace-wide injection, EVERY pod creation goes through the injection webhook — so if istiod has a bad moment, you can't start a database pod or a job that have nothing to do with the mesh. Selective injection contains the blast radius: only workloads that need the mesh depend on its health." },
+    { h: "Stateful workloads need headroom to recover", c: "A database sized only to run can be OOM-killed during crash-recovery (e.g. WAL replay), turning a brief blip into a crash loop.", f: "Size stateful workloads for their recovery path, not just steady state. Give the operator room to bring them back.",
+      n: "Gotcha 4 — size for recovery, not just steady state. A database sized just to run can be OOM-killed during crash recovery — WAL replay needs more memory than steady state — turning a brief blip into a crash loop. The lesson generalizes: size stateful workloads for their recovery path; give the operator headroom to bring them back. Ties to the recoverability discussion in section 03." },
   ];
   items.forEach((it) => {
     const s = pres.addSlide();
@@ -678,10 +500,9 @@ contentSlide({ eyebrow: "Appendix A · Gotchas", title: "Why these live in an ap
       { head: true, text: "Fix" }, { text: it.f },
     ], { x: 0.7, y: 2.1, w: PW - 1.4, fontSize: 17 });
     L.footer(s);
+    s.addNotes(it.n);
   });
 })();
 
 /* ============================ WRITE ============================ */
-pres.writeFile({ fileName: "Data_Mesh_on_OpenShift.pptx" }).then((f) => {
-  console.log("WROTE", f);
-});
+pres.writeFile({ fileName: "Data_Mesh_on_OpenShift.pptx" }).then((f) => console.log("WROTE", f));

@@ -53,7 +53,7 @@ function footer(slide, { dark = false } = {}) {
 }
 
 // ---- TITLE slide: red left panel + geometric line motif ----
-function titleSlide({ eyebrow, title, subtitle, author }) {
+function titleSlide({ eyebrow, title, subtitle, author, notes }) {
   const s = pres.addSlide();
   s.background = { color: C.white };
   const panelW = PW * 0.42;
@@ -69,11 +69,12 @@ function titleSlide({ eyebrow, title, subtitle, author }) {
   s.addText(title, { x: rx, y: 2.2, w: PW - rx - 0.6, h: 1.8, fontSize: 44, color: C.ink, fontFace: F.head, bold: true, valign: "top", margin: 0 });
   s.addText(subtitle, { x: rx, y: 3.95, w: PW - rx - 0.6, h: 1.0, fontSize: 18, color: C.gray, fontFace: F.body, valign: "top", margin: 0 });
   s.addText(author, { x: rx, y: 5.0, w: PW - rx - 0.6, h: 0.4, fontSize: 14, color: C.red, fontFace: F.bodyM, valign: "top", margin: 0 });
+  if (notes) s.addNotes(notes);
   return s;
 }
 
 // ---- SECTION DIVIDER: full red, two-digit number eyebrow + white title ----
-function divider({ num, title, sub }) {
+function divider({ num, title, sub, notes }) {
   const s = pres.addSlide();
   s.background = { color: C.red };
   s.addText(num, { x: 0.9, y: 1.5, w: 4, h: 2.2, fontSize: 150, color: "FFFFFF", fontFace: F.head, bold: true, transparency: 18, margin: 0 });
@@ -81,6 +82,7 @@ function divider({ num, title, sub }) {
   if (sub) s.addText(sub, { x: 1.0, y: 5.3, w: PW - 2.2, h: 1.0, fontSize: 16, color: "FFD9D9", fontFace: F.body, valign: "top", margin: 0 });
   PAGENO += 1;
   s.addText(String(PAGENO), { x: 0.5, y: PH - 0.5, w: 1, h: 0.3, fontSize: 9, color: "FFFFFF", fontFace: F.body, transparency: 30, margin: 0 });
+  if (notes) s.addNotes(notes);
   return s;
 }
 
@@ -91,12 +93,13 @@ function head(s, eyebrow, title, { titleH = 0.9 } = {}) {
 }
 
 // ---- CONTENT slide: eyebrow + title + left bullets (+ optional right visual handled by caller) ----
-function contentSlide({ eyebrow, title, bullets, bulletsX = 0.7, bulletsW = PW - 1.4, bulletsY = 1.95 }) {
+function contentSlide({ eyebrow, title, bullets, bulletsX = 0.7, bulletsW = PW - 1.4, bulletsY = 1.95, notes }) {
   const s = pres.addSlide();
   s.background = { color: C.white };
   head(s, eyebrow, title);
   if (bullets) addBullets(s, bullets, { x: bulletsX, y: bulletsY, w: bulletsW });
   footer(s);
+  if (notes) s.addNotes(notes);
   return s;
 }
 
@@ -115,7 +118,7 @@ function addBullets(s, bullets, { x, y, w, h = 4.6, fontSize = 16 }) {
 }
 
 // ---- DIAGRAM slide: eyebrow + title + centered diagram + caption ----
-function diagramSlide({ eyebrow, title, image, caption }) {
+function diagramSlide({ eyebrow, title, image, caption, notes }) {
   const s = pres.addSlide();
   s.background = { color: C.white };
   head(s, eyebrow, title);
@@ -127,11 +130,12 @@ function diagramSlide({ eyebrow, title, image, caption }) {
   s.addImage({ path: IMG(image), x, y, w, h });
   if (caption) s.addText(caption, { x: 0.8, y: PH - 1.0, w: PW - 1.6, h: 0.4, fontSize: 12, color: C.gray, fontFace: F.body, italic: true, align: "center", margin: 0 });
   footer(s);
+  if (notes) s.addNotes(notes);
   return s;
 }
 
 // ---- CODE slide: eyebrow + title + dark code panel + optional note ----
-function codeSlide({ eyebrow, title, lang, code, note }) {
+function codeSlide({ eyebrow, title, lang, code, note, notes }) {
   const s = pres.addSlide();
   s.background = { color: C.white };
   head(s, eyebrow, title);
@@ -149,6 +153,7 @@ function codeSlide({ eyebrow, title, lang, code, note }) {
     s.addText(note, { x: px + pw + 0.3, y: py + 0.1, w: PW - (px + pw + 0.3) - 0.6, h: ph, fontSize: 14, color: C.ink, fontFace: F.body, valign: "top", margin: 0 });
   }
   footer(s);
+  if (notes) s.addNotes(notes);
   return s;
 }
 

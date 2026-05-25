@@ -58,5 +58,49 @@
   "reference-data-mesh-architecture": {
     "w": 3333,
     "h": 2139
+  },
+  "17-api-implementations": {
+    "w": 3278,
+    "h": 1556
+  },
+  "17-keda-http": {
+    "w": 3278,
+    "h": 1389
+  },
+  "17-keda-lag": {
+    "w": 3278,
+    "h": 1389
+  },
+  "17-observability-stack": {
+    "w": 3278,
+    "h": 1500
+  },
+  "17-principles-to-pieces": {
+    "w": 3278,
+    "h": 1722
+  },
+  "17-service-mesh": {
+    "w": 3278,
+    "h": 1556
+  },
+  "17-three-signals": {
+    "w": 3278,
+    "h": 1556
+  },
+  "17-value-data-product": {
+    "w": 3278,
+    "h": 1500
+  },
+  "17-value-domain-ownership": {
+    "w": 3278,
+    "h": 1500
+  },
+  "17-value-governance": {
+    "w": 3278,
+    "h": 1500
+  },
+  "17-value-self-serve": {
+    "w": 3278,
+    "h": 1500
   }
 }
