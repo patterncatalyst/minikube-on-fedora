@@ -27,6 +27,74 @@ most of Phase C's content, just laid out linearly. So the restructure is mostly
 - **One topic is entirely unwritten and now owed: the selective-injection
   decision** (see §"New section to write" below). Tonight's saga is the material.
 
+## LOCKED structure (author-confirmed)
+
+**Format:** short §17 landing (scenario-setting prose) + **9 grouped concept pages**
+as dedicated child pages. Grouped (not one-per-section) for two reasons the author
+gave: (1) easier to find by concept, (2) each grouped page doubles as a Phase D
+slide-cluster. Naming/numbering still to confirm, but the page set is locked:
+
+1. **Concepts & principles** — what a data mesh is, operational vs. analytical, the
+   four principles. (Grounding; mirrors 101 deck slides 1-31, condensed. Decide:
+   recap briefly vs. link to the 101 deck and dive into implementation.)
+2. **Kubernetes as the substrate** — why k8s; four principles → k8s primitives;
+   architecture overview.
+3. **Services & data products** — the services, order-service template, data-product
+   anatomy, build/image story.
+4. **Contracts & the catalog** — Apicurio (registry) + OpenMetadata (catalog,
+   lineage, discovery); why the catalog is a mesh requirement.
+5. **The data planes** — async backbone (Kafka) + read layer (GraphQL/REST/gRPC).
+6. **Progressive delivery & mTLS** — Istio canary v1→v2 + the selective-injection
+   decision (design-decision framing; the cautionary version lives in Gotchas).
+7. **Elastic & resilient** — KEDA scale-to-zero + cloud-native recoverability.
+8. **Observability** — metrics/traces/logs correlation + Kiali (live vs after).
+9. **Anti-patterns** — conceptual/organizational data-mesh failure modes from the
+   literature (vendor-neutral, reusable). NOT our build's incidents — those are
+   "Gotchas" (below). Sources synthesized (paraphrase, never reproduce):
+     - **Tool ≠ transformation.** Data mesh is socio-technical; buying a catalog or
+       relabeling a lake doesn't make a mesh. (Globant #5; Moronta; Nextdata.)
+     - **Recreating centralization under a new name** — central team stays the
+       proxy, or "governance" re-centralizes approvals; shadow data teams.
+       (Nextdata "proxy data mesh"; Moronta "over-centralizing for coordination".)
+     - **"Dumb" data products** — products reduced to renamed tables / catalog rows
+       instead of *autonomous* units that serve, govern, and describe themselves.
+       (Nextdata's central thesis; Globant #1 lifecycle neglect.)
+     - **Governance as afterthought or as bureaucracy** — either bolted on outside
+       the product, or so heavy it bottlenecks. Federated *computational* governance
+       is the target. (Globant #4; Moronta; the federated-governance principle.)
+     - **Ownership vacuum / fuzzy domains** — no clear owner; overlapping domains;
+       conflicting versions. (Globant #10; Moronta; ThoughtWorks "fuzzy boundaries".)
+     - **Open loop / no feedback** — static downstream products, no operational↔
+       analytical loop, no consumer feedback. (Nextdata "open loop"; Globant #3.)
+     - **Hype-driven / wrong-fit adoption** — mesh isn't for every org; analysis
+       paralysis; more products ≠ better. (Globant #2/#8/#9; takt.dev "unsuitable
+       for small orgs / no governance culture".)
+   Framing (author to confirm): state each anti-pattern generally, then — where we
+   have one — a one-line nod to how our build's lessons are the operational analogue,
+   with a pointer to Gotchas. Keep page 9 conceptual. LinkedIn source (gugulla post)
+   could not be fetched (auth wall) — author to paste if its points should be added.
+
+## SEPARATE: "Gotchas" section → deck Appendix A
+
+Distinct from page 9. **Gotchas = the implementation/operational potholes WE hit
+building the demo**, mined from the CAP decision log — war-story framing, "here's
+what bit us and the fix." Maps to **Appendix A** in the Phase D deck. Candidates:
+  - Namespace-wide mesh injection broke batch Jobs (CAP-034) and crash-looped CNPG
+    via TLS-vs-Envoy (CAP-038); istiod became a fail-closed dependency for every
+    pod-create (CAP-040). → "mesh selectively."
+  - Under-sizing a stateful workload like a stateless one — Postgres OOM at 512Mi in
+    WAL recovery (CAP-038). → "size stateful workloads for their worst moment."
+  - App exits on first dependency failure at startup — order-service crash-loop; fix
+    = retry + holdApplicationUntilProxyStarts (CAP-037). → "deps aren't ready at boot."
+  - Long-lived single-node cluster treated as durable — idle-node /dev decay wedging
+    kube-proxy (CAP-040). → "cycle on resume; don't debug symptoms."
+  - Node PID ceiling (podman pids_limit default 2048) starving pod forks (CAP-041).
+  - Shell footguns under `set -euo pipefail` — the guard saga. → maybe a scripting
+    sidebar; author's call whether it earns a spot.
+Whether Gotchas also appears as a §17 page (vs. only the deck appendix) — author to
+decide. Likely: a short "Operating notes / gotchas" page or fold into page 7, with
+the full enumerated list reserved for the deck appendix.
+
 ## Decision to make first (blocks the section layout)
 
 **How to physically split the page.** Two options — need the author's call:
