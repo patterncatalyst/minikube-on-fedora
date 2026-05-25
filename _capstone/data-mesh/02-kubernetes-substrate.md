@@ -55,6 +55,8 @@ operator), the database (via its operator), autoscaling, the service mesh, and t
 observability stack are all shared platform infrastructure the domains consume by
 declaration. That's the self-serve principle made literal.
 
+![The three planes of the self-serve data platform]({{ '/assets/diagrams/17-platform-planes.svg' | relative_url }})
+
 **Federated computational governance → admission control, policy engines, mesh
 policy, CRD validation.** Governance in a mesh is supposed to be enforced by the
 platform, automatically, at the boundary — not by review meetings after the fact.

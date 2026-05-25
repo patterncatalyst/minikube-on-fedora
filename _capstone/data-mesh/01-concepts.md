@@ -34,6 +34,8 @@ monolithic data platform gets refactored into bounded *data products* owned by d
 teams. The mesh is the network of those products plus the platform and standards that
 let them interoperate.
 
+![From a monolithic data platform to a mesh of data products]({{ '/assets/diagrams/17-monolith-to-mesh.svg' | relative_url }})
+
 ## Operational vs. analytical data
 
 One distinction underlies everything and is worth stating plainly, because blurring it
@@ -51,6 +53,8 @@ analytical products derived from them, and publishes those products for other do
 to consume. The aim is to close the loop between the two planes within each domain,
 rather than leaving analytical data as a stale downstream copy.
 
+![Operational vs. analytical data planes]({{ '/assets/diagrams/17-operational-vs-analytical.svg' | relative_url }})
+
 This capstone models the **operational** side concretely — services that own their
 data and emit events — and shows how analytical consumers attach to that operational
 flow through the event backbone, rather than through a nightly extract. That's the
@@ -61,6 +65,8 @@ loop the mesh is meant to keep closed.
 Dehghani's data mesh rests on four interlocking principles. They depend on each other —
 implement one without the others and you get a distributed mess rather than a mesh —
 and each shows up explicitly in this capstone:
+
+![The four principles and how they map to Kubernetes primitives]({{ '/assets/diagrams/17-data-mesh-four-principles.svg' | relative_url }})
 
 **Domain ownership.** Data is owned, end to end, by the domain team that produces it.
 There is no central team that "owns the warehouse." Each domain owns its data's
