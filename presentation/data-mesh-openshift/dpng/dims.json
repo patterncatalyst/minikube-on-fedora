@@ -102,5 +102,9 @@
   "17-value-self-serve": {
     "w": 3278,
     "h": 1500
+  },
+  "17-trusted-supply-chain": {
+    "w": 3278,
+    "h": 1556
   }
 }

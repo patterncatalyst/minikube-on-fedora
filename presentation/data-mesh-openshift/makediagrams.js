@@ -323,4 +323,41 @@ valueDiagram("17-value-governance", "04", "Federated computational governance", 
   save("17-principles-to-pieces", s);
 })();
 
+/* ========== 8. RED HAT UBI + TRUSTED CONTENT (secure supply chain) ========== */
+(() => {
+  const s = new SVG(1180, 560);
+  s.title("A trusted base for every data product", "Red Hat UBI + trusted content: the supply chain the platform gives each domain");
+  // the build pipeline: base -> deps -> image -> signed -> deployed
+  const stage = (x, w, fam, title, body) => {
+    s.rect(x, 95, w, 120, fam);
+    const f = require("./svglib.js").FAM[fam];
+    s.text(x + w / 2, 122, title, { size: 12.5, anchor: "middle", weight: 700, fill: f.head });
+    s.lines(x + 18, 150, body, { size: 10.5, fill: "#3a3a3a", lh: 16 });
+  };
+  stage(70, 250, "blue", "Red Hat UBI", ["the base image:", "ubi9/python-311", "freely redistributable,", "enterprise-maintained"]);
+  s.arrow(320, 155, 360, 155, { color: "#5a5a5a", w: 1.8 });
+  stage(360, 250, "green", "Trusted libraries", ["language deps from", "Red Hat / verified", "channels — known", "provenance, patched"]);
+  s.arrow(610, 155, 650, 155, { color: "#5a8a3a", marker: "arrG", w: 1.8 });
+  stage(650, 230, "orange", "Your data product", ["FastAPI / gRPC /", "Strawberry app layered", "on the trusted base"]);
+  s.arrow(880, 155, 920, 155, { color: "#c97a3a", w: 1.8 });
+  stage(920, 190, "red", "Signed & scanned", ["SBOM + signature;", "admission verifies", "before it runs"]);
+  // value band — why it matters
+  s.rect(70, 250, 1040, 110, "tan");
+  s.text(90, 277, "WHY IT EARNS ITS PLACE", { size: 10, weight: 600, fill: "#8a7a5a" });
+  s.lines(90, 300, [
+    "Provenance you can prove — every layer traces to a maintained, signed source, not an anonymous public image.",
+    "Patched at the base — CVE fixes flow from the UBI/trusted channel, so a rebuild re-bases the whole fleet of products.",
+    "Governance hooks in — image signing + SBOM let admission policy reject anything unverified, mesh-wide.",
+  ], { size: 11.5, fill: "#3a3a3a", lh: 24 });
+  // tie to principles
+  s.rect(70, 390, 1040, 95, "white");
+  s.text(90, 417, "WHERE IT FITS THE MESH", { size: 10, weight: 600, fill: "#5a3a0a" });
+  s.lines(90, 440, [
+    "Self-serve platform: the trusted base is shared infrastructure every domain consumes — they inherit security, they don't each source it.",
+    "Federated governance: signature + SBOM verification is a global rule the platform enforces at admission, automatically.",
+  ], { size: 11.5, fill: "#3a3a3a", lh: 24 });
+  s.footer("Domains build on a base they can trust and the platform can verify — security as a property they inherit, not a task they own.");
+  save("17-trusted-supply-chain", s);
+})();
+
 console.log("DONE");
