@@ -43,6 +43,13 @@ collections:
   example_pages:
     output: true
     permalink: /examples/:name/
+  # capstone is the §17 data-mesh build, organized as its own internally-numbered
+  # set (00-index + 01..09) under a subdirectory — like the skeleton's reference
+  # collection. permalink uses :path (not :name) to preserve the subdirectory, so
+  # _capstone/data-mesh/01-concepts.md → /capstone/data-mesh/01-concepts/.
+  capstone:
+    output: true
+    permalink: /capstone/:path/
 
 # Default front-matter — saves typing `layout: tutorial` on every doc.
 defaults:
@@ -51,11 +58,18 @@ defaults:
       type: docs
     values:
       layout: tutorial
+      sectionid: docs
   - scope:
       path: ""
       type: plans
     values:
       layout: plan
+  - scope:
+      path: ""
+      type: capstone
+    values:
+      layout: tutorial
+      sectionid: capstone
 
 # Files that Jekyll should not process or include in the built site.
 exclude:

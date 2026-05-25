@@ -275,3 +275,37 @@ it's a personal tutorial — author's call). Suggested: keep the swap until at l
 **Writing order (recap):** 17.9 (anti-patterns — synthesis done) → 17.6 (Istio +
 selective-injection — material in hand) → 17.1-17.8 in sequence, relocating prose
 from 17-capstone.md.OLD per each page's PROSE SOURCE pointer.
+
+## STRUCTURE CORRECTED (mirrors the skeleton's reference/compendium pattern)
+
+The earlier `17.1`–`17.9`-in-_docs approach was WRONG — it injected pages into the
+main tutorial chain. Corrected to mirror the cpp-tutorial's Statelessness Compendium
+(`_reference/statelessness/` collection): the capstone is now its OWN collection.
+
+**What was built:**
+- `_config.yml`: new `capstone` collection (`output: true`, `permalink: /capstone/:path/`)
+  + a default scope giving it `layout: tutorial`, `sectionid: capstone`. Modeled on
+  the skeleton's `reference` collection (`:path` preserves the subdirectory).
+- `_layouts/tutorial.html`: prev/next now branches on `page.sectionid` — capstone
+  pages thread among `site.capstone` (their own internal chain), everything else
+  threads `site.docs` as before. This is the one layout change needed; verified
+  if/else/endif balanced.
+- `_capstone/data-mesh/`: `00-index.md` (set landing, "The set" list) + `01-concepts`
+  … `09-anti-patterns` (internally numbered 0-9). URLs: `/capstone/data-mesh/00-index/`,
+  `/capstone/data-mesh/01-concepts/`, … `/capstone/data-mesh/09-anti-patterns/`.
+- `_docs/17-capstone.md.NEW`: short hand-off page (stays in the main chain as §17,
+  links into the set). Staged as .NEW — the full original 17-capstone.md remains the
+  prose source until the set is written, then swap (see activation note above).
+
+**Content carried over unchanged:** the 9-section grouping, prose-source line-range
+pointers, diagram mapping, anti-patterns synthesis (7 themes, sourced), gotchas split.
+Only the housing changed: a self-contained collection with internal 00-09 numbering
+and its own landing + prev/next, instead of 17.N pages in the docs chain.
+
+**Resume:** extract, commit, sanity-check with a local Jekyll build if possible
+(the collection + layout branch are the only structural risk — verify
+/capstone/data-mesh/00-index/ renders and its prev/next chains within the set).
+Then write: 09-anti-patterns (synthesis done) → 06-progressive-delivery-mtls
+(material in hand) → 01-08 in order, relocating prose from 17-capstone.md (the OLD
+full page) per each doc's PROSE SOURCE note. Swap 17-capstone.md.NEW → live once
+06 and 09 are drafted.

@@ -4,12 +4,18 @@ layout: default
 
 {%- comment -%}
   Build sorted list of tutorial docs so we can derive prev/next.
-  Falls back to site.pages when docs/ isn't a Jekyll collection
-  (i.e. lives at docs/ rather than _docs/) so the nav still works.
+  Pages in the `capstone` collection (sectionid: capstone) thread among
+  themselves so the §17 data-mesh set has its own internal prev/next, separate
+  from the main docs/00..17 chain. Everything else threads through site.docs,
+  falling back to site.pages when docs/ isn't a Jekyll collection.
 {%- endcomment -%}
-{%- assign tutorial_docs = site.docs | sort: "order" -%}
-{%- if tutorial_docs.size == 0 -%}
-  {%- assign tutorial_docs = site.pages | where_exp: "p", "p.order != nil" | sort: "order" -%}
+{%- if page.sectionid == "capstone" -%}
+  {%- assign tutorial_docs = site.capstone | sort: "order" -%}
+{%- else -%}
+  {%- assign tutorial_docs = site.docs | sort: "order" -%}
+  {%- if tutorial_docs.size == 0 -%}
+    {%- assign tutorial_docs = site.pages | where_exp: "p", "p.order != nil" | sort: "order" -%}
+  {%- endif -%}
 {%- endif -%}
 {%- for d in tutorial_docs -%}
   {%- if d.url == page.url -%}
