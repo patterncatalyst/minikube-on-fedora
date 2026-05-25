@@ -1,5 +1,5 @@
 ---
-title: "Capstone: a data mesh on minikube"
+title: "The data-mesh capstone — start here"
 order: 0
 description: "The map — what the capstone builds, the reading order, and a link to each page in the set. Start here."
 ---
