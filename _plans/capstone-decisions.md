@@ -1971,3 +1971,47 @@ containers.conf before first bring-up.
 pids_limit=0, `minikube delete && bootstrap-capstone.sh` → node root pids.max is
 no longer 2048, order-service forks and reaches 2/2, bootstrap hits a true 8/8
 for the first time. Then Phase B canary verification can finally run.
+
+## CAP-042 — Kiali for mesh topology, wired to the existing observability stack
+
+**Status:** decided, shipped (Phase E.0); `unverified` until a cluster run.
+
+**Context.** The demo walkthrough's final act is the live mesh topology — the
+products and the traffic between them, canary split included. The capstone
+observability stack (CAP-027/028/029: Prometheus + Tempo + Grafana in the
+`observability` namespace) has no topology view; Kiali is the piece that
+provides it. Kiali is already proven in §11 (r12g) via the full Istio
+`samples/addons/` bundle, but that bundle also installs its OWN Prometheus,
+Grafana, Jaeger, and Loki.
+
+**Decision.** Add Kiali as its own run-once step (`scripts/setup-kiali.sh`),
+installing ONLY `samples/addons/kiali.yaml` — not the full addons bundle — and
+patching the `kiali` ConfigMap's `config.yaml` so `external_services` points at
+the capstone's EXISTING `observability`-namespace Prometheus
+(`prometheus-server.observability`), Grafana (`grafana.observability`), and Tempo
+(`tempo.observability:3100`). Single observability stack, no second TSDB. Kiali
+is additive and isolated: it runs after `setup-istio.sh` + `setup-observability.sh`
+and touches nothing they own. Verification is `demos/smoke-kiali.sh` (Ready +
+config wired to capstone Prometheus + `/healthz` + `/api/namespaces` lists
+`capstone` + a best-effort graph-API probe).
+
+**Why not the §11 approach (full samples/addons).** That stands up a parallel
+Prometheus/Grafana/Jaeger/Loki, which would (a) duplicate and conflict with the
+capstone stack, (b) bloat the node's footprint right after CAP-041's PID-ceiling
+fight, and (c) split metrics across two TSDBs so the dashboard and the topology
+disagree. Single-stack wiring keeps one source of truth.
+
+**Why standalone, not folded into setup-istio.sh.** Kiali is opt-in and only
+needed for the demo/topology view; keeping it a separate script means a cluster
+that just needs the canary doesn't pay for it, and it can be skipped or removed
+without touching the Istio install.
+
+**Consequences.** Offline-validated: `bash -n` clean on both scripts; the
+ConfigMap patch is a JSON merge on `data."config.yaml"` only (preserves the
+addon's labels/metadata; idempotent). Cluster-verify (pending): run
+`setup-istio.sh` → `setup-observability.sh` → `setup-kiali.sh`, then
+`smoke-kiali.sh` should PASS and, after a traffic-generating demo, the Kiali
+graph (namespace `capstone`) should show the products and their edges with the
+canary split. VERIFY-POINT: the addon ConfigMap is assumed to be named `kiali`
+with key `config.yaml`; if the installed Kiali/Istio version differs, adjust the
+patch in `setup-kiali.sh` and the config check in `smoke-kiali.sh`.
