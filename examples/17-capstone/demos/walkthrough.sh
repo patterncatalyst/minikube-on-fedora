@@ -80,7 +80,7 @@ done
 want_act() {
     local act="$1"
     [[ -n "$ONLY" && "$ONLY" != "$act" ]] && return 1
-    for s in "${SKIP[@]:-}"; do [[ "$s" == "$act" ]] && return 1; done
+    for s in ${SKIP[@]+"${SKIP[@]}"}; do [[ "$s" == "$act" ]] && return 1; done
     return 0
 }
 
@@ -92,7 +92,7 @@ validate_act() {
     exit 2
 }
 [[ -n "$ONLY" ]] && validate_act "$ONLY"
-for s in "${SKIP[@]:-}"; do validate_act "$s"; done
+for s in ${SKIP[@]+"${SKIP[@]}"}; do validate_act "$s"; done
 
 # ─── Presentation helpers ────────────────────────────────────────────────────
 
@@ -152,46 +152,73 @@ trap 'printf "\n%sinterrupted%s\n" "$RED" "$RST"; exit 130' INT
 preflight() {
     printf '%s%spreflight%s\n' "$BOLD" "$BLU" "$RST"
     local fail=0
-    check() { # check "label" "command-that-must-succeed" "fix message"
+
+    # check: at least one Ready pod matching a label selector in a namespace.
+    # Resilient to chart name changes (Deployment vs StatefulSet, release-name
+    # prefixes, etc.) — we don't care WHAT kind of object owns the pod, only
+    # that it's Ready.
+    ready_by_label() { # ready_by_label <namespace> <label-selector>
+        local ns="$1" sel="$2" line
+        # jsonpath emits one "True/False" per pod's Ready condition; we need at least one True
+        line="$(kubectl get pods -n "$ns" -l "$sel" \
+                -o 'jsonpath={range .items[*]}{.status.conditions[?(@.type=="Ready")].status}{"\n"}{end}' \
+                2>/dev/null || true)"
+        [[ -n "$line" ]] && printf '%s\n' "$line" | grep -qx True
+    }
+    # check: namespace exists
+    ns_exists() { kubectl get ns "$1" >/dev/null 2>&1; }
+
+    check() { # check <label> <test-expression> <fix-message>
         local label="$1" cmd="$2" fix="$3"
-        if eval "$cmd" >/dev/null 2>&1; then
+        if eval "$cmd"; then
             printf '  %s✓%s %s\n' "$GRN" "$RST" "$label"
         else
             printf '  %s✗%s %s\n      %sfix:%s %s\n' "$RED" "$RST" "$label" "$DIM" "$RST" "$fix"
             fail=$((fail + 1))
         fi
     }
+
     check "kubectl reachable" \
-          "kubectl version --request-timeout=5s" \
+          "kubectl version --request-timeout=5s >/dev/null 2>&1" \
           "is the cluster up? try: ./scripts/cluster-up.sh"
     check "capstone namespace exists" \
-          "kubectl get ns $NS" \
+          "ns_exists $NS" \
           "run the full bring-up: ./scripts/bootstrap-capstone.sh"
+
     if want_act trace || want_act lineage || want_act topology; then
-        check "observability stack (Tempo) Ready" \
-              "kubectl rollout status -n $OBS_NS deploy/tempo --timeout=10s" \
+        check "Tempo Ready" \
+              "ready_by_label $OBS_NS 'app.kubernetes.io/name=tempo'" \
+              "./scripts/setup-observability.sh   (or: kubectl get pods -n $OBS_NS -l app.kubernetes.io/name=tempo)"
+    fi
+    if want_act trace || want_act canary || want_act topology; then
+        check "Prometheus Ready" \
+              "ready_by_label $OBS_NS 'app.kubernetes.io/name=prometheus'" \
               "./scripts/setup-observability.sh"
     fi
     if want_act canary || want_act topology; then
         check "Istio control plane Ready" \
-              "kubectl rollout status -n $ISTIO_SYSTEM deploy/istiod --timeout=10s" \
+              "ready_by_label $ISTIO_SYSTEM 'app=istiod'" \
               "./scripts/setup-istio.sh"
     fi
     if want_act scale; then
         check "KEDA Ready" \
-              "kubectl rollout status -n keda deploy/keda-operator --timeout=10s" \
+              "ready_by_label keda 'app=keda-operator'" \
               "./scripts/setup-keda.sh"
     fi
     if want_act lineage; then
         check "OpenMetadata server Ready" \
-              "kubectl get pods -n openmetadata -l app.kubernetes.io/name=openmetadata --field-selector=status.phase=Running -o name | grep -q ." \
-              "./scripts/setup-openmetadata.sh + ./scripts/ingest-openmetadata.sh"
+              "ready_by_label openmetadata 'app.kubernetes.io/name=openmetadata'" \
+              "./scripts/setup-openmetadata.sh"
+        check "OpenMetadata ingestion has run (catalog populated)" \
+              "kubectl get job -n $NS om-ingest-postgres om-ingest-kafka om-declare-lineage --no-headers 2>/dev/null | wc -l | grep -q '^3$'" \
+              "./scripts/ingest-openmetadata.sh   (or re-run bootstrap-capstone.sh, which now does this)"
     fi
     if want_act topology; then
         check "Kiali Ready (CAP-042)" \
-              "kubectl rollout status -n $ISTIO_SYSTEM deploy/kiali --timeout=10s" \
-              "./scripts/setup-kiali.sh"
+              "ready_by_label $ISTIO_SYSTEM 'app.kubernetes.io/name=kiali'" \
+              "./scripts/setup-kiali.sh   (or re-run bootstrap-capstone.sh, which now does this)"
     fi
+
     if (( fail > 0 )); then
         printf '\n%s  preflight found %d problem(s) — fix the items above, or pass --no-preflight to bypass.%s\n' "$RED" "$fail" "$RST"
         exit 1

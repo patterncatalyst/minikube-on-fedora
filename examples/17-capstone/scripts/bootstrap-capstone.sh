@@ -41,13 +41,13 @@ fail() { printf '\n\xe2\x9c\x97 %s\n' "$1" >&2; exit 1; }
 wait_rollout() { kubectl rollout status "$1" -n "$NS" --timeout="${2:-300s}"; }
 
 # ── Tier 1: profile + registry ───────────────────────────────────────────────
-step "1/8 Profile + in-cluster registry"
+step "1/10 Profile + in-cluster registry"
 ./scripts/setup-capstone-profile.sh || fail "profile setup failed"
 [[ "$(kubectl config current-context 2>/dev/null)" == "$PROFILE" ]] || kubectl config use-context "$PROFILE"
 ok "profile up, context set"
 
 # ── Tier 2: Istio ────────────────────────────────────────────────────────────
-step "2/8 Istio control plane"
+step "2/10 Istio control plane"
 kubectl get ns istio-system >/dev/null 2>&1 && kubectl get deploy istiod -n istio-system >/dev/null 2>&1 \
     && ok "istiod already present" \
     || { ./scripts/setup-istio.sh || fail "istio setup failed"; }
@@ -55,13 +55,13 @@ kubectl wait -n istio-system --for=condition=Available deploy/istiod --timeout=1
 ok "istiod Available"
 
 # ── Tier 3: CloudNativePG operator ───────────────────────────────────────────
-step "3/8 CloudNativePG operator"
+step "3/10 CloudNativePG operator"
 kubectl get crd clusters.postgresql.cnpg.io >/dev/null 2>&1 \
     && ok "CNPG CRDs present" \
     || { ./scripts/setup-postgres-operator.sh || fail "postgres-operator setup failed"; }
 
 # ── Tier 4: Postgres cluster CR (OpenMetadata depends on this) ───────────────
-step "4/8 Postgres cluster"
+step "4/10 Postgres cluster"
 helm upgrade --install "$PG_RELEASE" "$PG_CHART" -n "$NS" --create-namespace || fail "postgres CR install failed"
 pg_ready=0
 for i in $(seq 1 72); do
@@ -74,7 +74,7 @@ done
 ok "Postgres primary Ready"
 
 # ── Tier 5: Kafka operator + cluster ─────────────────────────────────────────
-step "5/8 Kafka (Strimzi operator + cluster)"
+step "5/10 Kafka (Strimzi operator + cluster)"
 kubectl get crd kafkas.kafka.strimzi.io >/dev/null 2>&1 \
     && ok "Strimzi CRDs present" \
     || { ./scripts/setup-kafka-operator.sh || fail "kafka-operator setup failed"; }
@@ -83,13 +83,13 @@ kubectl wait "kafka/${KAFKA_CR}" -n "$NS" --for=condition=Ready --timeout=360s |
 ok "Kafka cluster Ready"
 
 # ── Tier 6: KEDA ─────────────────────────────────────────────────────────────
-step "6/8 KEDA (core + HTTP add-on)"
+step "6/10 KEDA (core + HTTP add-on)"
 kubectl get crd scaledobjects.keda.sh >/dev/null 2>&1 \
     && ok "KEDA CRDs present" \
     || { ./scripts/setup-keda.sh || fail "keda setup failed"; }
 
 # ── Tier 7: OpenMetadata (needs Postgres) + observability ────────────────────
-step "7/8 OpenMetadata + observability"
+step "7/10 OpenMetadata + observability"
 kubectl get deploy openmetadata -n "$NS" >/dev/null 2>&1 \
     && ok "OpenMetadata already deployed" \
     || { ./scripts/setup-openmetadata.sh || fail "openmetadata setup failed"; }
@@ -101,7 +101,7 @@ ok "OpenMetadata rolled out"
 ok "observability (Prometheus/Grafana/Tempo) installed"
 
 # ── Tier 8: images → apicurio → services → scalers → seed ────────────────────
-step "8/8 Workloads: images, apicurio, services, scalers"
+step "8/10 Workloads: images, apicurio, services, scalers"
 HOST_PORT="$(podman port "$PROFILE" 2>/dev/null | awk -F'[:]' '/5000\/tcp/ {print $NF; exit}')"
 [[ -n "$HOST_PORT" ]] || fail "registry host port not found"
 for svc in "${SERVICES[@]}"; do
@@ -140,19 +140,32 @@ curl -s -o /dev/null --max-time 8 -X POST "http://127.0.0.1:18080/orders" \
     && ok "seed order placed" || printf '    (seed skipped — place one later via smoke-order.sh)\n'
 kill "$SEED_PF" 2>/dev/null || true
 
+# ── Tier 9: Kiali (mesh topology console for the walkthrough's act 5) ───────
+# Kiali is additive and lives in istio-system; depends on Istio + observability
+# (it points at the existing Prometheus/Grafana/Tempo, single-stack — CAP-042).
+step "9/10 Kiali (mesh-topology console for the walkthrough)"
+./scripts/setup-kiali.sh || fail "kiali setup failed"
+ok "kiali installed (wired to the capstone observability stack)"
+
+# ── Tier 10: catalog ingestion (populate OpenMetadata + declare lineage) ────
+# Three one-off Jobs: catalog the Postgres schemas as Tables, catalog the Kafka
+# topics, then PUT the cross-product lineage edges. Idempotent — re-running is
+# safe and reflects whatever data exists at run time (CAP-022/CAP-023).
+step "10/10 OpenMetadata ingestion + lineage"
+./scripts/ingest-openmetadata.sh || fail "openmetadata ingestion failed"
+ok "catalog populated and lineage declared"
+
 # ── Status + follow-ons ──────────────────────────────────────────────────────
 step "Cluster status"
 bash ./scripts/cluster-status.sh || true
 
-step "Bring-up complete — to populate the catalog and finish:"
+step "Bring-up complete — the cluster is walkthrough-ready."
 cat <<EOF
-    # Discovery contracts (Apicurio) + OpenMetadata catalog + lineage:
-    ./demos/smoke-discovery.sh        # publishes OpenAPI/proto/SDL to Apicurio
-    ./scripts/ingest-openmetadata.sh  # catalogs schemas + declares lineage (Jobs opt out of mesh, r34)
+    # The five-act presenter walkthrough (the deck's "What you can see it do"):
+    ./demos/walkthrough.sh
 
-    # The Istio v1->v2 canary (Phase B) is a separate add:
-    kubectl apply -f istio/routing.yaml   # after order-service-v2 is deployed
-
-    # Phase A demo (add/back-out the review-service data product):
-    ./demos/demo-add-data-product.sh up
+    # Other things you can do from here:
+    ./demos/smoke-discovery.sh             # publish OpenAPI/proto/SDL to Apicurio
+    ./demos/demo-canary.sh up 90 10        # the v1->v2 contract canary (Phase B)
+    ./demos/demo-add-data-product.sh up    # Phase A — add/back-out a data product
 EOF

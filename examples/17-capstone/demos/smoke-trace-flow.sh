@@ -64,12 +64,27 @@ for _ in $(seq 1 15); do
 done
 
 step "Sending a GraphQL query (wakes the gateway from zero, fans out to backends)"
+# Pre-warm the gateway. KEDA HTTP's interceptor returns 502 with
+# X-Keda-Http-Cold-Start: true if its cold-start budget expires before the
+# workload is ready (uvicorn cold start can outrun the default ~15s
+# DialRetryTimeout). So we ping the interceptor once with a cheap GET, ignore
+# its response (whatever it is — that request's job was to trigger the
+# scale-from-zero), then wait for the gateway pod to actually be Available
+# before sending the real query.
+printf '    pre-warm: triggering scale-from-zero through the interceptor (response is discarded)\n'
+curl -s -o /dev/null --max-time 60 \
+    -H "Host: $HOST" "http://127.0.0.1:${GQL_PORT}/health" >/dev/null 2>&1 || true
+# now wait for the gateway pod KEDA just woke
+if kubectl wait -n "$NS" --for=condition=Available deploy/graphql-gateway --timeout=120s >/dev/null 2>&1; then
+    printf '    ✓ graphql-gateway is Available — sending the real query\n'
+else
+    printf '    ⚠ graphql-gateway did not become Available within 120s — proceeding anyway\n'
+fi
 # A dummy id is fine: the gateway still calls order-service (REST) to resolve it,
 # which is the downstream hop we want in the trace. With a real order the
-# inventory gRPC hop appears too (see smoke-graphql.sh). The interceptor holds
-# the request through cold start (waitTimeout=180s), so use a generous timeout.
+# inventory gRPC hop appears too (see smoke-graphql.sh).
 GQL_BODY='{"query":"{ order(id: \"trace-probe\") { id itemSku quantity stock { sku quantityOnHand available } } }"}'
-CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 200 \
+CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 60 \
     -H "Host: $HOST" -H "Content-Type: application/json" \
     -X POST --data "$GQL_BODY" "http://127.0.0.1:${GQL_PORT}/graphql" || echo "000")
 [[ "$CODE" == "200" ]] \

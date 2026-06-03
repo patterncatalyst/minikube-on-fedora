@@ -2050,3 +2050,54 @@ validation exercised. Cluster-verify pending: a full run-through on a healthy
 capstone profile. Because the walkthrough shells out to the existing scripts,
 any future fix to a demo (e.g. the Kiali web_root fix from CAP-042) is picked
 up automatically.
+
+## CAP-044 — Bootstrap installs everything the walkthrough needs; preflight enforces it
+
+**Status:** decided, shipped; `unverified` until a full bootstrap run.
+
+**Context.** With Phase E shipped (CAP-043, the `walkthrough.sh` orchestrator),
+two acts hit a class of failure that was unfair to the operator: lineage
+(`smoke-om-lineage.sh`) failed because ingestion hadn't been run, and topology
+(`smoke-kiali.sh`) failed because Kiali wasn't installed. Both were
+documented-but-manual steps from earlier iterations (Kiali only existed as
+CAP-042; `ingest-openmetadata.sh` was always a footer recommendation in
+bootstrap rather than a step bootstrap ran). The walkthrough's preflight could
+detect them, but the underlying principle was wrong: a presenter shouldn't have
+to remember manual steps to make the demo work.
+
+**Decision.** Two changes:
+
+1. `scripts/bootstrap-capstone.sh` is now the single command that produces a
+   walkthrough-ready cluster. Step 9 (new) runs `setup-kiali.sh`; step 10
+   (new) runs `ingest-openmetadata.sh`. Both are idempotent: Kiali via JSON
+   merge-patch on the addon ConfigMap (CAP-042), ingestion via
+   delete-then-apply Jobs that the script's header already documents as
+   re-runnable (OpenMetadata upserts by FQN; the lineage PUT is idempotent).
+   The footer "to populate the catalog and finish" message that previously
+   told operators to run those manually is replaced by the walkthrough as the
+   top-line follow-on.
+
+2. `demos/walkthrough.sh` preflight adds two checks for these dependencies,
+   each with a fix message pointing at the specific script (`setup-kiali.sh` /
+   `ingest-openmetadata.sh`) *or* a re-run of bootstrap. This is belt and
+   suspenders: a clean bootstrap should always satisfy them, but if an
+   operator runs the walkthrough on a partial or out-of-date cluster, the
+   preflight tells them exactly what to fix instead of failing mid-act.
+
+**Rejected alternative.** Folding `setup-kiali.sh` and `ingest-openmetadata.sh`
+into `walkthrough.sh` itself. Rejected: the walkthrough is a *demo* script and
+should fail fast on missing prerequisites, not install them. If it installed
+Kiali, by the same logic it should install Istio, observability, KEDA, etc. —
+and then it's a bootstrap script, not a demo. The walkthrough/bootstrap
+separation is preserved.
+
+**Consequences.** Offline-validated: `bash -n` clean on `bootstrap-capstone.sh`
+and `walkthrough.sh`; all step numerators renumbered 1/10..10/10. The ingest
+check is a Job-existence test (`om-ingest-postgres`, `om-ingest-kafka`,
+`om-declare-lineage` all present in `capstone`), since OpenMetadata's catalog
+state isn't trivially queried from kubectl alone. Cluster-verify (pending):
+on a fresh profile, `bootstrap-capstone.sh` finishes with all 10 steps green
+and `./demos/walkthrough.sh` (no flags) gets to act 5 without operator
+intervention beyond pressing Enter — including running the trace act, the one
+remaining sore spot from this iteration (see follow-ups: KEDA HTTP cold-start
+race, not addressed here).
