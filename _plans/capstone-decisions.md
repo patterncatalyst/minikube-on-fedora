@@ -2015,3 +2015,38 @@ graph (namespace `capstone`) should show the products and their edges with the
 canary split. VERIFY-POINT: the addon ConfigMap is assumed to be named `kiali`
 with key `config.yaml`; if the installed Kiali/Istio version differs, adjust the
 patch in `setup-kiali.sh` and the config check in `smoke-kiali.sh`.
+
+## CAP-043 — Phase E presenter walkthrough: orchestrator over the existing demos
+
+**Status:** decided, shipped; `unverified` until a presenter run on the cluster.
+
+**Context.** The deck's "What you can see it do" slide names five things a live
+demo would show: a trace whose spans cross three products, KEDA scaling on lag,
+a contract canaried by weight, OpenMetadata lineage, and the live Kiali
+topology. Each is already a working script in `demos/` (CAP-024–029, CAP-042).
+What was missing was a single replayable thread for a talk.
+
+**Decision.** `demos/walkthrough.sh` orchestrates the five existing
+scripts in order with narration between them — it does NOT reimplement their
+logic. Presenter-driven: Enter to advance between acts so the operator controls
+the tempo, can pause for questions, and can investigate a failure without
+losing context (resources stay in place; the underlying smoke scripts already
+behave this way). The walkthrough's only new logic is:
+
+- A preflight that checks each component the chosen acts need (kubectl,
+  `capstone` ns, Tempo, Istio, KEDA, OpenMetadata, Kiali) with a fix message
+  pointed at the specific setup script. Skippable via `--no-preflight`.
+- `--only ACT` to rehearse a single act and `--skip ACT` to drop one (both
+  validated against the act list — typos fail fast instead of no-opping).
+- The Kiali act starts a port-forward the presenter shows in the browser
+  through the rest of the discussion, then tears it down on exit (trap).
+
+Rejected alternatives: a standalone narrated re-implementation (would duplicate
+demo logic and drift), and a thin menu (less of a narrative — the linear
+five-act arc is the point).
+
+**Consequences.** Offline-validated: `bash -n` clean; `--help` and arg
+validation exercised. Cluster-verify pending: a full run-through on a healthy
+capstone profile. Because the walkthrough shells out to the existing scripts,
+any future fix to a demo (e.g. the Kiali web_root fix from CAP-042) is picked
+up automatically.

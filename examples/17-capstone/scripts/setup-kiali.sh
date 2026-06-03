@@ -121,11 +121,10 @@ external_services:
   tracing:
     enabled: true
     provider: tempo
-    use_grpc: false
     internal_url: ${TEMPO_URL}
     external_url: ${GRAFANA_EXT_URL}/explore
 server:
-  web_root: /
+  web_root: /kiali
 EOF
 
 # Patch only the data."config.yaml" key. A JSON merge patch with the value
@@ -152,7 +151,7 @@ kubectl rollout status deployment/kiali -n "$ISTIO_SYSTEM" --timeout=5m
 step "Kiali is installed and wired to the capstone observability stack."
 printf '\nView the mesh topology:\n'
 printf '  kubectl port-forward -n %s svc/kiali 20001:20001\n' "$ISTIO_SYSTEM"
-printf '  open http://localhost:20001   (Graph → namespace: capstone)\n'
+printf '  open http://localhost:20001/kiali   (Graph → namespace: capstone)\n'
 printf '\nVerify:\n'
 printf '  ./demos/smoke-kiali.sh\n'
 printf '\nNote: the live traffic graph only shows edges while traffic is flowing —\n'
