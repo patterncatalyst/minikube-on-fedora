@@ -285,7 +285,7 @@ prompt_enter "press Enter to start"
 
 trace_act() {
     local pf_pid=0 result=0
-    local query='{"query":"{ order(id: \"demo-1\") { id total currency stock } }"}'
+    local query='{"query":"{ order(id: \"trace-probe\") { id itemSku quantity stock { sku quantityOnHand available } } }"}'
 
     info "starting port-forward: graphql-gateway Service (capstone) → 127.0.0.1:8080"
     info "  (bypasses keda-add-ons-http-interceptor-proxy — see CAP-046)"
@@ -293,11 +293,12 @@ trace_act() {
     pf_pid=$!
     TRACE_PF=$pf_pid
 
-    # wait for the port-forward to bind (probe with a cheap GET; up to ~10s)
+    # wait for the port-forward to bind (probe with a cheap connect; up to ~10s).
+    # any response — including 404 — means the port-forward is alive; we use the
+    # same pattern as smoke-trace-flow.sh (no -f, just check that curl connects).
     local ready=0
     for _ in 1 2 3 4 5 6 7 8 9 10; do
-        if curl -fsS --max-time 1 -o /dev/null http://127.0.0.1:8080/health 2>/dev/null \
-        || curl -fsS --max-time 1 -o /dev/null http://127.0.0.1:8080/ 2>/dev/null; then
+        if curl -s -o /dev/null --max-time 2 http://127.0.0.1:8080/ 2>/dev/null; then
             ready=1; break
         fi
         sleep 1
@@ -309,22 +310,23 @@ trace_act() {
     printf '%s    ✓ port-forward live%s\n' "$GRN" "$RST"
 
     narrate "sending one GraphQL query to the gateway"
-    info "  query: { order(id: \"demo-1\") { id total currency stock } }"
+    info "  query: { order(id: \"trace-probe\") { id itemSku quantity stock { ... } } }"
     info "  (composes a REST call to order-service + a gRPC call to inventory-service)"
 
     # capture trace id from response headers if the gateway echoes it; otherwise
     # the user gets the trace by searching Tempo by service name in the next step.
     local http_status trace_id=""
-    http_status=$(curl -sS --max-time 15 \
+    http_status=$(curl -sS --max-time 30 \
                        -o /tmp/walkthrough-trace-response.json \
                        -D /tmp/walkthrough-trace-headers.txt \
                        -w '%{http_code}' \
+                       -H "Host: graphql-gateway.capstone" \
                        -H "Content-Type: application/json" \
                        -X POST --data "$query" \
                        http://127.0.0.1:8080/graphql 2>/dev/null || echo "000")
 
-    if [[ "$http_status" =~ ^2 ]]; then
-        printf '%s    ✓ gateway returned HTTP %s%s\n' "$GRN" "$http_status" "$RST"
+    if [[ "$http_status" == "200" ]]; then
+        printf '%s    ✓ gateway returned HTTP 200 — a trace should now be exporting%s\n' "$GRN" "$RST"
         # try to surface the trace id from response headers (traceresponse, x-trace-id, etc.)
         trace_id="$(grep -iE '^(traceresponse|x-trace-id|x-amzn-trace-id|x-b3-traceid):' \
                           /tmp/walkthrough-trace-headers.txt 2>/dev/null \
