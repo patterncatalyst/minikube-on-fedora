@@ -38,6 +38,8 @@ The capstone makes this concrete in one place: the gateway's resolvers literally
 REST and gRPC side by side, and GraphQL stitches the result — so you can see all three
 synchronous protocols cooperating rather than competing.
 
+![Four protocols and where each one earns its place — REST at the edge, gRPC between services, GraphQL composing reads, events on the async backbone]({{ '/assets/diagrams/17-api-implementations.svg' | relative_url }})
+
 ## The read layer: a gateway that composes
 
 A consumer that wants an order *and* its current stock level *and* its payment status

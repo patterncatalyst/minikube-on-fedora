@@ -35,6 +35,8 @@ order service, and an inventory service is a single user-facing operation spread
 three independently-owned products; understanding it means correlating signals that no
 one product owns in full.
 
+![The three signals — metrics, traces, and logs — and the question each answers about a request crossing products]({{ '/assets/diagrams/17-three-signals.svg' | relative_url }})
+
 ## Metrics, for free from the mesh
 
 The first pleasant surprise is how much you get without instrumenting anything. Because
