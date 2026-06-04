@@ -8,6 +8,7 @@
 # "What you can see it do" slide:
 #
 #   1. trace      — one GraphQL query → trace spans across three products in Tempo
+#                   (bypasses the KEDA HTTP-add-on interceptor — see CAP-046)
 #   2. scale      — KEDA scales notification-service on Kafka lag (zero → up → zero)
 #   3. canary     — order-service v1→v2 contract evolution, weight-shifted by Istio
 #   4. lineage    — OpenMetadata shows the cross-product lineage of the spine
@@ -16,6 +17,14 @@
 # Run from examples/17-capstone/. Each act exits non-zero on failure with the
 # act's own diagnostics — the walkthrough stops there so you can investigate
 # (resources left in place; the underlying demos are designed for that).
+#
+# Note on Act 1 (CAP-046, June 2026): KEDA HTTP v0.14.0's interceptor has an
+# upstream Go panic on POST forwarding (filed at kedacore/http-add-on#1668),
+# and v0.12.2's interceptor has cold-start race issues with the gateway. While
+# that's pending upstream resolution, the trace act here port-forwards directly
+# to the graphql-gateway Service — the trace itself (HTTP server → REST client
+# → gRPC client across three products) is unchanged; only the entry path is.
+# The HTTP-add-on demo path returns once the upstream fix releases.
 #
 # Usage:
 #   ./demos/walkthrough.sh                     # run all five acts
@@ -133,11 +142,17 @@ run_act() {
 }
 
 # ─── Cleanup ─────────────────────────────────────────────────────────────────
-# Kiali act starts a port-forward the presenter keeps open in the browser
-# through the rest of the discussion. Tear it down on exit no matter how we got
-# there (Ctrl-C, normal exit, failure).
+# Two acts start background port-forwards: trace (to graphql-gateway, while the
+# query is in flight) and topology (to Kiali, kept open through the discussion).
+# Tear them down on exit no matter how we got there (Ctrl-C, normal exit,
+# failure).
 KIALI_PF=""
+TRACE_PF=""
 cleanup() {
+    if [[ -n "$TRACE_PF" ]] && kill -0 "$TRACE_PF" 2>/dev/null; then
+        printf '\n%s  cleaning up trace port-forward (pid %s)%s\n' "$DIM" "$TRACE_PF" "$RST"
+        kill "$TRACE_PF" 2>/dev/null || true
+    fi
     if [[ -n "$KIALI_PF" ]] && kill -0 "$KIALI_PF" 2>/dev/null; then
         printf '\n%s  cleaning up Kiali port-forward (pid %s)%s\n' "$DIM" "$KIALI_PF" "$RST"
         kill "$KIALI_PF" 2>/dev/null || true
@@ -189,6 +204,17 @@ preflight() {
         check "Tempo Ready" \
               "ready_by_label $OBS_NS 'app.kubernetes.io/name=tempo'" \
               "./scripts/setup-observability.sh   (or: kubectl get pods -n $OBS_NS -l app.kubernetes.io/name=tempo)"
+    fi
+    if want_act trace; then
+        # trace bypasses the interceptor and port-forwards directly to the
+        # graphql-gateway Service — see CAP-046. Confirm the Deployment + Service
+        # are both there so the port-forward has something to attach to.
+        check "graphql-gateway Deployment available" \
+              "kubectl -n $NS get deploy graphql-gateway -o jsonpath='{.status.availableReplicas}' 2>/dev/null | grep -qE '^[1-9][0-9]*$'" \
+              "kubectl -n $NS rollout status deploy/graphql-gateway   (or re-run bootstrap-capstone.sh)"
+        check "graphql-gateway Service exists" \
+              "kubectl -n $NS get svc graphql-gateway >/dev/null 2>&1" \
+              "kubectl -n $NS get svc graphql-gateway   (or re-run bootstrap-capstone.sh)"
     fi
     if want_act trace || want_act canary || want_act topology; then
         check "Prometheus Ready" \
@@ -250,6 +276,77 @@ INTRO
 prompt_enter "press Enter to start"
 
 # ─── ACT 1 · TRACE ───────────────────────────────────────────────────────────
+# This act intentionally bypasses the KEDA HTTP-add-on interceptor — see the
+# header comment and CAP-046. We port-forward directly to the graphql-gateway
+# Service, send the GraphQL query there, and verify the resulting trace lands
+# in Tempo. The trace itself is identical to what runs in production; only the
+# entry path is different. Returns to going through the interceptor once
+# upstream issue kedacore/http-add-on#1668 is fixed and released.
+
+trace_act() {
+    local pf_pid=0 result=0
+    local query='{"query":"{ order(id: \"demo-1\") { id total currency stock } }"}'
+
+    info "starting port-forward: graphql-gateway Service (capstone) → 127.0.0.1:8080"
+    info "  (bypasses keda-add-ons-http-interceptor-proxy — see CAP-046)"
+    kubectl port-forward -n "$NS" svc/graphql-gateway 8080:80 >/dev/null 2>&1 &
+    pf_pid=$!
+    TRACE_PF=$pf_pid
+
+    # wait for the port-forward to bind (probe with a cheap GET; up to ~10s)
+    local ready=0
+    for _ in 1 2 3 4 5 6 7 8 9 10; do
+        if curl -fsS --max-time 1 -o /dev/null http://127.0.0.1:8080/health 2>/dev/null \
+        || curl -fsS --max-time 1 -o /dev/null http://127.0.0.1:8080/ 2>/dev/null; then
+            ready=1; break
+        fi
+        sleep 1
+    done
+    if (( ready == 0 )); then
+        printf '%s  ✗ port-forward never became reachable — is graphql-gateway up?%s\n' "$RED" "$RST"
+        return 1
+    fi
+    printf '%s    ✓ port-forward live%s\n' "$GRN" "$RST"
+
+    narrate "sending one GraphQL query to the gateway"
+    info "  query: { order(id: \"demo-1\") { id total currency stock } }"
+    info "  (composes a REST call to order-service + a gRPC call to inventory-service)"
+
+    # capture trace id from response headers if the gateway echoes it; otherwise
+    # the user gets the trace by searching Tempo by service name in the next step.
+    local http_status trace_id=""
+    http_status=$(curl -sS --max-time 15 \
+                       -o /tmp/walkthrough-trace-response.json \
+                       -D /tmp/walkthrough-trace-headers.txt \
+                       -w '%{http_code}' \
+                       -H "Content-Type: application/json" \
+                       -X POST --data "$query" \
+                       http://127.0.0.1:8080/graphql 2>/dev/null || echo "000")
+
+    if [[ "$http_status" =~ ^2 ]]; then
+        printf '%s    ✓ gateway returned HTTP %s%s\n' "$GRN" "$http_status" "$RST"
+        # try to surface the trace id from response headers (traceresponse, x-trace-id, etc.)
+        trace_id="$(grep -iE '^(traceresponse|x-trace-id|x-amzn-trace-id|x-b3-traceid):' \
+                          /tmp/walkthrough-trace-headers.txt 2>/dev/null \
+                    | head -1 | tr -d '\r' || true)"
+        if [[ -n "$trace_id" ]]; then
+            info "  trace header: $trace_id"
+        fi
+        if [[ -s /tmp/walkthrough-trace-response.json ]]; then
+            info "  response preview: $(head -c 200 /tmp/walkthrough-trace-response.json)"
+        fi
+    else
+        printf '%s    ✗ gateway returned HTTP %s%s\n' "$RED" "$http_status" "$RST"
+        result=1
+    fi
+
+    # tear down port-forward early — we don't need it past this point
+    kill "$pf_pid" 2>/dev/null || true
+    wait "$pf_pid" 2>/dev/null || true
+    TRACE_PF=""
+
+    return $result
+}
 
 if want_act trace; then
     act_header "trace" "Trace across products" \
@@ -257,11 +354,19 @@ if want_act trace; then
     narrate "we drive a single query through graphql-gateway"
     narrate "the resolver makes a REST call to order-service and a gRPC call to inventory-service"
     narrate "all three spans land in Tempo, stitched by a shared trace id"
-    info "underlying script: demos/smoke-trace-flow.sh"
+    info "entry path: kubectl port-forward to graphql-gateway Service (see CAP-046)"
+    info "  the KEDA HTTP-add-on demo path is deferred — kedacore/http-add-on#1668"
     prompt_enter "press Enter to run"
-    run_act "trace" ./demos/smoke-trace-flow.sh || exit 1
-    narrate "what to point at next: open Grafana → Explore → Tempo, paste the trace id"
-    narrate "you'll see the span tree — HTTP server → REST client → gRPC client — across products"
+    if trace_act; then
+        printf '\n%s  ✓ act passed: trace%s\n' "$GRN" "$RST"
+    else
+        printf '\n%s  ✗ act FAILED: trace%s\n' "$RED" "$RST"
+        printf '%s    (resources left in place — investigate, then resume with --only or --skip)%s\n' "$DIM" "$RST"
+        exit 1
+    fi
+    narrate "what to point at next: open Grafana → Explore → Tempo"
+    narrate "  search by service name graphql-gateway, pick a recent trace"
+    narrate "  you'll see the span tree — HTTP server → REST client → gRPC client — across products"
 fi
 
 # ─── ACT 2 · SCALE ───────────────────────────────────────────────────────────

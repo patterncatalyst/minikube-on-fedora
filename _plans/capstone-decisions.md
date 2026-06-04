@@ -2101,3 +2101,293 @@ and `./demos/walkthrough.sh` (no flags) gets to act 5 without operator
 intervention beyond pressing Enter — including running the trace act, the one
 remaining sore spot from this iteration (see follow-ups: KEDA HTTP cold-start
 race, not addressed here).
+
+## CAP-045 — Gateway HTTPScaledObject min:1, not min:0 (live-demo amendment to CAP-025)
+
+**Status:** decided, shipped; `unverified` until a cluster run.
+
+**Context.** With the walkthrough's trace act (CAP-043, act 1), the gateway's
+scale-from-zero path consistently produced HTTP 502 with header
+`X-KEDA-HTTP-Cold-Start: true`. Diagnosis (after extensive elimination — see
+the iteration log): the KEDA HTTP add-on 0.12.2 interceptor has a hardcoded
+~15-second cold-start budget (`DialRetryTimeout`), and the graphql-gateway's
+uvicorn cold start exceeds it. The interceptor gives up before the gateway is
+ready, returns 502, KEDA then scales the gateway back down within its
+30-second `scaledownPeriod`, and the next request triggers the same race.
+
+**What didn't work, for the next-engineer record.**
+- Raising `KEDA_RESPONSE_HEADER_TIMEOUT` to 15s (env-var present but the field
+  it maps to in 0.12.2 isn't the cold-start budget).
+- Setting `KEDA_HTTP_INTERCEPTOR_LOG_REQUESTS=true` (not honored by 0.12.2;
+  the env-var name is `KEDA_HTTP_*` *without* the `INTERCEPTOR_` infix).
+- The `autoscaling.keda.sh/paused-replicas` annotation (works on KEDA's core
+  `ScaledObject`, not on the HTTP add-on's `HTTPScaledObject`).
+- A pre-warm GET in `smoke-trace-flow.sh` (the warmup succeeded in waking the
+  gateway, but KEDA HTTP scaled it back down between the warmup and the real
+  POST faster than the script could send the second request).
+
+The 0.14 docs name a `readinessTimeout` / `KEDA_HTTP_READINESS_TIMEOUT` knob
+that *would* solve this, but 0.12.2 doesn't expose it and we're on 0.12.2 in
+the capstone. A chart upgrade is its own iteration (new `InterceptorRoute`
+CRD, different config shape).
+
+**Decision.** Change the gateway's `HTTPScaledObject` from `replicas.min: 0` to
+`replicas.min: 1`. The gateway always has one warm replica ready for the first
+request; the autoscaler still scales out to `max: 3` under load. The
+notification-service `ScaledObject` continues to scale to zero on Kafka lag
+(CAP-025), so the "elastic data products" story is told by the event consumer
+half of the architecture — which can cleanly scale to zero because Kafka lag
+is a backlog signal, not a request-latency one.
+
+**Narrative implication** (for the deck and the §17 prose). The honest split
+is now: *event consumers scale to zero on lag (cheap, deterministic);
+synchronous read gateways stay warm at a low baseline and scale out on traffic
+(deterministic first-request latency).* Both are "elastic data products" —
+just calibrated to their workload's character. This is actually a more honest
+story than "everything scales to zero", which papers over the cold-start cost
+of synchronous interfaces.
+
+**Consequences.** Offline-validated: YAML loads, smoke script lints. The
+pre-warm code added to `smoke-trace-flow.sh` during the failed cold-start
+debugging is reverted (no longer needed; with `min: 1` the gateway is warm).
+Cluster-verify pending: with the updated HTTPScaledObject applied, the
+walkthrough's trace act runs to completion on the first attempt. Follow-up
+options if scale-to-zero on the gateway is ever wanted: upgrade the HTTP
+add-on to 0.14 and configure `readinessTimeout`, or trim gateway imports so
+uvicorn starts within 0.12.2's hardcoded 15-second ceiling.
+
+## CAP-046 — Phase F: upgrade KEDA HTTP add-on 0.12.2 → 0.14.0; HTTPScaledObject → InterceptorRoute
+
+**Status:** **superseded by CAP-047** — the upgrade was attempted on the
+`phase-f-keda-http-014` branch and discovered an upstream interceptor regression
+that affects KEDA's own Getting Started tutorial. Branch discarded; cluster
+remains on 0.12.2. See CAP-047 for the outcome, the upstream issue filing
+(kedacore/http-add-on#1668), and the resulting walkthrough adjustment. This
+entry kept as historical record of the decision and the migration design.
+
+**Context.** The walkthrough's trace act (CAP-043) hit a 502 wall that nine+
+rounds of in-place debugging could not resolve cleanly. The minimum we knew
+for certain (see the iteration log for the full sequence):
+
+  * The gateway is healthy: bypass tests (direct POST to its Service while
+    scaled to one replica) returned 200 with the correct GraphQL response.
+  * The interceptor returned 502 with `X-Keda-Http-Cold-Start: true` on
+    actually-cold requests, and `X-Keda-Http-Cold-Start: false` on requests
+    against a known-warm gateway — both reproducible across all three
+    interceptor pods individually.
+  * 0.12.2's interceptor exposed neither a configurable cold-start budget
+    (the `DialRetryTimeout` field shown in its startup config has no
+    corresponding env var) nor request-level diagnostic logging
+    (`KEDA_HTTP_INTERCEPTOR_LOG_REQUESTS=true` was not honored).
+  * `replicas.min: 1` on the HTTPScaledObject (CAP-045) did not resolve the
+    warm-gateway 502, suggesting a second bug in 0.12.2's forwarding path on
+    top of the cold-start ceiling.
+
+The 0.14 release explicitly addresses the cold-start configurability gap (the
+`readiness` timeout is now a per-route configurable field on the new
+`InterceptorRoute` CRD), restructures the resource model along cleaner
+separation-of-concerns lines, and is a maintained version — 0.12.2 is two
+minor releases behind and unlikely to receive backport fixes.
+
+**Decision.** Upgrade the chart to 0.14.0 and migrate `graphql-gateway`'s
+routing from the deprecated `HTTPScaledObject` (v1alpha1) to two resources:
+`InterceptorRoute` (v1beta1) for routing/cold-start/timeouts, and a plain
+KEDA `ScaledObject` for replicas/cooldown. Done on a `phase-f-keda-http-014`
+branch — if the upgrade goes poorly we merge nothing and the cluster rolls
+back with `helm rollback keda-add-ons-http`. Done in one branch (not several
+commits on `main`) so any inadvertent breakage of the four working acts
+(scale, canary, lineage, topology) is contained.
+
+**What changes in source.**
+
+  * `scripts/setup-keda.sh` — `KEDA_HTTP_VERSION` 0.12.2 → 0.14.0.
+  * `keda/gateway-httpscaledobject.yaml` — DELETED.
+  * `keda/gateway-interceptorroute.yaml` — NEW. Routing + cold-start config:
+    `target.service`, single `rules[]` entry with hosts, `scalingMetric`
+    (preserved from prior), `timeouts.readiness: 60s` (the fix), and
+    `timeouts.responseHeader: 30s`.
+  * `keda/gateway-scaledobject.yaml` — NEW. `scaleTargetRef` to the Deployment,
+    `minReplicaCount: 0` (scale-to-zero restored — CAP-045's `min: 1`
+    workaround is no longer needed since the 60s readiness budget absorbs
+    uvicorn cold start), `maxReplicaCount: 3`, `cooldownPeriod: 30`, trigger
+    `external-push` pointing at `interceptorRoute: "graphql-gateway"`.
+  * `scripts/bootstrap-capstone.sh` — applies the two new manifests instead
+    of the one old.
+  * `demos/smoke-keda-http.sh` and `demos/smoke-trace-flow.sh` — comment and
+    fail-message updates; `smoke-trace-flow.sh` curl timeout bumped from 30s
+    to 90s to give the 60s readiness budget room.
+
+**Narrative implications** (deck/tutorial copy that benefits from this).
+The "elastic data products" framing is now coherent without the asterisk
+CAP-045 introduced: BOTH halves scale to zero — the event consumer
+(notification-service) on Kafka lag, and the read gateway on HTTP idle —
+calibrated to their workload's character. The `readiness` timeout is the
+explicit, configurable cold-start budget per route; the deck and §17
+observability/elasticity chapters can describe this honestly rather than
+hand-waving past it.
+
+**Things explicitly NOT changing in this phase.**
+
+  * The Istio canary (order-service v1/v2 VirtualService/DestinationRule) —
+    unaffected by HTTP add-on version.
+  * The Kafka consumer-lag scaler (`keda/notification-scaledobject.yaml`) —
+    plain KEDA ScaledObject, unaffected.
+  * Kiali / observability stack / OpenMetadata / Istio control plane —
+    unaffected.
+
+**Verification plan.** On the branch, after `helm upgrade`: confirm the new
+CRDs `httpscaledobjects.http.keda.sh` (still present, deprecated) and
+`interceptorroutes.http.keda.sh` (new) exist; confirm the interceptor pods
+report 0.14.0; apply the two new manifests; confirm
+`kubectl get interceptorroute,scaledobject -n capstone` shows both Ready;
+run `./demos/walkthrough.sh --only trace --no-preflight` — must pass first
+try; then `./demos/walkthrough.sh --skip trace --no-preflight` — the four
+previously-verified acts must still pass. If both groups pass, merge the
+branch into main and promote CAP-046's reconciliation row to `verified`. If
+either fails: `helm rollback keda-add-ons-http`, abandon the branch, and the
+trace act stays a known issue (CAP-045's `min: 1` workaround retained).
+
+**Rejected alternatives.** Stay on 0.12.2 and bypass the cold-start race with
+`min: 1` (CAP-045): partially worked but didn't fix the warm-gateway 502s, and
+leaves us on an unmaintained add-on version. Trim gateway imports to fit
+under 0.12.2's hardcoded 15s ceiling: real research, multi-iteration, doesn't
+address that 0.12.2 will keep accumulating bugs. Replace the interceptor with
+an Ingress controller: scope creep, abandons the "elastic synchronous gateway"
+demo. The upgrade is the right call.
+
+## CAP-047 — Phase F deferred: KEDA HTTP 0.14.0 has an upstream Go panic; trace demo bypasses the interceptor
+
+**Status:** decided, shipped on `main`; documented; cluster on KEDA HTTP 0.12.2.
+The upstream fix tracking issue is `kedacore/http-add-on#1668`; this CAP is
+revisited when that issue closes against a tagged release ≥ 0.14.1 (binary,
+not chart).
+
+**Context.** CAP-046 attempted to migrate the gateway from `HTTPScaledObject`
+(v1alpha1) to `InterceptorRoute` (v1beta1) by upgrading the chart from
+`0.12.2` to `0.14.1` (app version `0.14.0`). On the `phase-f-keda-http-014`
+branch with the upgrade applied, the trace act still failed — but the failure
+mode was a clean Go panic in the interceptor's POST forwarding path
+(`invalid concurrent Body.Read call` from `net/http`), not the cold-start
+race CAP-046 was designed to fix. Reproduced against KEDA's own Getting
+Started sample (`traefik/whoami`) with the maintainers' own manifests, copied
+verbatim — both `POST` (clean panic with stack trace) and `GET` (silent hang,
+no log, no response) failed to forward.
+
+**Diagnosis (for the audit trail).**
+
+  * Panic is in Go's `net/http`, raised when the server's full-duplex code
+    path reads a request body that is concurrently being read by something
+    else — golang/go#68560.
+  * The full-duplex code path was introduced upstream in
+    `kedacore/http-add-on#1386` ("Support full-duplex http1.1"), which
+    shipped in v0.12.0 and is in every version since, including v0.14.0.
+  * v0.11.1 (the last release *before* PR #1386 landed) does NOT panic on
+    the same workload — confirmed by rolling the cluster back and re-running.
+    However, v0.11.1's interceptor failed a different way (Service-dial
+    timeouts) for reasons unrelated to KEDA HTTP version (see the unrelated
+    networking note in the iteration log), so v0.11.1 is not a viable
+    fallback for our specific cluster either.
+  * Bypass tests confirm the workload is fine: a port-forward directly to
+    the `graphql-gateway` Service (no interceptor in the path) returns
+    `200 OK` with the correct GraphQL response. The bug is in the
+    interceptor's request-body handling, not anything about the gateway.
+
+**Decision.**
+
+1. **Defer the upgrade.** Discard the `phase-f-keda-http-014` branch.
+   The cluster stays on chart `0.12.2`, with `gateway-httpscaledobject.yaml`
+   from `main` (per CAP-045: `replicas.min: 1`). No source code on `main`
+   changes for the chart version or the manifests — the branch was the place
+   the upgrade lived, and it is not merged.
+
+2. **File the upstream issue.** Bug filed at
+   `https://github.com/kedacore/http-add-on/issues/1668`. The report
+   reproduces against KEDA's own Getting Started tutorial (their sample app,
+   their exact manifests, copied from `keda.sh/http-add-on/0.14/getting-started/`),
+   demonstrating that v0.14.0's tutorial does not actually work end-to-end.
+   That framing — "your tutorial is broken on your latest release" — is the
+   strongest possible argument for a fast upstream fix, regardless of our
+   specific use case.
+
+3. **Adjust the trace demo to bypass the interceptor.** The walkthrough's
+   trace act now port-forwards directly to the `graphql-gateway` Service
+   (`kubectl port-forward -n capstone svc/graphql-gateway 8080:80`) and
+   sends the GraphQL query there. The trace itself — HTTP server span at
+   the gateway, REST client span to order-service, gRPC client span to
+   inventory-service, all stitched in Tempo — is unchanged. Only the
+   *entry path* differs from the production-shaped story (no KEDA HTTP
+   interceptor in the path). The act demonstrates the same data-mesh
+   observability story (the three signals, spans across products) while
+   the upstream interceptor bug is resolved.
+
+4. **Keep the slide story intact.** Slide 33 ("Elastic reads: the KEDA
+   HTTP add-on") and slide 49 ("What you can see it do") in the deck
+   are unchanged conceptually. Speaker notes on both slides document
+   the current demo state and link to the upstream issue, so a future
+   presenter knows what to skip and why. The visual story of HTTP scaling
+   the read gateway is still the right architectural picture — only the
+   live demo of HTTP-add-on scale-from-zero is paused.
+
+**What changes in source (this iteration).**
+
+  * `demos/walkthrough.sh` — Act 1 (trace) replaced. Now: open a
+    background `kubectl port-forward` to `svc/graphql-gateway`, wait for
+    the local endpoint to bind, send one GraphQL POST, surface the HTTP
+    status and any trace-id headers, tear down the port-forward. The
+    cleanup trap is extended to handle the new `TRACE_PF` pid (in
+    addition to the existing `KIALI_PF`). Preflight gains two checks
+    that the trace act needs: `graphql-gateway` Deployment available
+    and `graphql-gateway` Service exists. Header comment updated.
+  * `_plans/capstone-decisions.md` — CAP-046 status updated to
+    "superseded by CAP-047"; CAP-047 (this entry) added.
+  * `_plans/reconciliation-plan.md` — the prior CAP-046 row marked
+    "superseded by CAP-047"; new CAP-047 rows added (one for the
+    walkthrough trace-bypass change, one for the deferred upgrade).
+  * `presentation/data-mesh-openshift/Data_Mesh_on_OpenShift.pptx` —
+    speaker notes appended on slides 33 and 49 documenting the demo
+    status and the upstream issue. Slide bodies and diagrams unchanged.
+
+**Pickup criteria for re-attempting the upgrade.** The upstream issue
+`kedacore/http-add-on#1668` closes with a fix released in a tagged version
+of the add-on (binary, not only the chart). At that point CAP-046's
+migration plan is re-runnable on a fresh branch: bump the chart, apply the
+two new manifests, retest the trace act through the interceptor, and if
+it passes, merge and supersede CAP-047 in the same step. The work product
+from the CAP-046 attempt (the migration design, the manifest shapes,
+the discovery of the per-route `timeouts.readiness` field) all remains
+valid and is recorded in CAP-046's body for that future revisit.
+
+**Rejected alternatives.**
+
+  * Pin to v0.11.1 in the tutorial. The interceptor doesn't panic there,
+    but it predates the InterceptorRoute model the rest of the upstream
+    docs and ecosystem are moving toward, and v0.11.1 had a separate
+    Service-routing issue in our cluster that we never resolved. Pinning
+    backward to an older minor version is a worse story than a temporary
+    bypass.
+  * Drop the trace act from the walkthrough entirely. Loses the strongest
+    "see it run" payoff on slide 49 — and the trace story is independent
+    of the HTTP add-on. The bypass keeps the trace's value with one less
+    component in the path.
+  * Drop the HTTP add-on from the deck. The architectural argument
+    (HTTP scaling for the gateway is the right tool for a read-volume
+    workload, distinct from Kafka-lag scaling for an event consumer) is
+    correct regardless of the temporary bug; removing the slide would
+    misrepresent the design.
+
+**Consequences.**
+
+  * Walkthrough remains five acts: trace (bypassed entry), scale, canary,
+    lineage, topology. The trace act's narrative now includes the
+    one-liner "we port-forward to the gateway directly while the
+    upstream HTTP-add-on fix is pending."
+  * The "elastic data products" story in the deck stays split honestly
+    by workload character (CAP-045's framing): event consumers scale to
+    zero on Kafka lag right now; the read gateway's scale-from-zero on
+    HTTP traffic is documented and visualized but its live demo is
+    paused. Both pieces are still in the deck.
+  * `keda/gateway-httpscaledobject.yaml` on `main` is unchanged — it
+    still carries `replicas.min: 1` from CAP-045. That partial
+    workaround is still useful for the cluster: it ensures the gateway
+    is always warm during the walkthrough, even though we're not relying
+    on the HTTP add-on to scale it from zero in the demo.
