@@ -48,6 +48,8 @@ This was verified end to end: with the split set to 90/10, a run of 100 requests
 the expected band, both subsets healthy in the mesh. The contract evolved in the open,
 under controlled traffic, exactly as the pattern intends.
 
+![The capstone's mesh in canary mode — sidecars beside each product, mTLS between them, weights moving traffic from v1 to v2]({{ '/assets/diagrams/17-service-mesh.svg' | relative_url }})
+
 ## mTLS for free
 
 The same mesh that routes the canary also secures it. When two services are in the

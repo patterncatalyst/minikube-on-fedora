@@ -42,6 +42,8 @@ different products:
   down to zero when the backlog is empty and there's nothing to do. When orders start
   flowing again, the lag rises and KEDA scales it back up.
 
+![KEDA scaling notification-service on Kafka consumer-group lag — scaling to zero when the backlog is empty, back up as events arrive]({{ '/assets/diagrams/17-keda-lag.svg' | relative_url }})
+
 - **HTTP-request scaling on the gateway.** The read gateway's load is incoming queries,
   so it scales on HTTP request volume via KEDA's HTTP add-on — including to zero when no
   one is querying.
@@ -57,6 +59,8 @@ target with no such conflict. Matching each scaler to the right product — lag-
 the consumer, request-based for the gateway, and neither on the canaried service — is
 the kind of fitting-the-mechanism-to-the-workload judgment the whole capstone keeps
 returning to.
+
+![Why the HTTP scaler goes on the gateway and not on the canaried order-service — matching the scaler to the workload]({{ '/assets/diagrams/17-keda-http.svg' | relative_url }})
 
 One harmless quirk you'll see at rest: with the gateway scaled to zero, its HTTP scaler
 reports an "unknown" status until traffic first arrives and the add-on has something to

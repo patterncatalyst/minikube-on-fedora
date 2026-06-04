@@ -66,6 +66,8 @@ authorization and mutual-TLS policies that govern traffic between products, and 
 schema validation built into every CRD. The rules become code that runs at the edge of
 the system, which is exactly what "computational governance" means.
 
+![Each of the four principles and the OpenShift/Kubernetes pieces that deliver it — one picture of the mapping]({{ '/assets/diagrams/17-principles-to-pieces.svg' | relative_url }})
+
 ## The shape of the system
 
 With the mapping in hand, here's the system this capstone builds. It has three

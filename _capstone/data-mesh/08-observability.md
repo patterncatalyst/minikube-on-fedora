@@ -54,6 +54,8 @@ That "for free" property is the self-serve platform principle showing up again: 
 team gets request metrics for its product because the platform's mesh provides them, not
 because the team instrumented anything.
 
+![The observability stack — sidecars emit, Prometheus scrapes metrics, Tempo stores spans, Grafana correlates them, Kiali shows the live topology]({{ '/assets/diagrams/17-observability-stack.svg' | relative_url }})
+
 ## Traces across products
 
 Metrics tell you *that* something is slow or failing; traces tell you *where*.
