@@ -94,9 +94,9 @@ ingress gateway.
 ```bash
 # cert-manager comes via helm
 helm repo add jetstack https://charts.jetstack.io
-helm install cert-manager jetstack/cert-manager \
+helm install cert-manager jetstack/cert-manager --version v1.21.2 \
     --namespace cert-manager --create-namespace \
-    --set installCRDs=true
+    --set crds.enabled=true
 ```
 
 Then define an `Ingress` resource pointing at your existing
@@ -132,7 +132,7 @@ and a sensible default set of dashboards and alerts.
 
 ```bash
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-helm install monitoring prometheus-community/kube-prometheus-stack \
+helm install monitoring prometheus-community/kube-prometheus-stack --version 92.2.0 \
     --namespace monitoring --create-namespace
 ```
 

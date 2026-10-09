@@ -965,7 +965,7 @@ demo (§5, §10), or summary navigation (§0, §16).
 - **Maintaining vendor-neutral language** — the PRD's
   vendor-neutral stance was deliberately relaxed for §13
   (Alternatives to minikube), where honest comparison of kind /
-  k3s / microk8s / MicroShift is more useful to the reader than
+  k3s / MicroShift is more useful to the reader than
   refusing to take a position. See
   `_plans/prd-reconciliation.md` for the full rationale
 - **Eliminating first-person plural ("we") voice** — the audit
@@ -973,27 +973,24 @@ demo (§5, §10), or summary navigation (§0, §16).
   awkward phrasing. The 7 surviving instances in §11 and §12 are
   contextual (rhetorical "if we had one", quoted upstream text,
   introducing tutorial choices) and judged not worth changing
-- **Pinning Podman to a specific version** — the prereq script
-  reports the installed version and warns if features used by
-  the tutorial are absent; specific version pinning would have
-  made the tutorial fragile to Fedora's rebase cadence
+- **Pinning the container engine to a specific version** — the
+  prereq script reports the installed Docker Engine version;
+  §1 records the version the tutorial was verified with
 
 ## Add to "Audience" section
 
 The shipped audience definition (Fedora 44 developer, basic
-Kubernetes literacy, wants local cluster without Docker Desktop
+Kubernetes literacy, wants local cluster without a desktop app
 or managed cloud) is more concrete than the PRD's
 `TODO:` placeholders. Specifically:
 
 - **Primary**: Fedora 44 desktop/workstation user with basic
   container experience (knows what an image is, can run
-  `podman build`)
-- **Secondary**: Linux developers on other distributions (most
-  material applies; only Fedora 44 is tested) and helm/Istio/KEDA
-  learners wanting a low-friction local environment
-- **Explicitly not served**: complete Kubernetes beginners,
-  Windows users without WSL, anyone needing macOS-tested
-  instructions
+  `docker build`)
+- **Secondary**: RHEL users, and Fedora or RHEL VMs, plus
+  helm/Istio/KEDA learners wanting a low-friction local environment
+- **Explicitly not served**: complete Kubernetes beginners, and
+  platforms other than Fedora and RHEL
 
 ## Add a "Project state" section near the end
 

@@ -32,7 +32,7 @@ partial reads still leave you with something useful.
 | 10 | Editor, shell, and terminal integration     | CLion k8s plugin, zsh + kubectx/kubens, warp.dev workflows               | 15 min   |
 | 11 | Istio on minikube                           | Install via `istioctl`, sidecar-enabled demo app, Gateway + VirtualService, mTLS basics  | 30 min   |
 | 12 | KEDA on minikube (optional)                 | Helm install of KEDA + HTTP add-on; HTTP-driven scaling with a `hey` load test           | 25 min   |
-| 13 | Alternatives to minikube                    | Brief tour: kind, k3s, microk8s, microshift — when to pick what                          | 5 min    |
+| 13 | Alternatives to minikube                    | Brief tour: kind, k3s, MicroShift — when to pick what                                    | 5 min    |
 | 14 | FAQ                                         | Common pain points; cleanup recipes                                                      | 5 min    |
 | 15 | Where to go next                            | Pointers to deeper resources and possible follow-on tutorials                            | 5 min    |
 
