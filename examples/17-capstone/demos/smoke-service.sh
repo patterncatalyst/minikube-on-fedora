@@ -84,7 +84,7 @@ helm upgrade --install "$PG_RELEASE" "$PG_CHART" -n "$NS" --create-namespace \
 step "Waiting for the Postgres cluster primary to be Ready"
 pg_ready=0
 for i in $(seq 1 60); do
-    if kubectl get pods -n "$NS" -l "cnpg.io/cluster=${PG_RELEASE},role=primary" \
+    if kubectl get pods -n "$NS" -l "cnpg.io/cluster=${PG_RELEASE},cnpg.io/instanceRole=primary" \
         -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null \
         | grep -q "True"; then
         printf '    primary pod Ready after ~%ds\n' "$((i*5))"
@@ -126,7 +126,7 @@ echo "$Z" | grep -q '"status":"ready"' || fail "/healthz not ready: $Z"
 step "Verify the schema exists in Postgres (direct query)"
 SCHEMA="$(helm get values "$SERVICE" -n "$NS" -a 2>/dev/null | awk '/schema:/{print $2; exit}')"
 SCHEMA="${SCHEMA:-$BASE}"
-PRIMARY="$(kubectl get pods -n "$NS" -l "cnpg.io/cluster=${PG_RELEASE},role=primary" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)"
+PRIMARY="$(kubectl get pods -n "$NS" -l "cnpg.io/cluster=${PG_RELEASE},cnpg.io/instanceRole=primary" -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)"
 if [[ -n "$PRIMARY" ]]; then
     if kubectl exec -n "$NS" "$PRIMARY" -- psql -U postgres -d capstone -tAc \
         "SELECT 1 FROM information_schema.schemata WHERE schema_name='${SCHEMA}'" 2>/dev/null | grep -q 1; then

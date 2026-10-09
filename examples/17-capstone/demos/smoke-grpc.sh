@@ -73,7 +73,7 @@ kubectl get crd clusters.postgresql.cnpg.io >/dev/null 2>&1 || fail "CloudNative
 helm upgrade --install "$PG_RELEASE" "$PG_CHART" -n "$NS" --create-namespace || fail "postgres CR install failed"
 pg_ready=0
 for i in $(seq 1 60); do
-    if kubectl get pods -n "$NS" -l "cnpg.io/cluster=${PG_RELEASE},role=primary" \
+    if kubectl get pods -n "$NS" -l "cnpg.io/cluster=${PG_RELEASE},cnpg.io/instanceRole=primary" \
         -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null | grep -q "True"; then
         printf '    primary Ready after ~%ds\n' "$((i*5))"; pg_ready=1; break
     fi

@@ -9,7 +9,7 @@
 #   * the openmetadata Deployment is rolled out
 #   * the server answers its version API (proves it booted AND reached its
 #     Postgres backend — OpenMetadata won't serve without a working DB)
-#   * the version it reports is the pinned 1.12.8
+#   * the version it reports is the pinned 2.0.5
 #   * the dedicated `openmetadata` database really exists in capstone-postgres
 #     and was populated by the server's migrations (sanity that Postgres reuse,
 #     not bundled MySQL, is what's backing it)
@@ -27,7 +27,7 @@ source "$(dirname "${BASH_SOURCE[0]}")/../scripts/lib/env.sh"   # PROFILE, NS, p
 
 PG_CLUSTER="capstone-postgres"
 OM_DB="openmetadata"
-EXPECTED_VERSION="1.12.8"
+EXPECTED_VERSION="2.0.5"
 LOCAL_PORT="$HOST_PORT_OPENMETADATA"   # published NodePort on 127.0.0.1
 SUCCESS=0
 
@@ -95,7 +95,7 @@ printf '    ✓ version %s serving over the API\n' "$EXPECTED_VERSION"
 
 step "Confirming the openmetadata database exists in ${PG_CLUSTER} and was populated"
 PG_PRIMARY="$(kubectl get pods -n "$NS" \
-    -l "cnpg.io/cluster=${PG_CLUSTER},role=primary" \
+    -l "cnpg.io/cluster=${PG_CLUSTER},cnpg.io/instanceRole=primary" \
     -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")"
 [[ -n "$PG_PRIMARY" ]] || fail "no capstone-postgres primary pod found"
 

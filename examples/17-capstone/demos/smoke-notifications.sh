@@ -80,7 +80,7 @@ kubectl get crd clusters.postgresql.cnpg.io >/dev/null 2>&1 || fail "CloudNative
 helm upgrade --install "$PG_RELEASE" "$PG_CHART" -n "$NS" --create-namespace >/dev/null || fail "postgres install failed"
 pg_ready=0
 for i in $(seq 1 60); do
-    if kubectl get pods -n "$NS" -l "cnpg.io/cluster=${PG_RELEASE},role=primary" \
+    if kubectl get pods -n "$NS" -l "cnpg.io/cluster=${PG_RELEASE},cnpg.io/instanceRole=primary" \
         -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null | grep -q "True"; then
         printf '    primary Ready after ~%ds\n' "$((i*5))"; pg_ready=1; break
     fi
@@ -99,7 +99,7 @@ printf '    ✓ notification-service rolled out — its `migrate` init container
 
 # ── confirm the table exists (migration really created it) ────────────────────
 step "Verifying the notifications table exists in Postgres"
-PG_PRIMARY="$(kubectl get pods -n "$NS" -l "cnpg.io/cluster=${PG_RELEASE},role=primary" -o jsonpath='{.items[0].metadata.name}')"
+PG_PRIMARY="$(kubectl get pods -n "$NS" -l "cnpg.io/cluster=${PG_RELEASE},cnpg.io/instanceRole=primary" -o jsonpath='{.items[0].metadata.name}')"
 TBL="$(kubectl exec -n "$NS" "$PG_PRIMARY" -c postgres -- psql -d capstone -tAqc \
     "select to_regclass('notifications.notifications')" 2>/dev/null || echo '')"
 [[ "$TBL" == "notifications.notifications" ]] || fail "notifications.notifications table not found (got: '${TBL}')"

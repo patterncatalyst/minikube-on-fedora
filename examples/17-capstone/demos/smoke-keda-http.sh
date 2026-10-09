@@ -93,13 +93,14 @@ for _ in $(seq 1 15); do
 done
 
 step "Firing a cold-start request through the interceptor (Host: $HOST)"
-# With interceptor.replicas.waitTimeout raised to 180s (setup-keda.sh), the
+# With interceptor.readinessTimeout set to 180s (setup-keda.sh), the
 # interceptor BUFFERS this request, signals KEDA to scale graphql-gateway from
 # zero, and HOLDS the connection until a replica is Ready — then forwards it and
 # returns the gateway's response. A 200 is the wake-from-zero proof; the elapsed
 # time is the cold-start cost. A single held request also gives KEDA the stable
-# pending-request pressure it needs to activate promptly (the old 20s wait made
-# requests churn-and-502 before a backend existed, starving that signal).
+# pending-request pressure it needs to activate promptly (a short readiness
+# timeout would end the held request with a 504 before a backend existed,
+# starving that signal).
 START=$(date +%s)
 CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 200 \
     -H "Host: $HOST" "http://127.0.0.1:${LOCAL_PORT}/health" || echo "000")
@@ -107,7 +108,7 @@ ELAPSED=$(( $(date +%s) - START ))
 if [[ "$CODE" != "200" ]]; then
     printf '    cold-start returned HTTP %s after %ss\n' "$CODE" "$ELAPSED"
     kubectl get deployment,pods -n "$NS" -l app.kubernetes.io/name=graphql-gateway 2>&1 | sed 's/^/      /'
-    fail "interceptor did not serve a 200 from a woken gateway (HTTP $CODE). 502 'context deadline exceeded' = waitTimeout too short; 404 = Host didn't match the HTTPScaledObject."
+    fail "interceptor did not serve a 200 from a woken gateway (HTTP $CODE). 504 (gateway timeout) = readinessTimeout too short; 404 = Host didn't match the HTTPScaledObject."
 fi
 printf '    ✓ woke from ZERO and served 200 in %ss (cold start)\n' "$ELAPSED"
 [[ "$(count_pods)" -gt 0 ]] || fail "served a 200 but no gateway pod present?!"

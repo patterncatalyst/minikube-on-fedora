@@ -5,11 +5,10 @@
 # istioctl install or an addon re-apply never reverts it. Published by the
 # mof-capstone profile as 127.0.0.1:5432 (see CAPSTONE_PORTS in
 # scripts/lib/env.sh).
-# Selector: CloudNativePG instance-pod labels cnpg.io/cluster + role=primary, the
-# pair the setup scripts already select on with the pinned operator (cnpg chart
-# 0.23.0). Newer operators also label pods cnpg.io/instanceRole=primary; if `role`
-# is ever dropped, switch to that label. Pod labels come from the operator, not
-# the chart, so this is not verifiable offline.
+# Selector: CloudNativePG instance-pod labels cnpg.io/cluster + cnpg.io/instanceRole=primary
+# (operator 1.30 documents these; the bare `role` label is deprecated in favour of
+# cnpg.io/instanceRole). Pod labels come from the operator, not the chart, so this
+# is not verifiable offline.
 #   verify live: kubectl --context mof-capstone get svc -n capstone capstone-postgres-rw -o jsonpath='{.spec.selector}'
 ---
 apiVersion: v1
@@ -23,7 +22,7 @@ spec:
   type: NodePort
   selector:
     cnpg.io/cluster: capstone-postgres
-    role: primary
+    cnpg.io/instanceRole: primary
   ports:
     - name: postgres
       port: 5432

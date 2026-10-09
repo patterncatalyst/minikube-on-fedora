@@ -20,15 +20,15 @@
 # (resources left in place; the underlying demos are designed for that).
 #
 # Note on Act 1 (CAP-046, June 2026): KEDA HTTP v0.14.0's interceptor has an
-# upstream Go panic on POST forwarding (filed at kedacore/http-add-on#1668),
-# and v0.12.2's interceptor has cold-start race issues with the gateway. While
-# that's pending upstream resolution, the trace act calls the graphql-gateway
+# upstream Go panic on POST forwarding (kedacore/http-add-on#1668, fixed in
+# v0.15.0; the stack now pins v0.16.0, CAP-051). The act still calls the graphql-gateway
 # directly on its published NodePort (127.0.0.1:18099) — the trace itself (HTTP
 # server → REST client → gRPC client across three products) is unchanged; only
 # the entry path is. The NodePort has no endpoints while KEDA holds the gateway
 # at zero, so the preflight requires an available gateway replica and the act
-# waits for it to answer before sending the query. The HTTP-add-on demo path
-# returns once the upstream fix releases.
+# waits for it to answer before sending the query. The interceptor entry path
+# can be restored now that the fix has shipped (smoke-keda-http.sh and
+# smoke-trace-flow.sh exercise it); this act is unchanged until verified live.
 #
 # There are no background processes: every service is reached on a published
 # NodePort on 127.0.0.1 (ports are fixed when the mof-capstone profile is
@@ -269,8 +269,8 @@ prompt_enter "press Enter to start"
 # header comment and CAP-046. We call the graphql-gateway NodePort directly on
 # 127.0.0.1:18099, send the GraphQL query there, and verify the resulting trace
 # lands in Tempo. The trace itself is identical to what runs in production; only
-# the entry path is different. Returns to going through the interceptor once
-# upstream issue kedacore/http-add-on#1668 is fixed and released.
+# the entry path is different. Returning to the interceptor path is a live-verification
+# follow-up (#1668 shipped in v0.15.0).
 
 trace_act() {
     local result=0 gw="http://127.0.0.1:${HOST_PORT_GATEWAY}"
@@ -331,7 +331,7 @@ if want_act trace; then
     narrate "the resolver makes a REST call to order-service and a gRPC call to inventory-service"
     narrate "all three spans land in Tempo, stitched by a shared trace id"
     info "entry path: the graphql-gateway NodePort on 127.0.0.1:${HOST_PORT_GATEWAY} (see CAP-046)"
-    info "  the KEDA HTTP-add-on demo path is deferred — kedacore/http-add-on#1668"
+    info "  the interceptor path is covered by smoke-keda-http.sh (#1668 fixed in KEDA HTTP 0.15.0)"
     prompt_enter "press Enter to run"
     if trace_act; then
         printf '\n%s  ✓ act passed: trace%s\n' "$GRN" "$RST"

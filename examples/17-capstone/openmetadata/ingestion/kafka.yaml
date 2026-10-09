@@ -18,10 +18,10 @@
 # config): the Strimzi plain listener is reachable in-cluster at
 #   capstone-kafka-kafka-bootstrap:9092
 #
-# VERIFY-POINT (OpenMetadata 1.12.8 Kafka connector schema; confirm at build
+# VERIFY-POINT (OpenMetadata 2.0.5 Kafka connector schema; confirm at build
 # time): `bootstrapServers` and `MessagingMetadata` are the expected keys; the
 # topic filter syntax (`topicFilterPattern.includes`) is stable across 1.x but
-# worth a glance against the 1.12.8 docs.
+# worth a glance against the 2.0.5 docs.
 
 source:
   type: kafka

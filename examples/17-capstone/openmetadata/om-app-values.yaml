@@ -1,7 +1,7 @@
 # om-app-values.yaml — OpenMetadata *server* config for the capstone.
 #
 # OVERRIDE file, merged by Helm onto the upstream open-metadata/openmetadata
-# chart defaults (chart 1.12.8). Only the keys that differ from the chart
+# chart defaults (chart 2.0.5). Only the keys that differ from the chart
 # default are listed; the literal key paths below were taken from that chart's
 # own values.yaml, so they are real, not reconstructed.
 #
@@ -21,10 +21,10 @@
 #     matches our deps deploy exactly — so it needs NO override here.
 
 # Pin the server image to the chart appVersion for reproducibility (the chart
-# default tag is "" which resolves to appVersion 1.12.8; pinning makes it
+# default tag is "" which resolves to appVersion 2.0.5; pinning makes it
 # explicit and stable across chart patch bumps).
 image:
-  tag: "1.12.8"
+  tag: "2.0.5"
 
 openmetadata:
   config:

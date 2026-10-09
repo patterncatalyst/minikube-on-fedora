@@ -1,13 +1,13 @@
-apiVersion: kafka.strimzi.io/v1beta2
+apiVersion: kafka.strimzi.io/v1
 kind: Kafka
 metadata:
   name: {{ .Values.clusterName }}
   namespace: {{ .Release.Namespace }}
-  annotations:
-    strimzi.io/node-pools: enabled
-    strimzi.io/kraft: enabled
+  # Strimzi v1 is KRaft-only and always uses KafkaNodePools; the
+  # strimzi.io/kraft and strimzi.io/node-pools annotations are gone.
 spec:
   kafka:
+    version: {{ .Values.version | quote }}
     listeners:
       - name: plain
         port: 9092

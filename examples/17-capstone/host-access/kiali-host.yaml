@@ -5,7 +5,7 @@
 # istioctl install or an addon re-apply never reverts it. Published by the
 # mof-capstone profile as 127.0.0.1:20001 (see CAPSTONE_PORTS in
 # scripts/lib/env.sh).
-# Selector: Istio samples/addons/kiali.yaml Service (Kiali v2.8.0).
+# Selector: Istio samples/addons/kiali.yaml Service (Kiali v2.31.0, Istio 1.31.1).
 #   verify live: kubectl --context mof-capstone get svc -n istio-system kiali -o jsonpath='{.spec.selector}'
 ---
 apiVersion: v1

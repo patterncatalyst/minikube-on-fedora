@@ -33,7 +33,7 @@ spec:
       restartPolicy: Never
       containers:
         - name: declare-lineage
-          image: docker.io/openmetadata/ingestion:1.12.8
+          image: docker.io/openmetadata/ingestion:2.0.5
           command:
             - /bin/bash
             - -c

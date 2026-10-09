@@ -24,8 +24,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/env.sh"
 
 NAMESPACE="keda"
-KEDA_VERSION="${KEDA_VERSION:-2.19.0}"
-KEDA_HTTP_VERSION="${KEDA_HTTP_VERSION:-0.12.2}"
+KEDA_VERSION="${KEDA_VERSION:-2.21.0}"
+KEDA_HTTP_VERSION="${KEDA_HTTP_VERSION:-0.16.0}"
 
 command -v kubectl >/dev/null 2>&1 || { printf 'ERROR: kubectl not in PATH.\n' >&2; exit 1; }
 command -v helm    >/dev/null 2>&1 || { printf 'ERROR: helm not in PATH — see §2.\n' >&2; exit 1; }
@@ -49,17 +49,18 @@ helm upgrade --install keda kedacore/keda \
 
 # ─── 3. KEDA HTTP add-on ─────────────────────────────────────────────────────
 printf '==> Installing the KEDA HTTP add-on %s into namespace %s\n' "$KEDA_HTTP_VERSION" "$NAMESPACE"
-# interceptor.replicas.waitTimeout (default 20s) is how long the interceptor
-# holds a request waiting for the scaled-from-zero workload to have a Ready
-# replica. 20s is too short here: a cold start (KEDA activation + image pull +
-# Python boot + startupProbe) routinely exceeds it, so requests 502 with
-# "context deadline exceeded" BEFORE a backend exists — which also starves KEDA
-# of the stable pending-request pressure it needs to activate promptly, making
-# scale-up slow and erratic. 180s holds the request through the whole cold start.
+# interceptor.readinessTimeout is how long the interceptor holds a request
+# waiting for the scaled-from-zero workload to have a Ready replica (replaces
+# the deprecated interceptor.replicas.waitTimeout; chart 0.16.0). Since 0.14.0
+# the default is 0 (disabled) and timeouts return 504, not 502. Setting it
+# explicitly bounds the hold: a cold start (KEDA activation + image pull +
+# Python boot + startupProbe) routinely takes tens of seconds, and 180s holds the
+# request through all of it, which also gives KEDA the stable pending-request
+# pressure it needs to activate promptly.
 helm upgrade --install keda-add-ons-http kedacore/keda-add-ons-http \
     --version "$KEDA_HTTP_VERSION" \
     --namespace "$NAMESPACE" \
-    --set interceptor.replicas.waitTimeout=180s \
+    --set interceptor.readinessTimeout=180s \
     --wait
 
 # ─── Done ────────────────────────────────────────────────────────────────────

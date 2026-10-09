@@ -1,7 +1,7 @@
 # om-deps-values.yaml — trimmed OpenMetadata *dependencies* for the capstone.
 #
 # This is an OVERRIDE file, merged by Helm onto the upstream
-# open-metadata/openmetadata-dependencies chart defaults (chart 1.12.8). We
+# open-metadata/openmetadata-dependencies chart defaults (chart 2.0.5). We
 # only change what the lean single-node demo needs; everything else stays at
 # the chart default.
 #

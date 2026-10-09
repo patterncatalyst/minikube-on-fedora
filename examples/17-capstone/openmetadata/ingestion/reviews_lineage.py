@@ -20,7 +20,7 @@ either in the ingestion image or host-side against the published server (127.0.0
 
 Usage:  OM_HOST=... OM_JWT=... ./reviews_lineage.py up|down
 
-VERIFY-POINTS (OpenMetadata 1.12.8 API shapes — same caveats as lineage.py):
+VERIFY-POINTS (OpenMetadata 2.0.5 API shapes — same caveats as lineage.py):
   * Entity-by-FQN: GET /api/v1/tables/name/{fqn} returns the entity with `id`.
   * Add edge: PUT /api/v1/lineage with
       {"edge": {"fromEntity": {"id","type"}, "toEntity": {"id","type"}}}.

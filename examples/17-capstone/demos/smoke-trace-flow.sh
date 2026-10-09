@@ -57,8 +57,8 @@ for _ in $(seq 1 15); do
 done
 
 step "Sending a GraphQL query (wakes the gateway from zero, fans out to backends)"
-# Pre-warm the gateway. KEDA HTTP's interceptor returns 502 with
-# X-Keda-Http-Cold-Start: true if its cold-start budget expires before the
+# Pre-warm the gateway. KEDA HTTP's interceptor returns 504 with
+# X-Keda-Http-Cold-Start: true if its readiness timeout expires before the
 # workload is ready (uvicorn cold start can outrun the default ~15s
 # DialRetryTimeout). So we ping the interceptor once with a cheap GET, ignore
 # its response (whatever it is — that request's job was to trigger the

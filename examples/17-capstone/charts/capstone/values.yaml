@@ -42,7 +42,9 @@ strimziCluster:
   enabled: true
   # Kafka cluster CR — the Strimzi operator must already be installed
   # (per §12 pattern). The cluster runs in the capstone namespace.
-  version: "4.1.0"
+  # NOTE: this block is not read by any template. The Kafka version is set in
+  # charts/kafka/values.yaml (`version`, a subchart value; override with
+  # `--set kafka.version=...`), where the Kafka CR template consumes it.
   replicas: 1   # single-broker dev cluster, NOT production-shaped
   storage:
     size: 10Gi

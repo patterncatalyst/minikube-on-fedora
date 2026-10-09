@@ -30,7 +30,7 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/env.sh"
 
 OPERATOR_NS="cnpg-system"
-CHART_VERSION="0.23.0"   # CloudNativePG helm chart version; pin for reproducibility
+CHART_VERSION="0.29.1"   # CloudNativePG helm chart 0.29.1 = operator 1.30.1; pin for reproducibility
 RELEASE_NAME="cnpg"
 
 # ─── Pre-flight ──────────────────────────────────────────────────────────────

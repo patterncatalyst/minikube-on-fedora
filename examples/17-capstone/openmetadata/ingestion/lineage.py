@@ -21,7 +21,7 @@ The spine (one directed edge per producer/consumer relationship):
 Stdlib only (urllib/json), so it runs in the ingestion image unchanged.
 Idempotent: PUT /api/v1/lineage upserts an edge, so re-running is a no-op.
 
-VERIFY-POINTS (OpenMetadata 1.12.8 API shapes; confirm at build time):
+VERIFY-POINTS (OpenMetadata 2.0.5 API shapes; confirm at build time):
   * Entity-by-FQN lookups: GET /api/v1/tables/name/{fqn} and
     GET /api/v1/topics/name/{fqn} return the entity with an `id`.
   * AddLineage payload: {"edge": {"fromEntity": {"id","type"}, "toEntity":

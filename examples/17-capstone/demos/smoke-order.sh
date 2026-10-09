@@ -108,7 +108,7 @@ helm upgrade --install "$RELEASE_PG" "$PG_CHART" -n "$NS" --create-namespace \
 step "Waiting for the Postgres cluster primary to be Ready"
 pg_ready=0
 for i in $(seq 1 60); do
-    if kubectl get pods -n "$NS" -l "cnpg.io/cluster=$RELEASE_PG,role=primary" \
+    if kubectl get pods -n "$NS" -l "cnpg.io/cluster=$RELEASE_PG,cnpg.io/instanceRole=primary" \
         -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null \
         | grep -q "True"; then
         printf '    primary pod Ready after ~%ds\n' "$((i*5))"
@@ -173,7 +173,7 @@ listing=$(curl -fsS "$BASE/orders") || fail "GET /orders failed"
 echo "$listing" | grep -q "$order_id" || fail "list does not contain new order"
 
 step "Verify the row actually persisted in Postgres (direct query)"
-pg_pod=$(kubectl get pods -n "$NS" -l "cnpg.io/cluster=$RELEASE_PG,role=primary" \
+pg_pod=$(kubectl get pods -n "$NS" -l "cnpg.io/cluster=$RELEASE_PG,cnpg.io/instanceRole=primary" \
     -o jsonpath='{.items[0].metadata.name}')
 row_count=$(kubectl exec -n "$NS" "$pg_pod" -- \
     psql -U postgres -d capstone -tAc \

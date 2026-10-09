@@ -5,7 +5,7 @@
 # istioctl install or an addon re-apply never reverts it. Published by the
 # mof-capstone profile as 127.0.0.1:8585 (see CAPSTONE_PORTS in
 # scripts/lib/env.sh).
-# Selector: open-metadata/openmetadata 1.12.8 (helm template, release openmetadata, openmetadata/om-app-values.yaml); namespace capstone (setup-openmetadata.sh NS).
+# Selector: open-metadata/openmetadata 2.0.5 (helm template, release openmetadata, openmetadata/om-app-values.yaml); namespace capstone (setup-openmetadata.sh NS).
 #   verify live: kubectl --context mof-capstone get svc -n capstone openmetadata -o jsonpath='{.spec.selector}'
 ---
 apiVersion: v1

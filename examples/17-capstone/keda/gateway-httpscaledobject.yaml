@@ -18,7 +18,8 @@
 # Deployment) so the interceptor → gateway path is clean.
 #
 # VERIFY-POINTS (KEDA HTTP add-on API/install; not renderable offline):
-#   * apiVersion http.keda.sh/v1alpha1 (matches the §12 add-on version, 0.12.x).
+#   * apiVersion http.keda.sh/v1alpha1 (still served by add-on 0.16.0; the InterceptorRoute
+#     CRD is its successor and is not adopted here).
 #   * scaleTargetRef.service/port reference the gateway's ClusterIP Service.
 #   * Traffic must arrive via the interceptor with a matching Host header
 #     (the smoke posts to the interceptor's published NodePort, 127.0.0.1:8081

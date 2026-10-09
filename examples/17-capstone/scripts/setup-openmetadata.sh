@@ -38,7 +38,7 @@ source "$SCRIPT_DIR/lib/env.sh"
 # ─── Configuration ───────────────────────────────────────────────────────────
 
 # NS (capstone) and PROFILE (mof-capstone) come from lib/env.sh.
-OM_CHART_VERSION="1.12.8"          # pin both deps and server to this release
+OM_CHART_VERSION="2.0.5"          # pin both deps and server to this release
 PG_CLUSTER="capstone-postgres"     # the CloudNativePG Cluster name (postgres subchart)
 
 OM_DB="openmetadata"               # dedicated database for OpenMetadata's own store
@@ -71,10 +71,10 @@ for f in "$DEPS_VALUES" "$APP_VALUES"; do
 done
 
 # Confirm the Postgres cluster is present and has a primary, since we provision
-# into it. The CNPG operator labels the primary pod role=primary.
+# into it. The CNPG operator labels the primary pod cnpg.io/instanceRole=primary.
 printf '==> Locating the capstone-postgres primary\n'
 PG_PRIMARY="$(kubectl get pods -n "$NS" \
-    -l "cnpg.io/cluster=${PG_CLUSTER},role=primary" \
+    -l "cnpg.io/cluster=${PG_CLUSTER},cnpg.io/instanceRole=primary" \
     -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")"
 if [[ -z "$PG_PRIMARY" ]]; then
     printf 'ERROR: no primary pod for CloudNativePG cluster "%s" in namespace "%s".\n' \

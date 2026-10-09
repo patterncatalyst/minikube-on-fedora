@@ -17,7 +17,7 @@ alternative for unattended pipelines.
 Stdlib only (urllib/json/base64) so it runs in the ingestion image with no
 added dependency.
 
-VERIFY-POINTS (OpenMetadata 1.12.8 basic-auth; confirm at build time):
+VERIFY-POINTS (OpenMetadata 2.0.5 basic-auth; confirm at build time):
   * The default install uses basic auth; the login comes from the
     OM_ADMIN_EMAIL / OM_ADMIN_PASSWORD environment variables, falling back to the
     chart's default admin account (see openmetadata/om-app-values.yaml).

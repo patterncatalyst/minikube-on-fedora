@@ -160,7 +160,7 @@
   <!-- Kafka -->
   <rect x="50" y="490" width="160" height="60" class="platform-box"/>
   <text x="130" y="513" text-anchor="middle" class="platform-label">Kafka</text>
-  <text x="130" y="529" text-anchor="middle" class="platform-sublabel">Strimzi 0.51 · 4.1.0</text>
+  <text x="130" y="529" text-anchor="middle" class="platform-sublabel">Strimzi 1.2 · Kafka 4.3.1</text>
   <text x="130" y="544" text-anchor="middle" class="platform-sublabel">Kraft (no ZK)</text>
 
   <!-- Apicurio -->

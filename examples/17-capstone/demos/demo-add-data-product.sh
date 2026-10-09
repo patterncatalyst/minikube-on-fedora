@@ -160,7 +160,7 @@ else
 
     # 5. Drop the Postgres schema (so a future re-ingest won't re-add it)
     step "Dropping the reviews Postgres schema"
-    primary="$(kubectl get pods -n "$NS" -l cnpg.io/cluster=capstone-postgres,role=primary -o name 2>/dev/null | head -1)"
+    primary="$(kubectl get pods -n "$NS" -l cnpg.io/cluster=capstone-postgres,cnpg.io/instanceRole=primary -o name 2>/dev/null | head -1)"
     if [[ -n "$primary" ]]; then
         kubectl exec -n "$NS" "$primary" -c postgres -- \
             psql -U postgres -d capstone -c 'DROP SCHEMA IF EXISTS reviews CASCADE' >/dev/null 2>&1 \

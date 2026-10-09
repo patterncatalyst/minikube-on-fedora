@@ -5,7 +5,7 @@
 # istioctl install or an addon re-apply never reverts it. Published by the
 # mof-capstone profile as 127.0.0.1:8081 (see CAPSTONE_PORTS in
 # scripts/lib/env.sh).
-# Selector: keda-add-ons-http 0.12.2 chart (helm template, release keda-add-ons-http).
+# Selector: keda-add-ons-http 0.16.0 chart (helm template, release keda-add-ons-http).
 #   verify live: kubectl --context mof-capstone get svc -n keda keda-add-ons-http-interceptor-proxy -o jsonpath='{.spec.selector}'
 ---
 apiVersion: v1

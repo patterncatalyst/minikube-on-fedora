@@ -5,8 +5,7 @@
 cluster:
   name: capstone-postgres
   instances: 1                # single-instance dev cluster (NOT production-shaped)
-  imageName: ""               # empty → operator default (a UBI-based Postgres image
-                              # is used by CloudNativePG's defaults; override here to pin)
+  imageName: "ghcr.io/cloudnative-pg/postgresql:18.6-standard-trixie"   # pinned (CAP-051): the CNPG standard image, newest 18.x
   storage:
     size: 5Gi                 # r21 skeleton; bump for sustained multi-service use
   # The application database the operator bootstraps. Each service uses its

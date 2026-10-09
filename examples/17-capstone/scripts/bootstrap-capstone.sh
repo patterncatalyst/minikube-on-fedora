@@ -71,7 +71,7 @@ helm upgrade --install "$PG_RELEASE" "$PG_CHART" -n "$NS" --create-namespace || 
 apply_host_access postgres-host.yaml
 pg_ready=0
 for i in $(seq 1 72); do
-    kubectl get pods -n "$NS" -l "cnpg.io/cluster=$PG_RELEASE,role=primary" \
+    kubectl get pods -n "$NS" -l "cnpg.io/cluster=$PG_RELEASE,cnpg.io/instanceRole=primary" \
         -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null \
         | grep -q True && { pg_ready=1; break; }
     sleep 5
