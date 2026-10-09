@@ -196,11 +196,14 @@ preflight() {
     if want_act trace; then
         # trace bypasses the interceptor and calls the graphql-gateway NodePort
         # (127.0.0.1:18099) directly — see CAP-046. That NodePort has endpoints
-        # only while a gateway replica is Available (KEDA scales it to zero when
-        # idle), so confirm the Deployment and Service before starting.
-        check "graphql-gateway Deployment available" \
+        # only while a gateway replica is Available. The KEDA HTTP add-on scales
+        # it straight back to zero when no traffic reaches the interceptor, so a
+        # manual scale-up doesn't last: hold the generated ScaledObject at one
+        # replica for the walkthrough (keda_hold_replicas releases it on exit).
+        keda_hold_replicas graphql-gateway-http 1 graphql-gateway >/dev/null 2>&1 || true
+        check "graphql-gateway Deployment available (held at 1 for the walkthrough)" \
               "kubectl -n $NS get deploy graphql-gateway -o jsonpath='{.status.availableReplicas}' 2>/dev/null | grep -qE '^[1-9][0-9]*$'" \
-              "kubectl -n $NS scale deploy/graphql-gateway --replicas=1 && kubectl -n $NS rollout status deploy/graphql-gateway   (KEDA holds it at zero when idle)"
+              "kubectl -n $NS describe scaledobject graphql-gateway-http   (the KEDA hold did not bring a replica up)"
         check "graphql-gateway Service exists" \
               "kubectl -n $NS get svc graphql-gateway >/dev/null 2>&1" \
               "kubectl -n $NS get svc graphql-gateway   (or re-run bootstrap-capstone.sh)"
@@ -222,7 +225,7 @@ preflight() {
     fi
     if want_act lineage; then
         check "OpenMetadata server Ready" \
-              "ready_by_label openmetadata 'app.kubernetes.io/name=openmetadata'" \
+              "ready_by_label $NS 'app.kubernetes.io/name=openmetadata'" \
               "./scripts/setup-openmetadata.sh"
         check "OpenMetadata ingestion has run (catalog populated)" \
               "kubectl get job -n $NS om-ingest-postgres om-ingest-kafka om-declare-lineage --no-headers 2>/dev/null | wc -l | grep -q '^3$'" \
