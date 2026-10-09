@@ -5,8 +5,8 @@ description: What this tutorial covers, in what order, and how the sections buil
 duration: 2 minutes
 ---
 
-This tutorial takes a developer comfortable with Fedora and Podman
-from `dnf install minikube` (where available) through running real
+This tutorial takes a developer comfortable with Fedora or RHEL (on a host or in a VM) and Docker Engine
+from installing Docker Engine and minikube through running real
 applications on a local Kubernetes cluster with `kubectl` and
 `helm`, and ends with reference material for Istio service mesh
 and KEDA HTTP-driven autoscaling. Sections 11 and 12 are skippable
@@ -22,14 +22,14 @@ partial reads still leave you with something useful.
 |----|---------------------------------------------|------------------------------------------------------------------------------------------|----------|
 | 1  | Prerequisites                               | What hardware, OS, and tools you need before starting                                    | 10 min   |
 | 2  | Installation                                | Install minikube, kubectl, helm, and the supporting toolbox (stern, kubectx, etc.)       | 20 min   |
-| 3  | Starting minikube                           | Drivers (podman, docker), in-cluster runtimes, status, pause/stop, upgrade               | 15 min   |
-| 4  | Custom resources, profiles, multi-node      | Tune CPU/memory, run parallel clusters via profiles, configure multi-node                | 15 min   |
+| 3  | Starting minikube                           | The docker driver, containerd, published ports, status, pause/stop, upgrade               | 15 min   |
+| 4  | Custom resources, profiles, multi-node      | Size clusters, run parallel profiles, configure multi-node                | 15 min   |
 | 5  | Addons and the dashboard                    | List, enable, and use addons; the Kubernetes dashboard                                   | 10 min   |
 | 6  | Deploying with kubectl                      | Imperative and declarative deploys, dry-run manifest generation, idiomatic kubectl       | 20 min   |
-| 7  | Services, NodePort, and minikube IP         | Service types, exposing apps, getting URLs back via `minikube service`                   | 10 min   |
+| 7  | Services, NodePort, and minikube IP         | Service types, exposing apps through published NodePorts on 127.0.0.1                   | 10 min   |
 | 8  | Persistent volumes                          | Static `hostPath` PVs and dynamic PVCs using the default storage class                   | 15 min   |
 | 9  | Deploying with Helm                         | `helm install/upgrade/rollback`, using public charts, authoring a small chart            | 25 min   |
-| 10 | Editor, shell, and terminal integration     | CLion k8s plugin, Podman Desktop, zsh + kubectx/kubens, warp.dev workflows               | 15 min   |
+| 10 | Editor, shell, and terminal integration     | CLion k8s plugin, zsh + kubectx/kubens, warp.dev workflows               | 15 min   |
 | 11 | Istio on minikube                           | Install via `istioctl`, sidecar-enabled demo app, Gateway + VirtualService, mTLS basics  | 30 min   |
 | 12 | KEDA on minikube (optional)                 | Helm install of KEDA + HTTP add-on; HTTP-driven scaling with a `hey` load test           | 25 min   |
 | 13 | Alternatives to minikube                    | Brief tour: kind, k3s, microk8s, microshift — when to pick what                          | 5 min    |
@@ -58,13 +58,15 @@ add real overhead on top of a basic cluster.
 
 ## Conventions in this tutorial
 
-- All commands target **Fedora 44** with the **podman driver**
-  unless explicitly noted. Where macOS differs, a "macOS note"
-  callout flags it — macOS is not a tested platform here, just
-  acknowledged
+- All commands target **Fedora 44** with the **docker driver** and
+  **containerd** (runc) on **Docker Engine**. RHEL and Fedora or RHEL
+  VMs use the same commands; §1 names the one repo URL that differs
+- Host access to workloads is always a **NodePort published to
+  127.0.0.1 when the profile is created** (§3). Reaching a Service never
+  needs a background process to reach a Service
 - All container images used by examples are **UBI-based** and
   pullable without `subscription-manager` registration:
-  `registry.access.redhat.com/ubi9/...`
+  `registry.access.redhat.com/ubi10/...`
 - The `examples/` directory holds runnable code for each hands-on
   section. Each example has a `README.md` (narrated walkthrough)
   and a `demo.sh` (strict end-to-end script that also serves as
@@ -77,7 +79,7 @@ add real overhead on top of a basic cluster.
 
 You should already know, roughly:
 
-- What a container is and how to run one with `podman run`
+- What a container is and how to run one with `docker run`
 - What a Pod, Deployment, and Service are in Kubernetes (one
   paragraph each is enough)
 - How to read YAML and edit it in a text editor
@@ -99,6 +101,5 @@ walkthrough][k8s-basics] is the right warm-up.
   options for navigation only)
 - Knative (intentionally out of scope; possible standalone
   follow-on)
-- Windows / WSL (not tested)
 
 Ready? [Start with §1: Prerequisites →]({{ "/docs/01-prerequisites/" | relative_url }})

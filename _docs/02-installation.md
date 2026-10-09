@@ -28,11 +28,10 @@ The cleanest install path is the upstream RPM via `dnf`, so
 future updates pick up like any other dnf-tracked package:
 
 ```bash
-sudo dnf install -y https://storage.googleapis.com/minikube/releases/latest/minikube-latest.x86_64.rpm
+sudo dnf install -y https://github.com/kubernetes/minikube/releases/download/v1.38.1/minikube-1.38.1-0.x86_64.rpm
 ```
 
-This pulls the latest stable release (v1.38.x as of mid-2026)
-and installs it as `/usr/bin/minikube`. Confirm:
+This installs the pinned release, v1.38.1, as `/usr/bin/minikube`. Confirm:
 
 ```bash
 minikube version
@@ -40,8 +39,8 @@ minikube version
 
 You should see output mentioning a default Kubernetes version
 that minikube targets — that's the *cluster* version, distinct
-from your `kubectl` client version. minikube v1.38.x defaults to
-launching Kubernetes 1.35.x clusters.
+from your `kubectl` client version. minikube v1.38.1 defaults to
+launching Kubernetes 1.35.x clusters; §3 pins v1.35.1 explicitly.
 
 ### Why not the upstream `curl ... && sudo install` path?
 
@@ -68,10 +67,22 @@ with any 1.34.x or 1.36.x cluster you might spin up via
 `--kubernetes-version`).
 
 If kubectl isn't installed, install the upstream binary (kubectl
-is not currently in Fedora 44's standard repos):
+is not currently in Fedora 44's standard repos). Pin it to the
+newest v1.35.x patch, which matches the cluster version §3 starts.
+Find that patch (v1.35.9 at the time of writing; `jq` is also used
+by the demo scripts):
 
 ```bash
-curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+sudo dnf install -y jq
+KUBECTL_VERSION=$(curl -s "https://api.github.com/repos/kubernetes/kubernetes/releases?per_page=100" \
+  | jq -r '.[].tag_name' | grep -E '^v1\.35\.[0-9]+$' | head -1)
+echo "$KUBECTL_VERSION"
+```
+
+Then download and install it:
+
+```bash
+curl -LO "https://dl.k8s.io/release/${KUBECTL_VERSION}/bin/linux/amd64/kubectl"
 sudo install -o root -g root -m 0755 kubectl /usr/local/bin/kubectl
 rm -f kubectl
 ```
@@ -149,7 +160,7 @@ have it (`hey --help` failing), install via Go:
 
 ```bash
 sudo dnf install -y golang
-go install github.com/rakyll/hey@latest
+go install github.com/rakyll/hey@v0.1.5
 ```
 
 The binary lands in `~/go/bin/hey`. If `~/go/bin/` isn't already
@@ -167,14 +178,14 @@ extensions ship as krew plugins rather than as standalone
 binaries — including `stern`, `kubectx`, and `kubens`, none of
 which are packaged in Fedora's repos.
 
-Install krew first:
+Install krew first (pinned to v0.5.0):
 
 ```bash
 ( set -x; cd "$(mktemp -d)" && \
   OS="$(uname | tr '[:upper:]' '[:lower:]')" && \
   ARCH="$(uname -m | sed -e 's/x86_64/amd64/' -e 's/arm.*$/arm/')" && \
   KREW="krew-${OS}_${ARCH}" && \
-  curl -fsSLO "https://github.com/kubernetes-sigs/krew/releases/latest/download/${KREW}.tar.gz" && \
+  curl -fsSLO "https://github.com/kubernetes-sigs/krew/releases/download/v0.5.0/${KREW}.tar.gz" && \
   tar zxvf "${KREW}.tar.gz" && \
   ./"${KREW}" install krew )
 ```
@@ -207,7 +218,7 @@ You should see three lines, one per plugin.
 
 ## Verify everything
 
-Re-run the audit script from r03 — every tool should now report
+Re-run the audit script — every tool should now report
 a path and a version:
 
 ```bash
@@ -224,20 +235,5 @@ minikube version | head -1 && kubectl version --client=true | head -1 && helm ve
 
 Three single-line version reports, no errors — you're ready for
 §3.
-
-## macOS note
-
-On macOS, every install in this section collapses to one Homebrew
-line (assuming Homebrew is installed; see `brew.sh`):
-
-```bash
-brew install minikube kubectl helm httpie yq stern kubectx hey
-```
-
-The minikube quickstart for macOS additionally covers the
-driver-specific setup (Podman Desktop on macOS bundles its own
-Linux VM and has its own configuration story) that differs from
-the Linux flow. Treat the macOS path as supplementary — the
-section §3 onward assumes Linux behavior.
 
 [On to §3: Starting minikube →]({{ "/docs/03-starting-minikube/" | relative_url }})

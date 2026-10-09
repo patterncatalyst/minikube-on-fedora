@@ -1,14 +1,15 @@
 ---
 title: Starting minikube
 order: 3
-description: Start a minikube cluster with the podman driver, verify it's healthy, manage its lifecycle.
+description: Start a minikube cluster with the docker driver and containerd, publish NodePorts to loopback, verify it's healthy, manage its lifecycle.
 duration: 15 minutes
 ---
 
 This section starts your first minikube cluster, walks through
-the layers involved (driver, in-cluster runtime, the cluster
-itself), and covers the lifecycle commands you'll use day to
-day: status, pause, stop, delete, upgrade.
+the layers involved (Docker Engine, the in-cluster runtime, the
+cluster itself), publishes the NodePorts later sections use, and
+covers the lifecycle commands you'll use day to day: status,
+pause, stop, delete, upgrade.
 
 At the end of the section, `examples/03-driver-check/demo.sh`
 runs the whole thing as a strict end-to-end script — same
@@ -19,95 +20,42 @@ supporting tools are on `PATH`).
 
 ![minikube on Fedora 44 topology]({{ "/assets/diagrams/03-minikube-topology.svg" | relative_url }})
 
-## Set sensible defaults
-
-Before the first `minikube start`, set defaults so you don't have
-to remember flags every time. **Run all five `config set` commands
-below before any other minikube command.** Use the values from
-the §1 hardware table that match your plan — these are good
-"comfortable for most of the tutorial" picks:
-
-```bash
-minikube config set cpus 6
-minikube config set memory 16384
-minikube config set driver podman
-minikube config set rootless true
-minikube config set container-runtime containerd
-```
-
-> **Run all five together before anything else.** Without `driver`
-> set, minikube auto-detects a driver on each `minikube start`. On
-> Fedora dev machines with both Podman and the Docker CLI installed
-> (a common shape — `dnf` makes both available), the auto-detect
-> can pick Docker. Combined with `rootless=true` already set, that
-> fails confusingly: `Using rootless Docker driver was required,
-> but the current Docker does not seem rootless`. Setting
-> `driver=podman` explicitly avoids the trap.
-
-These get written to `~/.minikube/config/config.json` and are
-applied by every future `minikube start` that doesn't override
-them via flags. Inspect with:
-
-```bash
-minikube config view
-```
-
-If you set values you later regret, `minikube config unset <key>`
-clears them, or just rerun `set` with a new value.
-
-### Why `rootless true`
-
-minikube's podman driver defaults to **rootful** mode — it shells
-out to `sudo podman ...` to talk to the system podman. That's the
-historical mainstream and works fine if you've configured passwordless
-sudo for podman. Fedora 44 ships rootless podman as default
-(verified in §1: `podman info` showed `rootless=true`), and the
-tutorial assumes that posture. Without `rootless true`, your first
-`minikube start` will fail with:
-
-```
-💣  Exiting due to PROVIDER_PODMAN_NOT_RUNNING:
-    "sudo -n -k podman version ..." exit status 1: sudo: a password is required
-```
-
-The fix is what we just set: `minikube config set rootless true`
-makes minikube use rootless podman directly — no `sudo`, no
-passwordless-sudo plumbing needed. Functionally equivalent
-clusters, the rootless one just has slightly different network
-plumbing under the hood. For everything in this tutorial, it
-doesn't matter which mode you use; the rootless choice avoids
-the password prompt.
-
 ## Start the cluster
 
-Now actually launch it:
+Pass everything on the command line. Do **not** use `minikube
+config set` for the driver or runtime: it writes
+`~/.minikube/config/config.json`, which every minikube project on
+the machine shares, so one project's choice silently changes
+another's.
 
 ```bash
-minikube start
+minikube start \
+    --driver=docker --container-runtime=containerd \
+    --kubernetes-version=v1.35.1 \
+    --cpus=6 --memory=16384 \
+    --ports=127.0.0.1:18080:30080,127.0.0.1:18081:30808,127.0.0.1:18090:30900
 ```
 
-The first run downloads minikube's "kicbase" image (a UBI-style
-base with kubeadm preinstalled) and starts a podman container
-named `minikube`, then bootstraps a single-node Kubernetes 1.35.x
+The values come from the §1 hardware table (6 CPUs and 16 GB is the
+"comfortable for most of the tutorial" pick) and match what the
+example demos pass when they create the `minikube` profile.
+
+The first run downloads minikube's "kicbase" image (the node image
+with kubeadm preinstalled) and starts a Docker container named
+`minikube`, then bootstraps a single-node Kubernetes v1.35.1
 cluster inside it. Expect 60–90 seconds for the first run; 15–30
 seconds for restarts thereafter.
 
 You'll see output like:
 
 ```
-😄  minikube v1.38.x on Fedora 44
-    ▪ MINIKUBE_ROOTLESS=true
-✨  Using the podman driver based on user configuration
-❗  Starting v1.39.0, minikube will default to "containerd" container runtime. See #21973 for more info.
-📌  Using rootless Podman driver
+😄  minikube v1.38.1 on Fedora 44
+✨  Using the docker driver based on user configuration
 👍  Starting "minikube" primary control-plane node in "minikube" cluster
-🚜  Pulling base image v0.0.50 ...
-💾  Downloading Kubernetes v1.35.x preload ...
-    > preloaded-images-k8s-...:  272 MiB / 272 MiB  100.00%
-    > gcr.io/k8s-minikube/kicbase...:  519 MiB / 519 MiB  100.00%
-E0516 ... cache.go:239] Error downloading kic artifacts: not yet implemented, see issue #8426
-🔥  Creating podman container (CPUs=6, Memory=16384MB) ...
-📦  Preparing Kubernetes v1.35.x on containerd 2.2.x ...
+🚜  Pulling base image ...
+💾  Downloading Kubernetes v1.35.1 preload ...
+🔥  Creating docker container (CPUs=6, Memory=16384MB) ...
+📦  Preparing Kubernetes v1.35.1 on containerd ...
 🔗  Configuring CNI (Container Networking Interface) ...
 🔎  Verifying Kubernetes components...
 🌟  Enabled addons: storage-provisioner, default-storageclass
@@ -116,29 +64,78 @@ E0516 ... cache.go:239] Error downloading kic artifacts: not yet implemented, se
 
 The last line is the important one — minikube has updated your
 `~/.kube/config` so `kubectl` points at the cluster you just
-started.
+started. Exact wording varies between minikube releases.
 
-> **About that red `E0516 ... cache.go:239] Error downloading kic
-> artifacts` line.** Harmless. minikube has a stub code path for
-> fetching auxiliary "kic" (Kubernetes-in-Container) image artifacts
-> via the podman driver that was never fully wired up — it returns
-> `ErrNotImplemented` and is logged at error level when it should be
-> info. Tracked as kubernetes/minikube#8426 (open since 2021). The
-> cluster comes up fine; ignore the line.
+### The published ports
+
+`--ports` publishes the node container's NodePorts on your
+loopback interface. Each entry is `127.0.0.1:<host port>:<nodePort>`.
+The three used by the core sections:
+
+| Host address        | nodePort | Used by                                                                         |
+|---------------------|----------|---------------------------------------------------------------------------------|
+| `127.0.0.1:18080`   | 30080    | §6 `nginx`; §8 and §9 reuse it one at a time; §12 HTTP add-on interceptor       |
+| `127.0.0.1:18081`   | 30808    | §7 `nginx-np`                                                                   |
+| `127.0.0.1:18090`   | 30900    | §5 dashboard, through the `dashboard-host` companion Service                    |
+
+A Service of `type: NodePort` with one of those `nodePort` values
+is then reachable at the matching host address, for example
+`curl http://127.0.0.1:18080/`. Loopback only means nothing on your
+network can reach it. No process has to stay running in a
+terminal for these to work.
+
+The §11 Istio profile has its own map of five ports, set in §11.
+
+### Published ports are fixed at creation
+
+Docker cannot add a published port to a running container, and
+minikube sets the mapping only when it creates the node. So:
+
+- Ports persist across `minikube stop` / `minikube start`
+- Adding or changing one means `minikube delete` and a new
+  `minikube start` with the full `--ports` list
+- A host port can be published by only one running profile at a
+  time (§4)
+
+Check what a profile publishes:
+
+```bash
+docker port minikube
+```
+
+```
+30080/tcp -> 127.0.0.1:18080
+30808/tcp -> 127.0.0.1:18081
+30900/tcp -> 127.0.0.1:18090
+```
+
+Ask for one nodePort to see just its mapping:
+
+```bash
+docker port minikube 30080/tcp
+```
+
+If a demo reports that a profile "does not publish nodePort ...",
+it is telling you the profile was created without that mapping. It
+prints the delete-and-recreate command; it never runs it for you.
 
 ### What just happened
 
 Three layers stacked up:
 
-| Layer                      | Implementation                              | Inspect with                              |
-|----------------------------|---------------------------------------------|-------------------------------------------|
-| Host container engine      | Podman (rootless, on Fedora 44)             | `podman ps` (shows the `minikube` container) |
-| In-cluster container runtime | containerd (set explicitly in defaults; see below) | `minikube ssh -- crictl info` |
-| Kubernetes itself          | One node running kubelet + control plane    | `kubectl get nodes`                       |
+| Layer                        | Implementation                                              | Inspect with                           |
+|------------------------------|-------------------------------------------------------------|----------------------------------------|
+| Host container engine        | Docker Engine (`docker-ce`; containerd.io and runc)         | `docker ps` (shows the `minikube` container) |
+| In-cluster container runtime | containerd with runc, inside the node container             | `minikube ssh -- sudo crictl info`     |
+| Kubernetes itself            | One node running kubelet + control plane                    | `kubectl get nodes`                    |
 
-Most readers don't need to think about the bottom two layers
-much — they're the implementation. What matters day to day is
-that `kubectl` talks to a working Kubernetes cluster.
+Docker Engine, through its own containerd and runc, runs the
+**node container**. Inside that container a second containerd with
+runc runs your **pods**, and the kubelet drives it over CRI. Most
+readers don't need to think about the bottom two layers much —
+they're the implementation. What matters day to day is that
+`kubectl` talks to a working Kubernetes cluster and that your
+NodePorts answer on `127.0.0.1`.
 
 ## Verify the cluster
 
@@ -162,18 +159,18 @@ kubeconfig: Configured
 Then via `kubectl`:
 
 ```bash
-kubectl get nodes
+kubectl --context minikube get nodes
 ```
 
 ```
 NAME       STATUS   ROLES           AGE   VERSION
-minikube   Ready    control-plane   30s   v1.35.x
+minikube   Ready    control-plane   30s   v1.35.1
 ```
 
 And the system pods that make the cluster work:
 
 ```bash
-kubectl get pods -A
+kubectl --context minikube get pods -A
 ```
 
 You should see pods in the `kube-system` namespace (`etcd`,
@@ -187,89 +184,41 @@ node first reports Ready.
 
 ## Drivers (briefly)
 
-You set `driver=podman` in the defaults above; here's what other
+The start command above uses `--driver=docker`; here's what other
 options exist and when you'd reach for them.
 
 | Driver     | When                                                                                       |
 |------------|--------------------------------------------------------------------------------------------|
-| **podman** | Default for this tutorial. Rootless on Fedora; no virtualization required                  |
-| `docker`   | Same shape as podman, runs the kicbase under Docker Engine. Fine if Docker is your daily   |
+| **docker** | Used by this tutorial. Runs the kicbase node as a container under Docker Engine; no virtualization required |
 | `kvm2`     | Runs a full VM via libvirt/KVM. Slower start, full isolation. Needs `libvirtd` configured  |
-| `qemu`     | Like `kvm2` but without KVM acceleration. Mainly for ARM hosts or unusual configurations   |
+| `qemu`     | Like `kvm2` but without KVM acceleration. Mainly for unusual configurations                |
 
-To try a different driver without changing the default, pass
-`--driver=<name>` to one-off `minikube start` invocations, or use
-a separate profile (covered in §4):
-
-```bash
-minikube start -p docker-profile --driver=docker
-```
+None of the examples support the VM drivers. Why the podman driver left this tutorial is
+in [LESSONS-LEARNED, Part
+4](https://github.com/patterncatalyst/minikube-on-fedora/blob/main/onboarding/LESSONS-LEARNED.md).
 
 ## In-cluster container runtime
 
-Separate from the driver above is the container runtime *inside*
-the cluster — what the kubelet uses to run Pods.
+Separate from the driver is the container runtime *inside* the
+cluster — what the kubelet uses to run Pods. This tutorial uses
+**containerd** with **runc**, selected with
+`--container-runtime=containerd`. Pass it explicitly on every
+`minikube start` that creates a profile; the examples do.
 
-The defaults block above sets `container-runtime=containerd`
-explicitly. This is worth a small detour to explain, because
-minikube v1.38.x's default behavior here surprises people.
+Three independent choices, easy to conflate:
 
-### What minikube picks if you don't choose
-
-minikube v1.38.x picks the in-cluster runtime based on the driver
-and other factors, and for the podman driver it historically
-defaults to **docker as the in-cluster runtime**. minikube's own
-v1.38 release notes flag that this is about to change:
-
-> Starting v1.39.0, minikube will default to "containerd"
-> container runtime.
-
-We're getting ahead of that — and avoiding a real failure mode in
-the meantime.
-
-### Why docker-as-in-cluster-runtime fails under rootless podman
-
-Inside the kicbase container, minikube has to start `dockerd` as a
-systemd service if you've selected the docker runtime. systemd
-expects to manage cgroup delegation, network namespaces, and a
-few other things in a way that **doesn't work cleanly inside a
-rootless container** (the kicbase container is rootless because
-the host's podman is rootless). The symptom is a failure during
-`minikube start` along the lines of:
-
-```
-Job for docker.service failed because the control process exited
-with error code.
-```
-
-`containerd` is simpler — no systemd-managed daemon to bring up,
-no cgroup-delegation dance — so it initializes cleanly in
-rootless mode.
-
-### Putting the layers together
-
-Three independent runtime choices, easy to conflate:
-
-| Layer                            | What we use here                         | Why                                                              |
-|----------------------------------|------------------------------------------|------------------------------------------------------------------|
-| Host container engine            | **Podman, rootless**                     | Default on Fedora 44; no `sudo` needed                            |
-| minikube driver                  | **`--driver=podman --rootless`**         | Talks to the host podman in rootless mode                         |
-| In-cluster container runtime     | **`--container-runtime=containerd`**     | Initializes cleanly in rootless; matches minikube's v1.39 default |
+| Layer                        | Used here                              |
+|------------------------------|-----------------------------------------------|
+| Host container engine        | **Docker Engine** (`docker-ce`)               |
+| minikube driver              | **`--driver=docker`**                         |
+| In-cluster container runtime | **`--container-runtime=containerd`** (runc)   |
 
 The first two are about the host's relationship with minikube.
 The third is what the kubelet uses inside the cluster to run
-Pods — *independent* of the first two.
-
-### Alternative in-cluster runtime: cri-o
-
-If you have a specific reason to run cri-o instead (matching a
-production environment that uses it, for example):
-
-```bash
-minikube start --container-runtime=cri-o
-```
-
-You'll rarely need this. Stick with containerd.
+Pods — *independent* of the first two. Docker Engine on the host
+and containerd in the node never share state: an image you
+`docker build` on the host is not visible to the cluster until you
+load it (`minikube image load`), which §6 shows.
 
 ### A note on docker-as-runtime in modern Kubernetes
 
@@ -309,8 +258,8 @@ minikube start
 ```
 
 `stop` terminates the cluster's container; `start` (without
-re-creating anything) brings it back. Persistent volumes and
-loaded workloads survive `stop`/`start`.
+re-creating anything) brings it back. Persistent volumes, loaded
+workloads, and the published ports survive `stop`/`start`.
 
 ### Delete
 
@@ -322,8 +271,10 @@ minikube delete
 ```
 
 You'll want this after experiments, or when an upgrade is in
-order, or if the cluster gets wedged. Recovery is fast: just
-`minikube start` again and you have a fresh cluster.
+order, or if the cluster gets wedged. Recovery is fast: run the
+start command from the next section again and you have a fresh
+cluster. Delete the profile and recreate it whenever you need a
+port that isn't published yet.
 
 ### Upgrading minikube
 
@@ -342,34 +293,29 @@ minikube update-check
 ```
 
 If you've been running an older cluster across an upgrade,
-`minikube delete && minikube start` is usually the cleanest way
-to migrate to the new minikube version's defaults.
-
-## A note about NodePort access
-
-A small driver-specific gotcha to know about ahead of §7:
-
-On Linux with `--driver=podman` (or `docker`), the cluster's
-node IP is reachable from your host — `curl minikube-ip:nodeport`
-works directly. On macOS or under Podman Desktop's VM, the
-cluster lives inside a VM and you need `minikube tunnel` or
-`minikube service <name>` to get a host-reachable URL. §7 covers
-both paths.
-
-This isn't something to act on now — it's just context for why
-§7 introduces `minikube service` as the canonical NodePort
-access pattern even though raw `minikube ip` is simpler.
+delete the profile and run the §3 start command again; that is
+usually the cleanest way to migrate to the new minikube version's
+defaults.
 
 ## Smoke test: examples/03-driver-check/
 
 The `examples/03-driver-check/demo.sh` script runs the whole
 sequence above as one end-to-end test:
 
-1. Starts a minikube cluster on a `driver-check` profile (so it
-   doesn't disturb your default cluster)
-2. Verifies status is fully `Running`
-3. Verifies `kubectl` can list nodes and system pods
-4. Tears down the profile on exit (even on failure, via `trap`)
+1. Checks Docker Engine (`require_docker_engine`): the `default`
+   context on `unix:///var/run/docker.sock`, `DOCKER_HOST` unset,
+   no `podman-docker`
+2. Starts a minikube cluster on a `driver-check` profile with
+   `--driver=docker --container-runtime=containerd` and
+   `--ports=127.0.0.1:18079:30079` (so it doesn't disturb your
+   default cluster or its ports)
+3. Verifies the profile reports driver `docker` and runtime
+   `containerd`, the node reports `containerd://...`, and
+   `docker port driver-check 30079/tcp` shows `127.0.0.1:18079`
+4. Verifies `minikube status` is fully `Running`
+5. Verifies `kubectl --context driver-check` can list nodes and
+   system pods
+6. Tears down the profile on exit (even on failure, via `trap`)
 
 Run it:
 
