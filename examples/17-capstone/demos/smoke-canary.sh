@@ -19,7 +19,7 @@
 #   ./demos/smoke-canary.sh
 #
 # Prerequisites:
-#   - capstone profile running, kubectl context = capstone
+#   - mof-capstone profile running (kubectl/helm are pinned to it by scripts/lib/env.sh)
 #   - scripts/setup-istio.sh has run (Istio installed, namespace injection on)
 #   - order-service (v1) deployed via the umbrella chart WITH the r26 selector
 #     (version=v1). If the live Deployment predates r26, this smoke detects the
@@ -30,15 +30,12 @@
 #   subset-by-label routing. Flagged in istio/routing.yaml.
 
 set -uo pipefail
-export MINIKUBE_ROOTLESS=true   # CAP-010
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/lib/env.sh"   # PROFILE, NS, ports; pins kubectl/helm to the profile
 
-NS="capstone"
-PROFILE="capstone"
 ISTIO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../istio" && pwd)"
-LOCAL_PORT="8080"
+LOCAL_PORT="$HOST_PORT_INGRESS"   # istio-ingressgateway, published NodePort on 127.0.0.1
 GW="http://127.0.0.1:${LOCAL_PORT}"
 REQUESTS=100
-PORT_FORWARD_PID=""
 
 step() { printf '\n==> %s\n' "$1"; }
 
@@ -55,11 +52,9 @@ dump_diagnostics() {
 
 fail() {
     printf '\n✗ FAILED: %s\n' "$1" >&2
-    [[ -n "$PORT_FORWARD_PID" ]] && kill "$PORT_FORWARD_PID" 2>/dev/null
     dump_diagnostics
     exit 1
 }
-trap '[[ -n "$PORT_FORWARD_PID" ]] && kill "$PORT_FORWARD_PID" 2>/dev/null || true' EXIT
 
 # apply_weights V1 V2 — render the VirtualService at the given split and apply
 apply_weights() {
@@ -95,8 +90,7 @@ measure_split() {
 # ─── Pre-flight ──────────────────────────────────────────────────────────────
 
 step "Pre-flight checks"
-[[ "$(kubectl config current-context 2>/dev/null)" == "$PROFILE" ]] \
-    || fail "kubectl context is not '$PROFILE' — run: kubectl config use-context $PROFILE"
+minikube status -p "$PROFILE" >/dev/null 2>&1 || fail "profile '$PROFILE' not running — ./scripts/setup-capstone-profile.sh"
 for t in kubectl curl; do command -v "$t" >/dev/null || fail "$t not in PATH"; done
 kubectl get deployment istiod -n istio-system >/dev/null 2>&1 \
     || fail "Istio not installed — run scripts/setup-istio.sh first"
@@ -142,12 +136,10 @@ printf '    ✓ both subsets are in the mesh\n'
 step "Applying the DestinationRule, Gateway, and a 90/10 canary"
 apply_weights 90 10
 
-step "Port-forwarding the istio-ingressgateway"
-kubectl port-forward -n istio-system svc/istio-ingressgateway "${LOCAL_PORT}:80" >/dev/null 2>&1 &
-PORT_FORWARD_PID=$!
-sleep 4
-curl -fsS "${GW}/version" >/dev/null 2>&1 \
-    || fail "ingress gateway not reachable on ${GW} (is the port-forward up?)"
+step "Reaching the istio-ingressgateway on ${GW} (published NodePort)"
+require_published_port "$PROFILE" "$NODE_PORT_INGRESS" "$HOST_PORT_INGRESS"
+wait_for_http "${GW}/version" 60 \
+    || fail "ingress gateway not reachable on ${GW} (is the ingressgateway-host Service applied? see host-access/ingressgateway-host.yaml)"
 
 step "Driving ${REQUESTS} requests at the 90/10 split"
 measure_split "90/10" 1 30      # ~10 expected; generous band for 100 samples

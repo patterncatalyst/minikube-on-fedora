@@ -6,8 +6,8 @@
 #
 # Flow:
 #   1. confirm committed gRPC stubs exist for the gateway
-#   2. sanity: charts point at the in-cluster registry
-#   3. build + push inventory-service, order-service, graphql-gateway
+#   2. assert the deployed images are bare <svc>:v1 with pullPolicy Never
+#   3. build + load inventory-service, order-service, graphql-gateway
 #   4. ensure Postgres Ready; deploy all three
 #   5. place an in-stock order via order-service REST to get an order id
 #   6. query the gateway:  { order(id) { id itemSku quantity stock { sku quantityOnHand available } } }
@@ -17,12 +17,10 @@
 # Usage:  ./demos/smoke-graphql.sh [--purge-db]
 
 set -uo pipefail
-export MINIKUBE_ROOTLESS=true   # CAP-010
-
-PROFILE="capstone"; NS="capstone"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"; cd "$ROOT"
+source "$ROOT/scripts/lib/env.sh"   # PROFILE, NS, host/node ports; pins kubectl/helm/istioctl to the profile
 PG_RELEASE="capstone-postgres"; PG_CHART="charts/capstone/charts/postgres"
-LOCAL_ORDER=18080; LOCAL_GQL=18099
+LOCAL_ORDER="$HOST_PORT_ORDER"; LOCAL_GQL="$HOST_PORT_GATEWAY"   # published NodePorts on 127.0.0.1
 PURGE_DB=0; [[ "${1:-}" == "--purge-db" ]] && PURGE_DB=1
 
 SERVICES=(inventory-service order-service graphql-gateway)
@@ -47,22 +45,38 @@ for svc in inventory-service order-service graphql-gateway; do
 done
 printf '    ✓ stubs present\n'
 
-# ── 2. registry-prefix guard ──────────────────────────────────────────────────
-step "Sanity: chart image.repository points at the registry"
-for svc in "${SERVICES[@]}"; do
-    repo="$(awk '/^  repository:/{print $2; exit}' "charts/capstone/charts/${svc}/values.yaml")"
-    case "$repo" in
-        localhost:5000/*) printf '    ✓ %s → %s\n' "$svc" "$repo" ;;
-        *) fail "${svc} image.repository is '${repo}' — must start with localhost:5000/" ;;
-    esac
-done
+# ── 2. image assertions (bare <svc>:v1, pullPolicy Never) ──────────────────────
+# Deployed image must be the bare <svc>:v1 with imagePullPolicy Never, and loaded in the node.
+assert_local_image() {  # deployment-name
+    local d="$1" img pol
+    img="$(kubectl get deployment "$d" -n "$NS" -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null)"
+    pol="$(kubectl get deployment "$d" -n "$NS" -o jsonpath='{.spec.template.spec.containers[0].imagePullPolicy}' 2>/dev/null)"
+    [[ "$img" == "${d}:v1" ]] || fail "${d} image is '${img}' — must be the bare '${d}:v1'"
+    [[ "$pol" == "Never" ]] || fail "${d} imagePullPolicy is '${pol}' — must be Never"
+    minikube -p "$PROFILE" image ls 2>/dev/null | grep -qE "(^|/)${d}:v1\$" \
+        || fail "${d}:v1 not in 'minikube -p ${PROFILE} image ls' — ./scripts/build-image.sh services/${d} ${d} v1"
+    printf '    ✓ %s → %s (pullPolicy Never, present in the node)\n' "$d" "$img"
+}
 
-# ── 3. build + push all three ─────────────────────────────────────────────────
+# graphql-gateway is scaled to zero by KEDA HTTP when idle and its NodePort has no
+# endpoints then. This demo calls the gateway directly on 127.0.0.1:${HOST_PORT_GATEWAY}, so
+# scale it up if needed and wait for a ready endpoint first.
+ensure_gateway_up() {
+    local ready
+    ready="$(kubectl get deployment graphql-gateway -n "$NS" -o jsonpath='{.status.readyReplicas}' 2>/dev/null)"
+    if [[ -z "$ready" || "$ready" == "0" ]]; then
+        kubectl scale deployment/graphql-gateway -n "$NS" --replicas=1 >/dev/null || fail "could not scale graphql-gateway up"
+    fi
+    kubectl rollout status deployment/graphql-gateway -n "$NS" --timeout=120s || fail "graphql-gateway not ready"
+    require_published_port "$PROFILE" "$NODE_PORT_GATEWAY" "$HOST_PORT_GATEWAY"
+    wait_for_http "http://127.0.0.1:${HOST_PORT_GATEWAY}/health" 60 || fail "graphql-gateway not answering on 127.0.0.1:${HOST_PORT_GATEWAY}"
+}
+
+# ── 3. build + load all three ─────────────────────────────────────────────────
 minikube status -p "$PROFILE" >/dev/null 2>&1 || fail "profile '$PROFILE' not running — ./scripts/setup-capstone-profile.sh"
-kubectl config use-context "$PROFILE" >/dev/null
 for svc in "${SERVICES[@]}"; do
-    step "Building + pushing ${svc}"
-    ./scripts/build-image.sh "services/${svc}" "${svc}" v1 || fail "${svc} build/push failed"
+    step "Building + loading ${svc}"
+    ./scripts/build-image.sh "services/${svc}" "${svc}" v1 || fail "${svc} build/load failed"
 done
 
 # ── 4. Postgres + deploy ──────────────────────────────────────────────────────
@@ -83,16 +97,14 @@ for svc in inventory-service order-service graphql-gateway; do
     step "Deploying ${svc}"
     helm upgrade --install "$svc" "charts/capstone/charts/${svc}" -n "$NS" || fail "${svc} install failed"
     kubectl rollout status "deployment/${svc}" -n "$NS" --timeout=120s || fail "${svc} rollout failed"
+    assert_local_image "$svc"
 done
 
 # ── 5. seed an order via order-service REST ───────────────────────────────────
-step "Port-forwarding order-service (${LOCAL_ORDER}) and graphql-gateway (${LOCAL_GQL})"
-kubectl port-forward -n "$NS" service/order-service "${LOCAL_ORDER}:80" >/dev/null 2>&1 &
-PF_O=$!
-kubectl port-forward -n "$NS" service/graphql-gateway "${LOCAL_GQL}:80" >/dev/null 2>&1 &
-PF_G=$!
-trap '[[ -n "${PF_O:-}" ]] && kill "$PF_O" 2>/dev/null; [[ -n "${PF_G:-}" ]] && kill "$PF_G" 2>/dev/null' EXIT
-sleep 3
+step "Waiting for order-service (${LOCAL_ORDER}) and graphql-gateway (${LOCAL_GQL}) on their published NodePorts"
+require_published_port "$PROFILE" "$NODE_PORT_ORDER" "$HOST_PORT_ORDER"
+wait_for_http "http://127.0.0.1:${LOCAL_ORDER}/health" 60 || fail "order-service not answering on 127.0.0.1:${LOCAL_ORDER}"
+ensure_gateway_up   # direct call on 18099: scale up + wait for endpoints (not via the KEDA interceptor)
 
 step "Placing an in-stock order (WIDGET-001 x2) via order-service REST"
 ORDER_JSON="$(curl -fsS -X POST "http://127.0.0.1:${LOCAL_ORDER}/orders" \
@@ -130,6 +142,5 @@ printf '\n✓ SUCCESS — federated GraphQL query verified (order via REST + sto
 
 # ── 7. cleanup on success ─────────────────────────────────────────────────────
 step "Cleanup (success)"
-kill "$PF_O" "$PF_G" 2>/dev/null; PF_O=""; PF_G=""
 helm uninstall "${SERVICES[@]}" -n "$NS" >/dev/null 2>&1 && echo "releases uninstalled"
 if (( PURGE_DB )); then helm uninstall "$PG_RELEASE" -n "$NS" >/dev/null 2>&1 && echo "postgres uninstalled"; fi

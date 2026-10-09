@@ -14,17 +14,14 @@
 # Run from examples/17-capstone/:  ./demos/smoke-reviews.sh
 
 set -uo pipefail
-export MINIKUBE_ROOTLESS=true
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/lib/env.sh"   # PROFILE, NS, ports; pins kubectl/helm to the profile
 
-NS="capstone"
-PROFILE="capstone"
 RELEASE="review-service"
 CHART="charts/capstone/charts/review-service"
 SERVICE_DIR="services/review-service"
 IMAGE_NAME="review-service"
 IMAGE_TAG="v1"
-PORT="18086"
-PF=""
+PORT="$HOST_PORT_REVIEW"   # published NodePort on 127.0.0.1
 SUCCESS=0
 
 step() { printf '\n==> %s\n' "$1"; }
@@ -41,9 +38,8 @@ dump() {
     fi
     printf '\nClean up manually: helm uninstall %s -n %s\n' "$RELEASE" "$NS"
 }
-fail() { printf '\n✗ FAILED: %s\n' "$1" >&2; [[ -n "$PF" ]] && kill "$PF" 2>/dev/null; dump; exit 1; }
+fail() { printf '\n✗ FAILED: %s\n' "$1" >&2; dump; exit 1; }
 on_exit() {
-    [[ -n "$PF" ]] && kill "$PF" 2>/dev/null || true
     if (( SUCCESS )); then
         step "Cleanup (success)"
         helm uninstall "$RELEASE" -n "$NS" 2>/dev/null || true
@@ -51,17 +47,28 @@ on_exit() {
 }
 trap on_exit EXIT
 
+# Deployed image must be the bare <svc>:v1 with imagePullPolicy Never, and loaded in the node.
+assert_local_image() {  # deployment-name
+    local d="$1" img pol
+    img="$(kubectl get deployment "$d" -n "$NS" -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null)"
+    pol="$(kubectl get deployment "$d" -n "$NS" -o jsonpath='{.spec.template.spec.containers[0].imagePullPolicy}' 2>/dev/null)"
+    [[ "$img" == "${d}:v1" ]] || fail "${d} image is '${img}' — must be the bare '${d}:v1'"
+    [[ "$pol" == "Never" ]] || fail "${d} imagePullPolicy is '${pol}' — must be Never"
+    minikube -p "$PROFILE" image ls 2>/dev/null | grep -qE "(^|/)${d}:v1\$" \
+        || fail "${d}:v1 not in 'minikube -p ${PROFILE} image ls' — ./scripts/build-image.sh services/${d} ${d} v1"
+    printf '    ✓ %s → %s (pullPolicy Never, present in the node)\n' "$d" "$img"
+}
+
 # ─── Pre-flight ──────────────────────────────────────────────────────────────
 step "Pre-flight checks"
-[[ "$(kubectl config current-context 2>/dev/null)" == "$PROFILE" ]] \
-    || fail "kubectl context is not '$PROFILE' — run: kubectl config use-context $PROFILE"
+minikube status -p "$PROFILE" >/dev/null 2>&1 || fail "profile '$PROFILE' not running — ./scripts/setup-capstone-profile.sh"
 kubectl get cluster.postgresql.cnpg.io capstone-postgres -n "$NS" >/dev/null 2>&1 \
     || fail "capstone-postgres not found — bring the capstone up first (./scripts/cluster-up.sh)"
 command -v helm >/dev/null || fail "helm not in PATH"
 
 # ─── Build + deploy ──────────────────────────────────────────────────────────
-step "Building and pushing ${IMAGE_NAME}:${IMAGE_TAG}"
-./scripts/build-image.sh "$SERVICE_DIR" "$IMAGE_NAME" "$IMAGE_TAG" || fail "image build/push failed"
+step "Building and loading ${IMAGE_NAME}:${IMAGE_TAG}"
+./scripts/build-image.sh "$SERVICE_DIR" "$IMAGE_NAME" "$IMAGE_TAG" || fail "image build/load failed"
 
 step "Deploying review-service"
 helm upgrade --install "$RELEASE" "$CHART" -n "$NS" || fail "helm install failed"
@@ -71,15 +78,12 @@ kubectl wait -n "$NS" --for=condition=Ready pod \
     -l app.kubernetes.io/name=review-service --timeout=180s >/dev/null 2>&1 \
     || fail "review-service pod did not become Ready"
 printf '    ✓ review-service Ready\n'
+assert_local_image review-service
 
-# ─── Port-forward + assert the REST surface ──────────────────────────────────
-step "Port-forwarding review-service ($PORT → svc:80)"
-kubectl port-forward -n "$NS" "svc/${RELEASE}" "${PORT}:80" >/dev/null 2>&1 &
-PF=$!
-for _ in $(seq 1 15); do
-    curl -s -o /dev/null --max-time 2 "http://127.0.0.1:${PORT}/health" && break
-    sleep 1
-done
+# ─── Published NodePort + assert the REST surface ────────────────────────────
+step "Waiting for review-service on 127.0.0.1:$PORT (published NodePort)"
+require_published_port "$PROFILE" "$NODE_PORT_REVIEW" "$HOST_PORT_REVIEW"
+wait_for_http "http://127.0.0.1:${PORT}/health" 60 || fail "review-service not answering on 127.0.0.1:${PORT}"
 
 base="http://127.0.0.1:${PORT}"
 

@@ -4,8 +4,8 @@
 # cross-product lineage declared (r27b).
 #
 # Does NOT run ingestion — that's scripts/ingest-openmetadata.sh. This proves
-# the result, over the server API (via a port-forward, the smoke-openmetadata.sh
-# pattern):
+# the result, over the server API on the published NodePort 127.0.0.1:8585 (the
+# smoke-openmetadata.sh pattern):
 #   * the Database Service  capstone-postgres  exists
 #   * the Messaging Service capstone-kafka      exists
 #   * the three spine entities exist:
@@ -20,7 +20,7 @@
 #   ./demos/smoke-om-lineage.sh
 #
 # Prerequisites:
-#   - capstone profile running, kubectl context = capstone
+#   - mof-capstone profile running (kubectl/helm are pinned to it by scripts/lib/env.sh)
 #   - scripts/setup-openmetadata.sh AND scripts/ingest-openmetadata.sh have run
 #
 # VERIFY-POINTS (OpenMetadata 1.12.8 API; confirm at build time):
@@ -29,20 +29,16 @@
 #     downstreamEdges). These are the things most likely to need a tweak.
 
 set -uo pipefail   # NOT -e: failures are handled so we can diagnose
-export MINIKUBE_ROOTLESS=true   # CAP-010
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/lib/env.sh"   # PROFILE, NS, ports; pins kubectl/helm to the profile
 
-NS="capstone"
-PROFILE="capstone"
-LOCAL_PORT="8585"
+LOCAL_PORT="$HOST_PORT_OPENMETADATA"   # published NodePort on 127.0.0.1
 OM="http://127.0.0.1:${LOCAL_PORT}"
-ADMIN_EMAIL="admin@open-metadata.org"
-ADMIN_PASSWORD="admin"   # demo default (r27)
+GET_TOKEN="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/openmetadata/ingestion/get_token.py"   # login lives there; credentials: see openmetadata/om-app-values.yaml
 
 ORDERS_FQN="capstone-postgres.capstone.orders.orders"
 TOPIC_FQN="capstone-kafka.order-placed"
 NOTIFS_FQN="capstone-postgres.capstone.notifications.notifications"
 
-PORT_FORWARD_PID=""
 TOKEN=""
 
 step() { printf '\n==> %s\n' "$1"; }
@@ -61,12 +57,9 @@ dump_diagnostics() {
 
 fail() {
     printf '\n✗ FAILED: %s\n' "$1" >&2
-    [[ -n "$PORT_FORWARD_PID" ]] && kill "$PORT_FORWARD_PID" 2>/dev/null
     dump_diagnostics
     exit 1
 }
-
-trap '[[ -n "$PORT_FORWARD_PID" ]] && kill "$PORT_FORWARD_PID" 2>/dev/null || true' EXIT
 
 # om_get PATH → echoes response body, returns curl's exit code
 om_get() {
@@ -76,26 +69,19 @@ om_get() {
 # ─── Pre-flight ──────────────────────────────────────────────────────────────
 
 step "Pre-flight checks"
-[[ "$(kubectl config current-context 2>/dev/null)" == "$PROFILE" ]] \
-    || fail "kubectl context is not '$PROFILE' — run: kubectl config use-context $PROFILE"
+minikube status -p "$PROFILE" >/dev/null 2>&1 || fail "profile '$PROFILE' not running — ./scripts/setup-capstone-profile.sh"
 command -v kubectl >/dev/null || fail "kubectl not in PATH"
 command -v curl >/dev/null || fail "curl not in PATH"
 command -v python3 >/dev/null || fail "python3 not in PATH"
 kubectl get deployment openmetadata -n "$NS" >/dev/null 2>&1 \
     || fail "openmetadata not deployed — run scripts/setup-openmetadata.sh first"
 
-# ─── Port-forward + admin token ──────────────────────────────────────────────
+# ─── Published NodePort + admin token ────────────────────────────────────────
 
-step "Port-forwarding the server and obtaining an admin token"
-kubectl port-forward -n "$NS" svc/openmetadata "${LOCAL_PORT}:8585" >/dev/null 2>&1 &
-PORT_FORWARD_PID=$!
-sleep 4
-
-PW_B64="$(printf '%s' "$ADMIN_PASSWORD" | base64)"
-LOGIN_JSON="$(curl -fsS -X POST "${OM}/api/v1/users/login" \
-    -H 'Content-Type: application/json' \
-    -d "{\"email\":\"${ADMIN_EMAIL}\",\"password\":\"${PW_B64}\"}" 2>/dev/null || echo '')"
-TOKEN="$(printf '%s' "$LOGIN_JSON" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("accessToken",""))' 2>/dev/null || echo '')"
+step "Reaching the server on 127.0.0.1:${LOCAL_PORT} (published NodePort) and obtaining an admin token"
+require_published_port "$PROFILE" "$NODE_PORT_OPENMETADATA" "$HOST_PORT_OPENMETADATA"
+wait_for_http "${OM}/api/v1/system/version" 120 || fail "no response from ${OM} — is the server serving?"
+TOKEN="$(OM_HOST="$OM" python3 "$GET_TOKEN" 2>/dev/null || echo '')"
 [[ -n "$TOKEN" ]] || fail "could not obtain an admin token (is the server serving? check auth provider)"
 printf '    ✓ authenticated\n'
 
@@ -148,5 +134,4 @@ step "SUCCESS"
 printf 'The catalog is populated and the lineage is declared:\n'
 printf '  orders (Postgres) -> order-placed (Kafka) -> notifications (Postgres)\n\n'
 printf 'Browse it:\n'
-printf '  kubectl port-forward -n %s svc/openmetadata 8585:8585\n' "$NS"
-printf '  http://127.0.0.1:8585  (admin@open-metadata.org / admin)\n'
+printf '  http://127.0.0.1:%s   (credentials: see openmetadata/om-app-values.yaml)\n' "$LOCAL_PORT"

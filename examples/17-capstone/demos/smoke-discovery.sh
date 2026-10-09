@@ -9,23 +9,21 @@
 # feedstock OpenMetadata ingests later.
 #
 # Flow: ensure Strimzi+Kafka+Apicurio+Postgres → deploy inventory/order/gateway
-#       → port-forward → publish discovery contracts → assert each artifact is
+#       → published NodePorts → publish discovery contracts → assert each artifact is
 #       retrievable from Apicurio's v3 API (and the Avro subject from ccompat)
 #       → cleanup on success.
 #
 # Usage:  ./demos/smoke-discovery.sh [--purge-db]
 
 set -uo pipefail
-export MINIKUBE_ROOTLESS=true   # CAP-010
-
-PROFILE="capstone"; NS="capstone"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"; cd "$ROOT"
+source "$ROOT/scripts/lib/env.sh"   # PROFILE, NS, host/node ports; pins kubectl/helm/istioctl to the profile
 PG_RELEASE="capstone-postgres"; PG_CHART="charts/capstone/charts/postgres"
 KAFKA_RELEASE="capstone-kafka"; KAFKA_CHART="charts/capstone/charts/kafka"; KAFKA_CR="capstone-kafka"
 APICURIO_RELEASE="apicurio"; APICURIO_CHART="charts/capstone/charts/apicurio"
 PROTO_PATH="proto/capstone/inventory/v1/inventory.proto"
 GROUP="default"
-LOCAL_ORDER=18080; LOCAL_GW=18099; LOCAL_APIC=18085
+LOCAL_ORDER="$HOST_PORT_ORDER"; LOCAL_GW="$HOST_PORT_GATEWAY"; LOCAL_APIC="$HOST_PORT_APICURIO"   # published NodePorts on 127.0.0.1
 PURGE_DB=0; [[ "${1:-}" == "--purge-db" ]] && PURGE_DB=1
 
 DEPLOY=(inventory-service order-service graphql-gateway)
@@ -43,19 +41,33 @@ fail() {
     exit 1
 }
 
-# ── registry guard ────────────────────────────────────────────────────────────
-step "Sanity: chart image.repository points at the registry"
-for svc in "${DEPLOY[@]}"; do
-    repo="$(awk '/^  repository:/{print $2; exit}' "charts/capstone/charts/${svc}/values.yaml")"
-    case "$repo" in
-        localhost:5000/*) printf '    ✓ %s → %s\n' "$svc" "$repo" ;;
-        *) fail "${svc} image.repository is '${repo}' — must start with localhost:5000/" ;;
-    esac
-done
+# Deployed image must be the bare <svc>:v1 with imagePullPolicy Never, and loaded in the node.
+assert_local_image() {  # deployment-name
+    local d="$1" img pol
+    img="$(kubectl get deployment "$d" -n "$NS" -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null)"
+    pol="$(kubectl get deployment "$d" -n "$NS" -o jsonpath='{.spec.template.spec.containers[0].imagePullPolicy}' 2>/dev/null)"
+    [[ "$img" == "${d}:v1" ]] || fail "${d} image is '${img}' — must be the bare '${d}:v1'"
+    [[ "$pol" == "Never" ]] || fail "${d} imagePullPolicy is '${pol}' — must be Never"
+    minikube -p "$PROFILE" image ls 2>/dev/null | grep -qE "(^|/)${d}:v1\$" \
+        || fail "${d}:v1 not in 'minikube -p ${PROFILE} image ls' — ./scripts/build-image.sh services/${d} ${d} v1"
+    printf '    ✓ %s → %s (pullPolicy Never, present in the node)\n' "$d" "$img"
+}
+# graphql-gateway is scaled to zero by KEDA HTTP when idle and its NodePort has no
+# endpoints then. This demo calls the gateway directly on 127.0.0.1:${HOST_PORT_GATEWAY}, so
+# scale it up if needed and wait for a ready endpoint first.
+ensure_gateway_up() {
+    local ready
+    ready="$(kubectl get deployment graphql-gateway -n "$NS" -o jsonpath='{.status.readyReplicas}' 2>/dev/null)"
+    if [[ -z "$ready" || "$ready" == "0" ]]; then
+        kubectl scale deployment/graphql-gateway -n "$NS" --replicas=1 >/dev/null || fail "could not scale graphql-gateway up"
+    fi
+    kubectl rollout status deployment/graphql-gateway -n "$NS" --timeout=120s || fail "graphql-gateway not ready"
+    require_published_port "$PROFILE" "$NODE_PORT_GATEWAY" "$HOST_PORT_GATEWAY"
+    wait_for_http "http://127.0.0.1:${HOST_PORT_GATEWAY}/health" 60 || fail "graphql-gateway not answering on 127.0.0.1:${HOST_PORT_GATEWAY}"
+}
 [[ -f "$PROTO_PATH" ]] || fail "proto not found at ${PROTO_PATH} — run ./scripts/gen-protos.sh? (the .proto is committed)"
 
 minikube status -p "$PROFILE" >/dev/null 2>&1 || fail "profile '$PROFILE' not running"
-kubectl config use-context "$PROFILE" >/dev/null
 
 # ── platform: Strimzi + Kafka + Apicurio ──────────────────────────────────────
 step "Ensuring Strimzi + Kafka + Apicurio are up"
@@ -66,10 +78,10 @@ helm upgrade --install "$APICURIO_RELEASE" "$APICURIO_CHART" -n "$NS" >/dev/null
 kubectl rollout status deployment/apicurio -n "$NS" --timeout=180s || fail "apicurio rollout failed"
 printf '    ✓ Kafka + Apicurio ready\n'
 
-# ── build + push + Postgres + deploy ──────────────────────────────────────────
+# ── build + load + Postgres + deploy ──────────────────────────────────────────
 for svc in "${DEPLOY[@]}"; do
-    step "Building + pushing ${svc}"
-    ./scripts/build-image.sh "services/${svc}" "${svc}" v1 || fail "${svc} build/push failed"
+    step "Building + loading ${svc}"
+    ./scripts/build-image.sh "services/${svc}" "${svc}" v1 || fail "${svc} build/load failed"
 done
 step "Ensuring Postgres is Ready"
 kubectl get crd clusters.postgresql.cnpg.io >/dev/null 2>&1 || fail "CloudNativePG operator missing"
@@ -87,15 +99,18 @@ for svc in "${DEPLOY[@]}"; do
     step "Deploying ${svc}"
     helm upgrade --install "$svc" "charts/capstone/charts/${svc}" -n "$NS" >/dev/null || fail "${svc} install failed"
     kubectl rollout status "deployment/${svc}" -n "$NS" --timeout=120s || fail "${svc} rollout failed"
+    assert_local_image "$svc"
 done
 
-# ── port-forwards ─────────────────────────────────────────────────────────────
-step "Port-forwards: order(${LOCAL_ORDER}) gateway(${LOCAL_GW}) apicurio(${LOCAL_APIC})"
-kubectl port-forward -n "$NS" service/order-service "${LOCAL_ORDER}:80" >/dev/null 2>&1 & PF_O=$!
-kubectl port-forward -n "$NS" service/graphql-gateway "${LOCAL_GW}:80" >/dev/null 2>&1 & PF_G=$!
-kubectl port-forward -n "$NS" service/apicurio "${LOCAL_APIC}:8080" >/dev/null 2>&1 & PF_A=$!
-trap '[[ -n "${PF_O:-}" ]]&&kill "$PF_O" 2>/dev/null;[[ -n "${PF_G:-}" ]]&&kill "$PF_G" 2>/dev/null;[[ -n "${PF_A:-}" ]]&&kill "$PF_A" 2>/dev/null' EXIT
-sleep 3
+# ── published NodePorts ───────────────────────────────────────────────────────
+# order-service and Apicurio are reached on their NodePorts; the gateway is scaled up first
+# (see ensure_gateway_up) because its NodePort has no endpoints while KEDA holds it at zero.
+step "Waiting for order(${LOCAL_ORDER}) gateway(${LOCAL_GW}) apicurio(${LOCAL_APIC}) on their published NodePorts"
+require_published_port "$PROFILE" "$NODE_PORT_ORDER" "$HOST_PORT_ORDER"
+require_published_port "$PROFILE" "$NODE_PORT_APICURIO" "$HOST_PORT_APICURIO"
+wait_for_http "http://127.0.0.1:${LOCAL_ORDER}/health" 60 || fail "order-service not answering on 127.0.0.1:${LOCAL_ORDER}"
+wait_for_http "http://127.0.0.1:${LOCAL_APIC}/apis/registry/v3/system/info" 60 || fail "apicurio not answering on 127.0.0.1:${LOCAL_APIC}"
+ensure_gateway_up
 
 # ── publish ───────────────────────────────────────────────────────────────────
 step "Publishing discovery contracts (OpenAPI + Protobuf + GraphQL SDL)"
@@ -123,7 +138,6 @@ printf '\n✓ SUCCESS — discovery contracts published; Apicurio now holds all 
 
 # ── cleanup on success ────────────────────────────────────────────────────────
 step "Cleanup (success)"
-kill "$PF_O" "$PF_G" "$PF_A" 2>/dev/null; PF_O=""; PF_G=""; PF_A=""
 helm uninstall "${DEPLOY[@]}" -n "$NS" >/dev/null 2>&1 && echo "service releases uninstalled"
 if (( PURGE_DB )); then
     helm uninstall "$APICURIO_RELEASE" "$KAFKA_RELEASE" "$PG_RELEASE" -n "$NS" >/dev/null 2>&1 && echo "apicurio + kafka + postgres uninstalled"

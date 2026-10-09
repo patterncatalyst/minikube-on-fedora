@@ -8,7 +8,8 @@
 # "What you can see it do" slide:
 #
 #   1. trace      — one GraphQL query → trace spans across three products in Tempo
-#                   (bypasses the KEDA HTTP-add-on interceptor — see CAP-046)
+#                   (calls the gateway directly on its NodePort, bypassing the
+#                   KEDA HTTP-add-on interceptor — see CAP-046)
 #   2. scale      — KEDA scales notification-service on Kafka lag (zero → up → zero)
 #   3. canary     — order-service v1→v2 contract evolution, weight-shifted by Istio
 #   4. lineage    — OpenMetadata shows the cross-product lineage of the spine
@@ -21,10 +22,17 @@
 # Note on Act 1 (CAP-046, June 2026): KEDA HTTP v0.14.0's interceptor has an
 # upstream Go panic on POST forwarding (filed at kedacore/http-add-on#1668),
 # and v0.12.2's interceptor has cold-start race issues with the gateway. While
-# that's pending upstream resolution, the trace act here port-forwards directly
-# to the graphql-gateway Service — the trace itself (HTTP server → REST client
-# → gRPC client across three products) is unchanged; only the entry path is.
-# The HTTP-add-on demo path returns once the upstream fix releases.
+# that's pending upstream resolution, the trace act calls the graphql-gateway
+# directly on its published NodePort (127.0.0.1:18099) — the trace itself (HTTP
+# server → REST client → gRPC client across three products) is unchanged; only
+# the entry path is. The NodePort has no endpoints while KEDA holds the gateway
+# at zero, so the preflight requires an available gateway replica and the act
+# waits for it to answer before sending the query. The HTTP-add-on demo path
+# returns once the upstream fix releases.
+#
+# There are no background processes: every service is reached on a published
+# NodePort on 127.0.0.1 (ports are fixed when the mof-capstone profile is
+# created; see scripts/lib/env.sh).
 #
 # Usage:
 #   ./demos/walkthrough.sh                     # run all five acts
@@ -42,8 +50,8 @@ set -uo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 CAPSTONE_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 cd "$CAPSTONE_ROOT"
+source "$CAPSTONE_ROOT/scripts/lib/env.sh"   # PROFILE, NS, host/node ports; pins kubectl/helm/istioctl to the profile
 
-NS="capstone"
 OBS_NS="observability"
 ISTIO_SYSTEM="istio-system"
 
@@ -141,26 +149,6 @@ run_act() {
     fi
 }
 
-# ─── Cleanup ─────────────────────────────────────────────────────────────────
-# Two acts start background port-forwards: trace (to graphql-gateway, while the
-# query is in flight) and topology (to Kiali, kept open through the discussion).
-# Tear them down on exit no matter how we got there (Ctrl-C, normal exit,
-# failure).
-KIALI_PF=""
-TRACE_PF=""
-cleanup() {
-    if [[ -n "$TRACE_PF" ]] && kill -0 "$TRACE_PF" 2>/dev/null; then
-        printf '\n%s  cleaning up trace port-forward (pid %s)%s\n' "$DIM" "$TRACE_PF" "$RST"
-        kill "$TRACE_PF" 2>/dev/null || true
-    fi
-    if [[ -n "$KIALI_PF" ]] && kill -0 "$KIALI_PF" 2>/dev/null; then
-        printf '\n%s  cleaning up Kiali port-forward (pid %s)%s\n' "$DIM" "$KIALI_PF" "$RST"
-        kill "$KIALI_PF" 2>/dev/null || true
-    fi
-}
-trap cleanup EXIT
-trap 'printf "\n%sinterrupted%s\n" "$RED" "$RST"; exit 130' INT
-
 # ─── Preflight ───────────────────────────────────────────────────────────────
 # Cheap "is the stack actually here?" checks. Each failure includes the fix.
 
@@ -206,12 +194,13 @@ preflight() {
               "./scripts/setup-observability.sh   (or: kubectl get pods -n $OBS_NS -l app.kubernetes.io/name=tempo)"
     fi
     if want_act trace; then
-        # trace bypasses the interceptor and port-forwards directly to the
-        # graphql-gateway Service — see CAP-046. Confirm the Deployment + Service
-        # are both there so the port-forward has something to attach to.
+        # trace bypasses the interceptor and calls the graphql-gateway NodePort
+        # (127.0.0.1:18099) directly — see CAP-046. That NodePort has endpoints
+        # only while a gateway replica is Available (KEDA scales it to zero when
+        # idle), so confirm the Deployment and Service before starting.
         check "graphql-gateway Deployment available" \
               "kubectl -n $NS get deploy graphql-gateway -o jsonpath='{.status.availableReplicas}' 2>/dev/null | grep -qE '^[1-9][0-9]*$'" \
-              "kubectl -n $NS rollout status deploy/graphql-gateway   (or re-run bootstrap-capstone.sh)"
+              "kubectl -n $NS scale deploy/graphql-gateway --replicas=1 && kubectl -n $NS rollout status deploy/graphql-gateway   (KEDA holds it at zero when idle)"
         check "graphql-gateway Service exists" \
               "kubectl -n $NS get svc graphql-gateway >/dev/null 2>&1" \
               "kubectl -n $NS get svc graphql-gateway   (or re-run bootstrap-capstone.sh)"
@@ -277,37 +266,27 @@ prompt_enter "press Enter to start"
 
 # ─── ACT 1 · TRACE ───────────────────────────────────────────────────────────
 # This act intentionally bypasses the KEDA HTTP-add-on interceptor — see the
-# header comment and CAP-046. We port-forward directly to the graphql-gateway
-# Service, send the GraphQL query there, and verify the resulting trace lands
-# in Tempo. The trace itself is identical to what runs in production; only the
-# entry path is different. Returns to going through the interceptor once
+# header comment and CAP-046. We call the graphql-gateway NodePort directly on
+# 127.0.0.1:18099, send the GraphQL query there, and verify the resulting trace
+# lands in Tempo. The trace itself is identical to what runs in production; only
+# the entry path is different. Returns to going through the interceptor once
 # upstream issue kedacore/http-add-on#1668 is fixed and released.
 
 trace_act() {
-    local pf_pid=0 result=0
+    local result=0 gw="http://127.0.0.1:${HOST_PORT_GATEWAY}"
     local query='{"query":"{ order(id: \"trace-probe\") { id itemSku quantity stock { sku quantityOnHand available } } }"}'
 
-    info "starting port-forward: graphql-gateway Service (capstone) → 127.0.0.1:8080"
+    info "gateway entry: graphql-gateway NodePort → ${gw}"
     info "  (bypasses keda-add-ons-http-interceptor-proxy — see CAP-046)"
-    kubectl port-forward -n "$NS" svc/graphql-gateway 8080:80 >/dev/null 2>&1 &
-    pf_pid=$!
-    TRACE_PF=$pf_pid
+    require_published_port "$PROFILE" "$NODE_PORT_GATEWAY" "$HOST_PORT_GATEWAY"
 
-    # wait for the port-forward to bind (probe with a cheap connect; up to ~10s).
-    # any response — including 404 — means the port-forward is alive; we use the
-    # same pattern as smoke-trace-flow.sh (no -f, just check that curl connects).
-    local ready=0
-    for _ in 1 2 3 4 5 6 7 8 9 10; do
-        if curl -s -o /dev/null --max-time 2 http://127.0.0.1:8080/ 2>/dev/null; then
-            ready=1; break
-        fi
-        sleep 1
-    done
-    if (( ready == 0 )); then
-        printf '%s  ✗ port-forward never became reachable — is graphql-gateway up?%s\n' "$RED" "$RST"
+    # The NodePort only answers while a gateway replica is Available. Poll the
+    # liveness probe until it does (up to ~30s).
+    if ! wait_for_http "${gw}/health" 30; then
+        printf '%s  ✗ graphql-gateway not answering on %s — is a replica up (KEDA may have scaled it to zero)?%s\n' "$RED" "$gw" "$RST"
         return 1
     fi
-    printf '%s    ✓ port-forward live%s\n' "$GRN" "$RST"
+    printf '%s    ✓ gateway answering on %s%s\n' "$GRN" "$gw" "$RST"
 
     narrate "sending one GraphQL query to the gateway"
     info "  query: { order(id: \"trace-probe\") { id itemSku quantity stock { ... } } }"
@@ -323,7 +302,7 @@ trace_act() {
                        -H "Host: graphql-gateway.capstone" \
                        -H "Content-Type: application/json" \
                        -X POST --data "$query" \
-                       http://127.0.0.1:8080/graphql 2>/dev/null || echo "000")
+                       "${gw}/graphql" 2>/dev/null || echo "000")
 
     if [[ "$http_status" == "200" ]]; then
         printf '%s    ✓ gateway returned HTTP 200 — a trace should now be exporting%s\n' "$GRN" "$RST"
@@ -342,11 +321,6 @@ trace_act() {
         result=1
     fi
 
-    # tear down port-forward early — we don't need it past this point
-    kill "$pf_pid" 2>/dev/null || true
-    wait "$pf_pid" 2>/dev/null || true
-    TRACE_PF=""
-
     return $result
 }
 
@@ -356,7 +330,7 @@ if want_act trace; then
     narrate "we drive a single query through graphql-gateway"
     narrate "the resolver makes a REST call to order-service and a gRPC call to inventory-service"
     narrate "all three spans land in Tempo, stitched by a shared trace id"
-    info "entry path: kubectl port-forward to graphql-gateway Service (see CAP-046)"
+    info "entry path: the graphql-gateway NodePort on 127.0.0.1:${HOST_PORT_GATEWAY} (see CAP-046)"
     info "  the KEDA HTTP-add-on demo path is deferred — kedacore/http-add-on#1668"
     prompt_enter "press Enter to run"
     if trace_act; then
@@ -434,20 +408,15 @@ if want_act topology; then
     prompt_enter "press Enter to verify Kiali"
     run_act "topology (smoke)" ./demos/smoke-kiali.sh || exit 1
 
-    narrate "now opening a port-forward to Kiali for you to show in the browser"
-    info "  http://localhost:20001/kiali   (Graph → namespace: capstone)"
-    info "  the port-forward stays open until this script exits (Ctrl-C or end of walkthrough)"
-    # background port-forward; cleanup trap kills it on any exit
-    kubectl port-forward -n "$ISTIO_SYSTEM" svc/kiali 20001:20001 >/dev/null 2>&1 &
-    KIALI_PF=$!
-    # give it a couple seconds to bind, then probe
-    for _ in 1 2 3 4 5 6 7 8 9 10; do
-        if curl -fsS http://127.0.0.1:20001/kiali/healthz >/dev/null 2>&1; then
-            printf '%s    ✓ Kiali port-forward live at http://localhost:20001/kiali%s\n' "$GRN" "$RST"
-            break
-        fi
-        sleep 1
-    done
+    narrate "Kiali is published on a NodePort — open it in the browser"
+    require_published_port "$PROFILE" "$NODE_PORT_KIALI" "$HOST_PORT_KIALI"
+    if wait_for_http "http://127.0.0.1:${HOST_PORT_KIALI}/kiali/healthz" 30; then
+        printf '%s    ✓ Kiali live at http://127.0.0.1:%s/kiali%s\n' "$GRN" "$HOST_PORT_KIALI" "$RST"
+    else
+        printf '%s    ✗ Kiali /healthz did not answer on 127.0.0.1:%s%s\n' "$RED" "$HOST_PORT_KIALI" "$RST"
+        exit 1
+    fi
+    info "  http://127.0.0.1:${HOST_PORT_KIALI}/kiali   (Graph → namespace: capstone)"
 
     narrate "to make EDGES appear in the graph, generate some traffic:"
     info "  in another shell:  for i in {1..40}; do ./demos/smoke-trace-flow.sh >/dev/null; done"
@@ -461,8 +430,3 @@ printf '\n%s%s══════════════════════
 printf '%s%s  walkthrough complete  ·  %d / %d acts run%s\n' "$BOLD" "$GRN" "$ACT_NUM" "$ACT_TOTAL" "$RST"
 printf '%s%s═══════════════════════════════════════════════════════════════════════%s\n\n' "$BOLD" "$GRN" "$RST"
 
-if want_act topology && [[ -n "$KIALI_PF" ]] && kill -0 "$KIALI_PF" 2>/dev/null; then
-    printf '%s  Kiali port-forward is still up (pid %s) — http://localhost:20001/kiali%s\n' "$DIM" "$KIALI_PF" "$RST"
-    printf '%s  press Enter to tear it down and exit, or Ctrl-C to keep the script alive until you do%s\n\n' "$DIM" "$RST"
-    prompt_enter "press Enter to exit"
-fi
