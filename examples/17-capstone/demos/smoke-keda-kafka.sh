@@ -19,10 +19,8 @@
 # Run from examples/17-capstone/:  ./demos/smoke-keda-kafka.sh
 
 set -uo pipefail
-export MINIKUBE_ROOTLESS=true
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/lib/env.sh"   # PROFILE, NS, ports; pins kubectl/helm to the profile
 
-NS="capstone"
-PROFILE="capstone"
 KEDA_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../keda" && pwd)"
 DEP="notification-service"
 SEL="app.kubernetes.io/name=notification-service"
@@ -64,8 +62,7 @@ is_scaledup(){ [[ "$(count_pods)" -gt 0 ]]; }
 
 # ─── Pre-flight ──────────────────────────────────────────────────────────────
 step "Pre-flight checks"
-[[ "$(kubectl config current-context 2>/dev/null)" == "$PROFILE" ]] \
-    || fail "kubectl context is not '$PROFILE'"
+minikube status -p "$PROFILE" >/dev/null 2>&1 || fail "profile '$PROFILE' not running — ./scripts/setup-capstone-profile.sh"
 kubectl get deployment keda-operator -n keda >/dev/null 2>&1 \
     || fail "KEDA not installed — run scripts/setup-keda.sh first"
 kubectl get deployment "$DEP" -n "$NS" >/dev/null 2>&1 \

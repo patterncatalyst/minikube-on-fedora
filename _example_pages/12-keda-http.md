@@ -19,7 +19,10 @@ now autoscaled based on in-flight request concurrency.
 ```
 
 The HTTP add-on installs alongside KEDA core in the `keda`
-namespace — `setup-keda.sh` does both. No Strimzi needed for
+namespace — `setup-keda.sh` does both. The demo also needs the
+`minikube` profile created with the core published ports
+(`CORE_PORTS` in `scripts/lib/_helpers.sh`, §4): nodePort 30080
+is published as `127.0.0.1:18080`. No Strimzi needed for
 this demo (Kafka demo is independent — see
 `examples/12-keda-kafka/`).
 
@@ -28,7 +31,7 @@ this demo (Kafka demo is independent — see
 Six §12 HTTP claims:
 
 1. KEDA HTTP add-on installs cleanly via helm at the pinned
-   version (0.12.2) on the existing `minikube` profile
+   version (0.16.0) on the existing `minikube` profile
 2. An `HTTPScaledObject` CR + a Deployment with `replicas: 0`
    results in **zero replicas at idle**
 3. The HTTP add-on **interceptor buffers the first request**
@@ -85,30 +88,57 @@ Pod startup dominated by readinessProbe `initialDelaySeconds`).
    curl handles `-H 'Host:'` correctly because curl treats Host as
    a special case
 2. **`hey` not installed** — `go install
-   github.com/rakyll/hey@latest` per §2
+   github.com/rakyll/hey@v0.1.5` per §2
 2. **HTTP add-on not installed** — symptom: pre-flight
    complains about `keda-add-ons-http-interceptor` not found.
    `./scripts/setup-keda.sh` installs both core + add-on
 3. **Cold-start timeout** — if the interceptor's first request
-   takes >60s, something's wrong with the Pod startup. Check
+   takes >60s, something's wrong with the Pod startup. A configured
+   timeout (`interceptor.readinessTimeout`, default disabled in 0.16)
+   surfaces as HTTP 504, not 502. Check
    `kubectl describe pod -l app=nginx-http` for events
 4. **Scale-up doesn't happen** — the HTTPScaledObject CRD has
    a status block; `kubectl describe httpscaledobject` shows
    conditions. The demo dumps this on failure
-5. **`Host: nginx.local` header missing** — the interceptor
+5. **nodePort 30080 is already taken, or not published** —
+   §6, §8, §9 and this demo share nodePort 30080 and only one
+   holds it at a time. The demo fails with `delete <ns>/<svc>
+   first` when another Service owns it; delete that Service (or
+   run its `cleanup.sh`) and re-run. If the profile was created
+   without `127.0.0.1:18080:30080`, the demo prints the exact
+   `minikube delete` and `minikube start` command with the full port map;
+   published ports are fixed at profile creation
+6. **`Host: nginx.local` header missing** — the interceptor
    routes based on the Host header. The demo always sets it;
    if you're testing manually, `curl -H 'Host: nginx.local'
    http://127.0.0.1:18080/` is the recipe
 
+## Host access
+
+The interceptor Service the chart installs
+(`keda-add-ons-http-interceptor-proxy`) is ClusterIP and is never
+patched, because `helm upgrade` would revert it. The demo applies a
+companion Service this repo owns,
+`host-access/interceptor-host.yaml` (`keda-interceptor-host` in
+namespace `keda`, NodePort 30080, selecting the same interceptor
+Pods). The `minikube` profile publishes that nodePort, so
+requests go to `http://127.0.0.1:18080/` with a
+`Host: nginx.local` header. No helper process is involved,
+so nothing disconnects mid-run. The companion lives outside
+`manifests/` and is applied only for the length of the demo.
+
 ## Cleanup
 
-Cleanup trap removes the Deployment, Service, and
-HTTPScaledObject. KEDA stays installed (re-install is slow).
+Cleanup trap removes the Deployment, Service,
+HTTPScaledObject, and the `keda-interceptor-host` companion
+(freeing nodePort 30080 for §6, §8, §9). KEDA stays installed
+(re-install is slow).
 
 For deeper cleanup, use `cleanup.sh`:
 
 ```bash
-# Remove the nginx workload + HTTPScaledObject (keeps KEDA
+# Remove the nginx workload + HTTPScaledObject + interceptor-host
+# (keeps KEDA
 # installed for next time)
 ./cleanup.sh
 

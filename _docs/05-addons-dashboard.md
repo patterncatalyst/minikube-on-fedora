@@ -41,10 +41,10 @@ against the current cluster. Most addons take effect within a few
 seconds; ones requiring container image pulls take a minute or two
 the first time.
 
-## Addons we'll use in this tutorial
+## Addons used in this tutorial
 
-Enable these on your default cluster — later sections assume
-they're running:
+Enable these on your default cluster. Later sections assume
+`metrics-server` and `dashboard` are running; `ingress` is optional:
 
 ```bash
 minikube addons enable metrics-server
@@ -62,8 +62,8 @@ CPU-based scaling target.
 Verify a minute after enabling:
 
 ```bash
-kubectl top nodes
-kubectl top pods -A
+kubectl --context minikube top nodes
+kubectl --context minikube top pods -A
 ```
 
 If `kubectl top` errors with "metrics not available yet", give
@@ -73,15 +73,17 @@ before it can serve them.
 ### `ingress`
 
 Installs the NGINX Ingress controller in namespace `ingress-nginx`.
-§7 covers NodePort access; ingress is what you reach for beyond
-that when you want host-based or path-based routing rather than
-per-service NodePort exposure. §11 Istio replaces ingress with its
-own Gateway resources, but in §7-§10 the NGINX ingress is enough.
+This tutorial does **not** use it to reach workloads: every
+host-facing Service is a NodePort published to `127.0.0.1` (§3, §7).
+Ingress is what you reach for beyond that when you want host-based
+or path-based routing rather than per-service NodePort exposure,
+and §11 Istio replaces it with its own Gateway resources. Enable
+it to see how it works; nothing later depends on it.
 
 Verify:
 
 ```bash
-kubectl get pods -n ingress-nginx
+kubectl --context minikube get pods -n ingress-nginx
 ```
 
 You should see an `ingress-nginx-controller-*` pod in `Running`
@@ -99,9 +101,8 @@ Not needed for this tutorial but worth knowing they exist:
 
 | Addon                       | What it gives you                                                                          |
 |-----------------------------|--------------------------------------------------------------------------------------------|
-| `registry`                  | An in-cluster image registry — push images here from your host, nodes pull them locally   |
 | `volcano`                   | Batch scheduling for ML/HPC workloads                                                      |
-| `nvidia-gpu-device-plugin`  | GPU support (Linux only, NVIDIA only)                                                      |
+| `nvidia-gpu-device-plugin`  | GPU support (NVIDIA only)                                                      |
 | `cloud-spanner`             | Cloud Spanner emulator                                                                     |
 | `csi-hostpath-driver`       | A CSI-based version of the default storage class — more flexible than the default hostPath provisioner |
 | `inaccel`                   | FPGA accelerator support                                                                   |
@@ -122,44 +123,75 @@ minikube addons configure registry-creds
 ```
 
 This prompts for credentials interactively (or accepts them via
-environment variables). For the addons we use in this tutorial
+environment variables). For the addons used in this tutorial
 the defaults are fine — no `configure` step needed.
 
 ## The Kubernetes Dashboard
 
-The dashboard is enabled like any other addon (we did so above):
+The dashboard is enabled like any other addon (done above):
 
 ```bash
 minikube addons enable dashboard
 ```
 
-But access is via a dedicated subcommand:
+The addon's Service is a `ClusterIP`, which your host can't reach,
+and this tutorial doesn't use proxies or tunnels. Instead you add a
+small **companion** NodePort Service that selects the same pods.
+The profile already publishes nodePort 30900 on `127.0.0.1:18090`
+(§3), so the Service only has to claim it:
 
 ```bash
-minikube dashboard
+kubectl --context minikube apply -f - <<'YAML'
+apiVersion: v1
+kind: Service
+metadata:
+  name: dashboard-host
+  namespace: kubernetes-dashboard
+spec:
+  type: NodePort
+  selector:
+    k8s-app: kubernetes-dashboard
+  ports:
+    - name: http
+      port: 80
+      targetPort: 9090
+      nodePort: 30900
+YAML
 ```
 
-This opens your default browser at the dashboard URL, behind a
-`kubectl proxy` that handles auth automatically. You'll see node
+Open the dashboard at <http://127.0.0.1:18090/>. You'll see node
 and pod status, can browse namespaces, edit manifests inline, view
 logs, exec into pods.
 
-For headless setups — working over SSH, on a remote host — get
-just the URL and don't open a browser:
+Notes:
+
+- **Loopback only.** The port is published on `127.0.0.1`, so only
+  this machine reaches the dashboard. The dashboard addon runs
+  without a login, which is why it must not be exposed on a LAN
+  address
+- **The companion survives addon changes.** The Service is owned
+  by you, not by the addon. minikube re-applies the addon's own
+  manifests on `minikube start`, and that doesn't touch
+  `dashboard-host`
+- **Nothing to keep running.** There is no proxy process; the
+  mapping lives in the Docker container's port bindings
+- **No answer on 18090?** Run `docker port minikube 30900/tcp`. If
+  it prints nothing, the profile was created without the mapping
+  and has to be recreated (§3)
+
+To remove the companion later:
 
 ```bash
-minikube dashboard --url
+kubectl --context minikube delete service dashboard-host -n kubernetes-dashboard
 ```
-
-You can then port-forward or tunnel that URL however you need.
 
 ### Dashboard or kubectl?
 
 The dashboard is genuinely useful for exploring an unfamiliar
 cluster — like joining a project that already has Kubernetes
 running. For day-to-day work in this tutorial, `kubectl` is faster
-and more reproducible (and what we'll be doing throughout). We'll
-mention the dashboard occasionally; we won't rely on it.
+and more reproducible, and it is what the tutorial uses throughout.
+The dashboard comes up occasionally; nothing relies on it.
 
 ## Verifying the three addons are running
 
@@ -175,7 +207,7 @@ Should show all three as `enabled` (the regex avoids matching
 For a deeper check that the addons' workloads are actually running:
 
 ```bash
-kubectl get pods -A | grep -E '(metrics-server|ingress-nginx|kubernetes-dashboard)'
+kubectl --context minikube get pods -A | grep -E '(metrics-server|ingress-nginx|kubernetes-dashboard)'
 ```
 
 Each should show a `Running` pod. metrics-server may take an extra

@@ -20,10 +20,8 @@
 # Idempotent. up re-applies; down ignores-not-found.
 
 set -uo pipefail
-export MINIKUBE_ROOTLESS=true   # CAP-010
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/lib/env.sh"   # PROFILE, NS, ports; pins kubectl/helm to the profile
 
-NS="capstone"
-PROFILE="capstone"
 ISTIO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../istio" && pwd)"
 V2_MANIFEST="$ISTIO_DIR/order-service-v2.yaml"
 ROUTING="$ISTIO_DIR/routing.yaml"
@@ -44,8 +42,8 @@ cmd="${1:-}"; shift || true
 case "$cmd" in
   up)
     w1="${1:-90}"; w2="${2:-10}"
-    [[ "$(kubectl config current-context 2>/dev/null)" == "$PROFILE" ]] \
-        || fail "kubectl context is not '$PROFILE'"
+    minikube status -p "$PROFILE" >/dev/null 2>&1 || fail "profile '$PROFILE' not running — ./scripts/setup-capstone-profile.sh"
+    require_published_port "$PROFILE" "$NODE_PORT_INGRESS" "$HOST_PORT_INGRESS"
     kubectl get deployment order-service -n "$NS" >/dev/null 2>&1 \
         || fail "order-service (v1) not deployed — install it first via its chart"
 
@@ -60,8 +58,8 @@ case "$cmd" in
 
     step "Canary is live. Observe the split:"
     cat <<EOF
-    kubectl port-forward -n istio-system svc/istio-ingressgateway 8080:80 &
-    for i in \$(seq 20); do curl -s localhost:8080/version; echo; done
+    # the istio-ingressgateway is published on 127.0.0.1:${HOST_PORT_INGRESS} (host-access/ingressgateway-host.yaml)
+    for i in \$(seq 20); do curl -s http://127.0.0.1:${HOST_PORT_INGRESS}/version; echo; done
     # ~${w2}% of responses report api_version=v2 and include "currency":"USD"
 
     Shift the canary forward:   ./demos/demo-canary.sh shift 50 50

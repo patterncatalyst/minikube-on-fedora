@@ -10,7 +10,7 @@
 ## 1. Summary
 
 **One sentence:** A hands-on tutorial that walks a Fedora-using
-Podman-comfortable developer from `dnf install` through running real
+Docker Engine developer from `dnf install` through running real
 applications on minikube with `kubectl` and `helm`, plus reference
 material for Istio and (optionally) KEDA.
 
@@ -18,11 +18,11 @@ material for Istio and (optionally) KEDA.
 Fedora 44 how to stand up a local Kubernetes cluster with minikube,
 deploy applications imperatively with `kubectl` and declaratively
 with `helm`, and extend the cluster with the Istio service mesh and
-KEDA event-driven autoscaling. Readers arrive knowing Podman and
+KEDA event-driven autoscaling. Readers arrive knowing containers and
 their package manager; they leave with a workflow they can use to
 prototype Kubernetes-bound applications without provisioning a
 remote cluster. It exists because most existing minikube tutorials
-are Docker-first and Ubuntu-or-macOS-first, because helm and istio
+are Docker-first and written for other Linux distributions or desktop platforms, because helm and istio
 integration on minikube lives scattered across vendor docs that
 don't share a coherent example, and because the prior personal
 version of this tutorial (2023) targeted Kubernetes 1.22 against
@@ -34,9 +34,8 @@ version of this tutorial (2023) targeted Kubernetes 1.22 against
 
 ### Who is the reader?
 
-A working developer on Fedora 44 who uses Podman, podman-compose,
-and Podman Desktop daily and has the Docker CLI installed as a
-familiarity safety net. They've used containers for years, know
+A working developer on Fedora 44 (or RHEL) who runs Docker Engine
+(`docker-ce`) daily. They've used containers for years, know
 what a Pod, Deployment, and Service are at a paragraph-level, but
 haven't operated more than a hobby cluster. Their motivation is
 usually a new project that targets Kubernetes in production and
@@ -48,8 +47,8 @@ KEDA outside their main workplace cluster.
 The official minikube docs treat installation as a one-liner, then
 redirect into the broader Kubernetes documentation that assumes
 more cluster-ops literacy than most application developers have.
-Existing third-party tutorials are largely Docker-first or
-Ubuntu-first; on Fedora 44 with Podman, much of their command-line
+Existing third-party tutorials are largely written for other
+platforms; on Fedora 44 and RHEL, much of their command-line
 prose reads as out of date. Helm, kubectl idioms, Istio, and KEDA
 each live in their own ecosystems with their own getting-started
 pages, and stitching them together against minikube is a half-day
@@ -58,14 +57,17 @@ Overflow without understanding why it works.
 
 ### Why now?
 
-Fedora 44 is current as of 2026; the podman / podman-compose
-tooling has stabilized to where the docker driver is no longer the
-default-best choice on Fedora; helm 3.x is universal; KEDA's HTTP
+Fedora 44 is current as of 2026; with Docker Engine from Docker's
+Fedora/RHEL repository, the minikube docker driver publishes
+NodePorts to the host's loopback interface when the cluster is
+created (`--ports`), so no example needs a tunnel (see
+[`onboarding/LESSONS-LEARNED.md`](onboarding/LESSONS-LEARNED.md)
+Part 4 for why the earlier driver choice was retired); helm is
+universal; KEDA's HTTP
 add-on (the piece that makes HTTP-driven autoscaling actually
 demonstrable rather than only CPU-based) reached usable maturity
 in 2024–2025; and the 2023 version of this tutorial targeted
-Kubernetes 1.22 with `containerd`, both of which are now misleading
-defaults.
+Kubernetes 1.22, which is now a misleading default.
 
 ---
 
@@ -74,14 +76,16 @@ defaults.
 ### Goals
 
 - A reader who finishes the tutorial can install minikube on
-  Fedora 44, start a cluster with the podman driver, deploy an
+  Fedora 44, start a cluster with the docker driver (containerd runtime),
+  deploy an
   app two ways (kubectl and helm), expose it via NodePort, watch
   logs and basic metrics, and tear it all down — without
   consulting other docs
 - A reader understands the difference between minikube's drivers,
   cluster runtimes, and addons well enough to pick the right combo
   for a next project
-- All hands-on examples run on Fedora 44 with the podman driver
+- All hands-on examples run on Fedora 44 with the docker driver on
+  Docker Engine, reached through published NodePorts,
   and pass an end-to-end `demo.sh` script with no manual fixups
 - The tutorial covers helm chart **authoring** for at least one
   small app — not just `helm install` of someone else's chart
@@ -108,7 +112,8 @@ defaults.
 - This tutorial does NOT include Knative (intentionally dropped
   from the 2023 outline to keep scope tractable; may live as a
   follow-on)
-- This tutorial does NOT cover Windows / WSL — not tested
+- This tutorial does NOT cover platforms other than Fedora and RHEL
+  (hosts or VMs)
 
 ---
 
@@ -116,19 +121,16 @@ defaults.
 
 ### Primary audience
 
-A developer running Fedora 44 with Podman, podman-compose, and
-Podman Desktop installed; comfortable with `dnf`, `systemctl`, and
-their shell. Has the Docker CLI installed for familiarity. Knows
+A developer running Fedora 44 (host or VM) with Docker Engine
+installed; comfortable with `dnf`, `systemctl`, and
+their shell. Knows
 that a Deployment hosts Pods which match a Service's selector but
 hasn't operated production Kubernetes.
 
 ### Secondary audience
 
-- Developers on Fedora derivatives (RHEL, Rocky, Alma) — most of
-  the `dnf`-based instructions apply unchanged
-- Developers on macOS who occasionally need local Kubernetes —
-  served through brief "macOS notes" callouts in §1 and §2 only,
-  not as a tested platform
+- Developers on RHEL (hosts or VMs) — the `dnf`-based instructions
+  apply unchanged
 - Developers learning Helm, Istio, or KEDA who want a low-friction
   local environment for hands-on practice and don't need to start
   from "what is minikube"
@@ -140,7 +142,7 @@ hasn't operated production Kubernetes.
 - Production cluster operators — minikube is for local dev;
   readers seeking production guidance should look at OpenShift,
   GKE, or EKS docs
-- Windows users without WSL — and even WSL is not tested here
+- Readers on platforms other than Fedora and RHEL — not covered
 
 ---
 
@@ -154,16 +156,16 @@ Sections numbered 0–15. Filenames mirror these numbers in `_docs/`
 | §  | Title                                            | Purpose                                                                                  | Est. duration |
 |----|--------------------------------------------------|------------------------------------------------------------------------------------------|---------------|
 | 0  | Outline                                          | Reader's map of what's ahead; quick-reference TOC                                        | 2 min         |
-| 1  | Prerequisites                                    | Hardware, OS, Podman/Docker checks, `dnf`-installable basics                             | 10 min        |
+| 1  | Prerequisites                                    | Hardware, OS, Docker Engine checks, `dnf`-installable basics                             | 10 min        |
 | 2  | Installation                                     | Install minikube + kubectl + helm + supporting tools                                     | 20 min        |
-| 3  | Starting minikube                                | Drivers (podman, docker), runtimes (containerd, cri-o), status, pause/stop, upgrade      | 15 min        |
+| 3  | Starting minikube                                | Docker driver, containerd runtime (runc), published ports, status, pause/stop, upgrade      | 15 min        |
 | 4  | Custom resources, profiles, multi-node           | CPU/memory tuning, profiles for parallel clusters, multi-node config                     | 15 min        |
 | 5  | Addons and the dashboard                         | Listing/enabling addons; metrics-server, ingress, registry, dashboard                    | 10 min        |
 | 6  | Deploying with kubectl                           | Imperative + declarative deploys, dry-run manifest generation, idiomatic kubectl         | 20 min        |
-| 7  | Services, NodePort, and minikube IP              | Service types, exposing apps, getting URLs back via `minikube service`                   | 10 min        |
+| 7  | Services, NodePort, and minikube IP              | Service types, exposing apps, reaching apps on published loopback ports                    | 10 min        |
 | 8  | Persistent volumes                               | Static `hostPath` PV; dynamic PVC via the default storage class                          | 15 min        |
 | 9  | Deploying with Helm                              | `helm install/upgrade/rollback`; using public charts; authoring a tiny chart             | 25 min        |
-| 10 | Editor, shell, and terminal integration          | CLion k8s plugin; Podman Desktop's k8s view; zsh + kubectx/kubens; warp.dev workflows    | 15 min        |
+| 10 | Editor, shell, and terminal integration          | CLion k8s plugin; zsh + kubectx/kubens; warp.dev workflows    | 15 min        |
 | 11 | Istio on minikube                                | Install via `istioctl`, sidecar-enabled demo app, Gateway + VirtualService, mTLS basics  | 30 min        |
 | 12 | KEDA on minikube (optional)                      | Helm install of KEDA + HTTP add-on; HTTP-driven `ScaledObject`; load test with `hey`     | 25 min        |
 | 13 | Alternatives to minikube                         | Brief: kind, k3s, microk8s, microshift — when to pick what                               | 5 min         |
@@ -259,7 +261,7 @@ verification test. Every `demo.sh`:
 - [x] Aggregator script `scripts/test-all-examples.sh` invoking
   each example's `demo.sh`
 - [ ] CI via GitHub Actions — deferred. minikube needs a host
-  with virtualization that GitHub's default ubuntu runners don't
+  with virtualization that GitHub's default hosted runners don't
   cleanly offer. Revisit if this becomes a pain point
 - [ ] Manual verification — fallback, recorded in the
   reconciliation plan
@@ -290,7 +292,7 @@ These will adjust as prose drives the actual need — not all are
 guaranteed to make the cut:
 
 - `03-minikube-driver-runtime-layers.svg` — how the driver
-  (podman/docker), the in-cluster runtime (containerd/cri-o), and
+  (docker), the in-cluster runtime (containerd with runc), and
   the Fedora host stack layer together
 - `06-deployment-pod-service-mapping.svg` — selectors connecting
   Service → Pod via Deployment's labels
@@ -310,7 +312,7 @@ guaranteed to make the cut:
 ### Verification metrics (we control these)
 
 - All examples' `demo.sh` pass under `scripts/test-all-examples.sh`
-  on Fedora 44 with the podman driver
+  on Fedora 44 with the docker driver on Docker Engine
 - Reconciliation plan shows all Section C (testing matrix) rows
   as `verified (Fedora 44)`
 - §1 prerequisites tested on a fresh Fedora 44 install or VM
@@ -330,18 +332,20 @@ guaranteed to make the cut:
 
 ### Technical constraints
 
-- Primary platform: Fedora 44 with podman as the minikube driver
-- macOS appears only as advisory callouts in §1 and §2; not tested
-- Examples must run rootless where minikube permits
+- Supported platforms: Fedora, Fedora VMs, RHEL, and RHEL VMs only
+- Primary platform: Fedora 44 with Docker Engine (`docker-ce`) and
+  `minikube start --driver=docker --container-runtime=containerd`
+- Host-facing Services are NodePorts published at profile creation
+  (`--ports=127.0.0.1:<host>:<nodePort>`); nothing relies on
+  forwarded connections
 - All container images pulled by examples must be UBI-based and
   pullable without `subscription-manager` registration —
   `registry.access.redhat.com/ubi9/...` family
 - Standard Fedora repositories preferred for tool installs (`dnf
   install`); fall back to upstream installers only when the
   package isn't carried in Fedora repos
-- `minikube --driver=podman` is the primary tested driver; the
-  `docker` driver is covered as a documented alternate (the user
-  has both available)
+- `minikube --driver=docker --container-runtime=containerd` is the
+  only tested path; Docker Engine is the requirement
 - No paid services, no accounts behind paywalls
 
 ### Editorial constraints
@@ -355,8 +359,8 @@ guaranteed to make the cut:
 - Multi-line scripts ship inside `examples/<name>/demo.sh` not as
   inline blocks
 - Diagrams use SVG, never PNG; sized via `viewBox`
-- Where Fedora and macOS differ, the macOS guidance lives in a
-  clearly marked callout, not woven into the primary prose
+- Every command targets Fedora or RHEL; there are no per-platform
+  callouts
 - Idiomatic `kubectl` is preferred where it fits naturally; `helm`
   is preferred for deploying applications when both kubectl and
   helm would work
@@ -364,7 +368,7 @@ guaranteed to make the cut:
 ### Dependencies
 
 - minikube binary (Fedora package if/when available, else upstream
-  install from `https://storage.googleapis.com/minikube/releases/latest/`)
+  install of the pinned v1.39.0 RPM from GitHub releases)
 - UBI image availability at `registry.access.redhat.com`
 - Helm chart sources: `kedacore/keda`, `kedacore/keda-add-ons-http`
   for §12; `istio-base` / `istiod` charts or `istioctl install` for §11
@@ -385,7 +389,7 @@ years; helm charts are semver-pinned and won't disappear silently.
 | Pinned minikube version goes stale within months                        | Medium  | High       | Pin to a tested version; record "tested against X.Y.Z" in reconciliation plan; refresh quarterly            |
 | Istio on minikube hits resource limits on default 2-CPU / 2 GB           | High    | Medium     | §1 prereqs bump to 6 CPU / 16 GB; §3 walks through `minikube config set` for these defaults                 |
 | KEDA HTTP add-on API changes (it's still evolving)                       | Medium  | Medium     | Pin add-on version; section opens with version disclosure; mark `unverified` until tested                   |
-| podman driver behavior differs from docker driver in subtle ways         | Medium  | Medium     | Note differences inline; test both drivers for the core nginx demos before marking those rows verified      |
+| Published NodePort slots are shared (one Service per nodePort)           | Medium  | Medium     | Preflight fails with "delete X first" if another Service holds the nodePort; `scripts/check-port-map.sh`    |
 | Tutorial reads as too long; readers skim and miss prerequisites          | High    | Medium     | §0 outline sets expectations; §1 front-loaded; sections written so partial reads work                       |
 | Manifests embed image tags that get retagged upstream                    | Low     | Low        | Use immutable digests inside `demo.sh` tests; human-readable tags in the tutorial prose                     |
 | GitHub Pages CDN serves stale diagram SVGs after deploy                  | Low     | Medium     | Per LESSONS-LEARNED.md: hard-reload during verification; expect ~10 min CDN catch-up                        |
@@ -438,17 +442,16 @@ leak into prose as unverified claims:
 - Is `kubectl` cleanly installable via `dnf install
   kubernetes-client` without pulling the full server stack, or
   is the upstream binary cleaner? (Resolve in §2)
-- Does Podman Desktop's bundled minikube on macOS conflict with a
-  standalone minikube install? (For the macOS callouts in §1, §2)
 - For the §12 KEDA HTTP add-on demo, what's the smallest UBI-based
   workload that's still illustrative — UBI httpd with a static
   page, or a small Go binary copied into `ubi9-minimal`?
 - Should `.excalidraw` sources be committed alongside their `.svg`
   from the start (per skeleton convention) or only once a diagram
   is finalized? (Default: yes, from the start)
-- Does the `minikube` podman driver work cleanly with rootless
-  podman on Fedora 44, or are there permission gotchas worth a
-  callout? (Resolve in §3)
+- Resolved 2026-10-09: the earlier driver choice was retired in
+  favor of Docker Engine; see the decision log and
+  [`onboarding/LESSONS-LEARNED.md`](onboarding/LESSONS-LEARNED.md)
+  Part 4
 
 ---
 
@@ -464,14 +467,21 @@ re-litigating.
 | 2026-05-16 | Brand emoji: ☸️ (kubernetes wheel)                                                    | Tutorial spans more than helm so the helm wheel ⎈ would be misleading; ☸️ covers the whole scope                                     |
 | 2026-05-16 | Knative dropped from scope                                                            | Out of scope for the Fedora-focused personal tutorial; possible standalone follow-on later                                            |
 | 2026-05-16 | Istio added; KEDA added with optional flag                                            | User uses Istio extensively elsewhere and wants a minikube reference. KEDA + HTTP add-on demonstrates HTTP-driven scaling, not only CPU |
-| 2026-05-16 | macOS coverage is advisory notes only, not a tested platform                          | Author's primary workstation is Fedora 44; testing macOS would add overhead without proportional benefit                              |
+<!-- policy-exempt:start -->
+| 2026-05-16 | macOS coverage is advisory notes only, not a tested platform (superseded 2026-10-09 by "Fedora/RHEL only") | Author's primary workstation is Fedora 44; testing macOS would add overhead without proportional benefit |
+<!-- policy-exempt:end -->
 | 2026-05-16 | `examples/<name>/demo.sh` serves both reader demo and maintainer test (merge pattern) | Linear demos (manifest → deploy → hit endpoint → cleanup) fit a single strict script cleanly; splitting would duplicate logic         |
 | 2026-05-16 | Tool list: kubectl, helm, stern, kubectx/kubens, yq, krew, httpie, hey                | Dropped kapp and ytt (Carvel — useful but tangential); kept hey because the author runs it for load tests across multiple projects   |
-| 2026-05-16 | "IDE plugins" section reframed as "Editor, shell, and terminal integration"           | Better captures what's actually in scope: CLion plugin + Podman Desktop GUI + zsh integration + warp.dev workflows                    |
+| 2026-05-16 | "IDE plugins" section reframed as "Editor, shell, and terminal integration"           | Better captures what's actually in scope: CLion plugin + zsh integration + warp.dev workflows                    |
 | 2026-05-16 | Container images: UBI-based, pullable without subscription-manager                    | User constraint; `registry.access.redhat.com/ubi9/...` is public and dnf-free at pull time                                            |
-| 2026-05-16 | minikube `--driver=podman` is the primary tested driver                               | Matches author's daily workflow; docker driver remains a documented alternate                                                         |
+<!-- policy-exempt:start -->
+| 2026-05-16 | minikube `--driver=podman` is the primary tested driver (superseded 2026-10-09 by "Docker Engine + docker driver + containerd/runc") | Matches author's daily workflow; docker driver remains a documented alternate |
+<!-- policy-exempt:end -->
 | 2026-05-16 | Standard Fedora repos preferred for tool installs                                     | User preference; falls back to upstream installers only when a package isn't carried by Fedora                                        |
 | 2026-05-16 | Iteration delivery: `<repo>_rNN.tar.gz` with explicit single-line git instructions    | User-specified workflow; respects the zsh-paste caveat in LESSONS-LEARNED.md                                                          |
+| 2026-10-09 | Docker Engine + `--driver=docker --container-runtime=containerd` (runc) replaces the earlier driver | `docker-ce` from Docker's Fedora/RHEL repo, `systemctl enable --now docker`, context `default`; rationale in LESSONS-LEARNED Part 4 |
+| 2026-10-09 | Host access via NodePorts published at profile creation (`--ports=127.0.0.1:<host>:<nodePort>`) | Forwarded connections drop; published ports survive restarts and are checked by `scripts/check-port-map.sh` |
+| 2026-10-09 | Targets are Fedora, Fedora VMs, RHEL, and RHEL VMs only                                | Keeps every command tested on one family; capstone profile renamed `mof-capstone`                                                     |
 
 ---
 
@@ -565,11 +575,11 @@ The reader doesn't read about data mesh — they deploy one.
 |---|---|
 | §1 Prerequisites | Same Fedora 44 baseline + inotify limits |
 | §2 Tooling install | kubectl, helm, hey, yq + new: `buf`, `grpcurl`, `ghz` |
-| §3 Starting minikube | Dedicated `capstone` profile, sized for the workload |
+| §3 Starting minikube | Dedicated `mof-capstone` profile, sized for the workload |
 | §4 Profiles | Profile isolation — §17 doesn't touch §6–§12 profile state |
 | §5 Addons | metrics-server (required for autoscaling) |
 | §6 Deploy via kubectl | Imperative deploys for ad-hoc troubleshooting |
-| §7 NodePort | Same slirp4netns tunnel pattern for external access |
+| §7 NodePort | Same published-NodePort pattern for host access |
 | §8 Persistent Volumes | Each service's Postgres uses PVs (per-domain ownership) |
 | §9 helm | Every deployable is a helm chart (or umbrella chart) |
 | §10 Editor/shell | k9s, kubectx for navigating the larger cluster state |
@@ -607,7 +617,7 @@ pieces combine; it doesn't re-explain what the pieces are.
   "we used gRPC here" but "gRPC because (a) internal-only,
   (b) low-latency required, (c) typed contracts useful, (d) no
   browser clients"
-- Deploy the full stack to a single dedicated `capstone`
+- Deploy the full stack to a single dedicated `mof-capstone`
   minikube profile, with the entire stack manageable via
   helm umbrella chart
 - Demonstrate observability that's *actually useful* — golden
@@ -728,7 +738,7 @@ commitment.
   images), use the upstream image and **explicitly note it
   in the chart values and in the §17 prose**. Maintain a
   "UBI vs upstream" table in the §17 narrative
-- **Single `capstone` minikube profile.** Sized at 24GB RAM /
+- **Single `mof-capstone` minikube profile.** Sized at 24GB RAM /
   16 CPU. Reader stops the `minikube` / `istio` profiles
   before running the capstone (documented in §17's
   Prerequisites subsection)
@@ -814,7 +824,7 @@ Performance testing tools mentioned but not the focus:
   Examples repo: <https://github.com/k8spatterns/examples>
 - **`patterncatalyst/cpp-container-optimization-tutorial`**
   and **`patterncatalyst/otel-observability-demos`** — your
-  prior work on the Grafana stack running on podman. The
+  prior work on the Grafana stack running in containers. The
   capstone reuses the OTEL collector + Prometheus + Grafana
   + Tempo configuration patterns from these repos, adapted
   for Kubernetes deployment via helm
@@ -859,7 +869,7 @@ protocol always surfaces unanticipated friction.
 §17 ships when:
 
 1. `helm install capstone` brings up the entire stack on the
-   `capstone` profile in under 10 minutes
+   `mof-capstone` profile in under 10 minutes
 2. All five demo scripts (`demo-rest.sh`, `demo-grpc.sh`,
    `demo-graphql.sh`, `demo-kafka.sh`,
    `demo-orchestration.sh`) pass on Fedora 44

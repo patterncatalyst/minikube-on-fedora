@@ -44,6 +44,13 @@ for example_dir in examples/*/; do
     name=$(basename "$example_dir")
     readme="${example_dir}README.md"
 
+    # The capstone has its own /capstone/ collection pages.
+    if [[ "$name" == "17-capstone" ]]; then
+        printf 'SKIP %s (published through the capstone collection)\n' "$name" >&2
+        skipped+=1
+        continue
+    fi
+
     if [[ ! -f "$readme" ]]; then
         printf 'SKIP %s (no README.md)\n' "$name" >&2
         skipped+=1

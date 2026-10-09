@@ -20,15 +20,15 @@
   <rect width="920" height="500" fill="#fdfbf7"/>
   <rect width="920" height="500" fill="url(#grid)"/>
 
-  <text x="460" y="40" text-anchor="middle" class="title">minikube on Fedora 44 (rootless Podman driver)</text>
+  <text x="460" y="40" text-anchor="middle" class="title">minikube on Fedora 44 (docker driver on Docker Engine)</text>
 
   <rect x="40" y="70" width="840" height="380" rx="6" class="tan"/>
   <text x="58" y="92" class="label">Fedora 44 host</text>
   <text x="58" y="108" class="sublabel">cgroups v2 · SELinux enforcing · user namespaces enabled</text>
 
   <rect x="70" y="130" width="780" height="300" rx="5" class="neutral"/>
-  <text x="88" y="152" class="label">rootless Podman</text>
-  <text x="88" y="168" class="sublabel">user-namespaced container engine — runs containers via crun, no daemon</text>
+  <text x="88" y="152" class="label">Docker Engine (docker-ce)</text>
+  <text x="88" y="168" class="sublabel">dockerd + containerd.io; runs the node container via runc</text>
 
   <rect x="100" y="190" width="720" height="220" rx="4" class="neutral-2"/>
   <text x="118" y="212" class="label">minikube node container</text>
@@ -52,5 +52,6 @@
 
   <text x="700" y="345" class="sublabel">… and so on</text>
 
-  <text x="460" y="475" text-anchor="middle" class="footnote">Two container runtimes, not one: Podman (host) runs the node container via crun; containerd (inside the node) runs the Pods.</text>
+  <text x="460" y="470" text-anchor="middle" class="footnote">Two container runtimes, not one: Docker Engine (host) runs the node container via runc; containerd (inside the node) runs the Pods.</text>
+  <text x="460" y="488" text-anchor="middle" class="footnote">127.0.0.1:18080 → nodePort 30080 (published at minikube start)</text>
 </svg>

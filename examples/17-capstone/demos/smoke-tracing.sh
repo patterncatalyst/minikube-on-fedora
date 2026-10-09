@@ -16,23 +16,14 @@
 # Run from examples/17-capstone/:  ./demos/smoke-tracing.sh
 
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/lib/env.sh"   # PROFILE, ports; pins kubectl/helm to the profile
 
-NS="observability"
-TEMPO_PORT="3200"
-OTLP_PORT="4318"
-GRAF_PORT="3000"
-TEMPO_PF=""
-OTLP_PF=""
-GRAF_PF=""
+NS="observability"   # this demo works in the observability namespace (env.sh's NS is the app namespace)
+TEMPO_PORT="$HOST_PORT_TEMPO"        # Tempo query API, published NodePort on 127.0.0.1
+OTLP_PORT="$HOST_PORT_TEMPO_OTLP"    # Tempo OTLP/HTTP receiver, published NodePort on 127.0.0.1
+GRAF_PORT="$HOST_PORT_GRAFANA"       # Grafana, published NodePort on 127.0.0.1
 
 step() { printf '\n==> %s\n' "$1"; }
-cleanup() {
-    [[ -n "$TEMPO_PF" ]] && kill "$TEMPO_PF" 2>/dev/null
-    [[ -n "$OTLP_PF" ]] && kill "$OTLP_PF" 2>/dev/null
-    [[ -n "$GRAF_PF" ]] && kill "$GRAF_PF" 2>/dev/null
-    true
-}
-trap cleanup EXIT
 dump() {
     step "DIAGNOSTIC DUMP (failure — resources left in place)"
     kubectl get statefulset,deployment,pods,svc -n "$NS" 2>&1 | grep -iE 'tempo|grafana|NAME' || true
@@ -55,9 +46,8 @@ kubectl wait -n "$NS" --for=condition=Ready pod \
 printf '    ✓ tempo pod is Ready\n'
 
 # ─── Tempo answers its readiness probe ───────────────────────────────────────
-step "Port-forwarding Tempo ($TEMPO_PORT → tempo:3200) and checking /ready"
-kubectl port-forward -n "$NS" svc/tempo "${TEMPO_PORT}:3200" >/dev/null 2>&1 &
-TEMPO_PF=$!
+step "Checking Tempo /ready on 127.0.0.1:${TEMPO_PORT} (published NodePort)"
+require_published_port "$PROFILE" "$NODE_PORT_TEMPO" "$HOST_PORT_TEMPO"
 ok=""
 for _ in $(seq 1 20); do
     body="$(curl -s --max-time 2 "http://127.0.0.1:${TEMPO_PORT}/ready" 2>/dev/null)"
@@ -68,16 +58,15 @@ done
 printf '    ✓ Tempo is ready to receive (OTLP :4317/:4318) and serve queries (:3200)\n'
 
 # ─── Grafana has the Tempo datasource and can reach it ───────────────────────
-step "Port-forwarding Grafana ($GRAF_PORT → grafana:80)"
-kubectl port-forward -n "$NS" svc/grafana "${GRAF_PORT}:80" >/dev/null 2>&1 &
-GRAF_PF=$!
+step "Reaching Grafana on 127.0.0.1:${GRAF_PORT} (published NodePort)"
+require_published_port "$PROFILE" "$NODE_PORT_GRAFANA" "$HOST_PORT_GRAFANA"
 for _ in $(seq 1 15); do
     curl -s -o /dev/null --max-time 2 "http://127.0.0.1:${GRAF_PORT}/api/health" && break
     sleep 1
 done
 
 step "Confirming the Tempo datasource is provisioned and healthy"
-# Real password from the secret (the chart preserves an existing one on upgrade).
+# Read the admin login from the Grafana secret (never printed; the chart preserves an existing one on upgrade).
 GRAF_USER="$(kubectl get secret grafana -n "$NS" -o jsonpath='{.data.admin-user}' 2>/dev/null | base64 -d)"
 GRAF_PASS="$(kubectl get secret grafana -n "$NS" -o jsonpath='{.data.admin-password}' 2>/dev/null | base64 -d)"
 code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 \
@@ -102,9 +91,8 @@ fi
 # if this roundtrip works, a "no traces" result later is the emitter's fault,
 # not the pipeline's.
 step "End-to-end: POST a synthetic span to OTLP :$OTLP_PORT and read it back"
-kubectl port-forward -n "$NS" svc/tempo "${OTLP_PORT}:4318" >/dev/null 2>&1 &
-OTLP_PF=$!
-# Give the forward a moment to establish.
+require_published_port "$PROFILE" "$NODE_PORT_TEMPO_OTLP" "$HOST_PORT_TEMPO_OTLP"
+# Wait for the OTLP receiver's socket to accept connections.
 for _ in $(seq 1 10); do
     curl -s -o /dev/null --max-time 2 "http://127.0.0.1:${OTLP_PORT}/" 2>/dev/null && break
     sleep 1
@@ -132,7 +120,7 @@ code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 6 \
     || fail "Tempo rejected the synthetic OTLP/HTTP span on :$OTLP_PORT (HTTP $code) — the OTLP receiver isn't ingesting; check tempo-values.yaml receivers.otlp.protocols.http"
 printf '    \xe2\x9c\x93 Tempo accepted the span (HTTP 200) on :%s/v1/traces\n' "$OTLP_PORT"
 
-# Read it back via TraceQL on :3200 (TEMPO_PF from the /ready check is still up).
+# Read it back via TraceQL on :3200 (Tempo query port, checked above).
 # Ingestion → searchable has a short lag; retry.
 found=""
 for _ in $(seq 1 12); do

@@ -26,10 +26,14 @@ parameterized via `values.yaml`. By the end you'll have authored
 a working chart and exercised the install/upgrade/history/uninstall
 loop.
 
+Every `helm` command here carries `--kube-context minikube`, and every
+`kubectl` command assumes the `minikube` context from §4 (add
+`--context minikube` if another is current). The demo pins both.
+
 ## helm 3 vs helm 4
 
 §2 installed helm via `dnf install helm`, which on Fedora 44 gives
-**helm 4** (4.1.x at time of writing). The chart format used here
+**helm 4**. The chart format used here
 is `apiVersion: v2`, which is the format helm 3 introduced and
 helm 4 continues to use. **Charts written for helm 3 generally
 work unchanged with helm 4.** The helm 4 changes are mostly under
@@ -93,11 +97,15 @@ replicaCount: 1
 image:
   repository: nginx-custom
   tag: v1
-  pullPolicy: IfNotPresent
+  pullPolicy: Never       # loaded into the node in §6
 
 service:
-  type: ClusterIP
+  type: NodePort
   port: 80
+  # Published to 127.0.0.1:18080 at profile creation
+  # (--ports=127.0.0.1:18080:30080). Shared slot with §6, §8, §12-http.
+  # Set to null for a Kubernetes-assigned port.
+  nodePort: 30080
 
 content:
   title: "Test Page from helm chart"
@@ -158,13 +166,19 @@ spec:
     metadata:
       labels:
         {{- include "nginx-helm.selectorLabels" . | nindent 8 }}
+      annotations:
+        # Rotates when the rendered ConfigMap content changes, so a
+        # `helm upgrade` that only changes values rolls the Pods.
+        checksum/configmap: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
     spec:
       containers:
       - name: nginx
         image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
         imagePullPolicy: {{ .Values.image.pullPolicy }}
         ports:
-        - containerPort: 8080
+        - name: http
+          containerPort: 8080
+          protocol: TCP
         volumeMounts:
         - name: content
           mountPath: /usr/share/nginx/html
@@ -195,11 +209,25 @@ spec:
   selector:
     {{- include "nginx-helm.selectorLabels" . | nindent 4 }}
   ports:
-  - port: {{ .Values.service.port }}
-    targetPort: 8080
+  - name: http
+    port: {{ .Values.service.port }}
+    targetPort: http
     protocol: TCP
+    {{- if .Values.service.nodePort }}
+    nodePort: {{ .Values.service.nodePort }}
+    {{- end }}
 ```
 {% endraw %}
+
+With `service.type: NodePort` and `service.nodePort: 30080`, the
+Service lands on the slot the `minikube` profile publishes to
+`127.0.0.1:18080` (§7 explains the mechanism). The `if` makes the port
+optional: `--set service.nodePort=null` lets Kubernetes pick one, and
+`--set service.type=ClusterIP` with `nodePort=null` gives an internal
+Service. Only one Service can hold 30080 at a time, so **delete §8's
+Service first** (`kubectl delete -f
+examples/08-persistent-volume/manifests/`); the demo's preflight stops
+with a "delete X first" message if something holds the port.
 
 ### _helpers.tpl
 
@@ -240,7 +268,7 @@ two labels that *don't* change across releases of the same chart).
 ### Install
 
 ```bash
-helm install nginx-helm ./chart \
+helm --kube-context minikube install nginx-helm ./chart \
     --set content.title="First install" \
     --set content.customLine="from helm install"
 ```
@@ -260,19 +288,23 @@ helm rendered the templates with the merged values
 resulting manifests, and tracked the release as `nginx-helm`
 revision 1.
 
-Verify:
+Verify, then reach it on the published port:
 
 ```bash
-helm list
+helm --kube-context minikube list
 kubectl get deployment,svc,configmap -l app.kubernetes.io/instance=nginx-helm
+curl http://127.0.0.1:18080/
 ```
+
+The response contains the title and custom line you passed with
+`--set`.
 
 ### Dry-run rendering — `helm template`
 
 Before `install`, render the chart to stdout and inspect:
 
 ```bash
-helm template nginx-helm ./chart --set content.title="Preview"
+helm --kube-context minikube template nginx-helm ./chart --set content.title="Preview"
 ```
 
 This is invaluable for catching template errors or visualizing
@@ -284,7 +316,7 @@ cluster.
 Quick chart sanity check:
 
 ```bash
-helm lint ./chart
+helm --kube-context minikube lint ./chart
 ```
 
 Catches missing fields in `Chart.yaml`, bad indentation,
@@ -296,20 +328,23 @@ issues.
 After install, change a value and upgrade:
 
 ```bash
-helm upgrade nginx-helm ./chart \
+helm --kube-context minikube upgrade nginx-helm ./chart \
     --set content.title="Upgraded title" \
     --set content.customLine="from helm upgrade"
 ```
 
-The release moves to revision 2. The Deployment rolls out the new
-ConfigMap; the existing Pods get recreated (or you'd need to add
-an annotation that triggers rollout on ConfigMap change — a
-separate refinement worth knowing about for production charts).
+The release moves to revision 2. A ConfigMap change alone does not
+roll Pods, so the Deployment template carries a
+`checksum/configmap` annotation: the hash of the rendered ConfigMap
+changes with the values, the Pod template changes with it, and the
+Pods are recreated. The published port follows them with no
+re-attaching; `curl http://127.0.0.1:18080/` shows the new title once
+the rollout finishes.
 
 ### History
 
 ```bash
-helm history nginx-helm
+helm --kube-context minikube history nginx-helm
 ```
 
 ```
@@ -321,7 +356,7 @@ REVISION  UPDATED                  STATUS      CHART             ...  DESCRIPTIO
 ### Rollback (optional)
 
 ```bash
-helm rollback nginx-helm 1
+helm --kube-context minikube rollback nginx-helm 1
 ```
 
 Reverts to revision 1's values. Useful when an upgrade misbehaves.
@@ -329,29 +364,30 @@ Reverts to revision 1's values. Useful when an upgrade misbehaves.
 ### Uninstall
 
 ```bash
-helm uninstall nginx-helm
+helm --kube-context minikube uninstall nginx-helm
 ```
 
-Removes the Deployment, Service, ConfigMap, and the release record.
-A clean uninstall — no orphans.
+Removes the Deployment, Service, ConfigMap, and the release record,
+freeing nodePort 30080. A clean uninstall — no orphans.
 
 ## Verification: examples/09-deploy-nginx-helm/
 
 `examples/09-deploy-nginx-helm/demo.sh` exercises the full
 workflow:
 
-1. Pre-flight: cluster up; image cached (auto-build if not);
-   helm available
+1. Pre-flight: Docker Engine, `minikube` profile with published
+   ports, pinned context; helm available; image loaded (auto-build and
+   load from §6 if not); nodePort 30080 free
 2. `helm lint` the chart
 3. `helm template` the chart (renders without applying; verifies
    the chart parses)
 4. `helm install` with `--set content.title="..."` overrides
 5. Wait for Deployment Available
-6. Port-forward, curl, verify the installed title appears in the
-   served HTML
+6. Confirm the port is published, curl `http://127.0.0.1:18080/`,
+   verify the installed title appears in the served HTML
 7. `helm upgrade` with different title
 8. Wait for rollout
-9. Re-establish port-forward (Pods got recreated)
+9. Poll `http://127.0.0.1:18080/` until the recreated Pods answer
 10. Curl, verify the upgraded title now appears
 11. `helm history nginx-helm` — show both revisions
 12. `helm uninstall nginx-helm` — clean removal

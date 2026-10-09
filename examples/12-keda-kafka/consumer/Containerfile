@@ -10,7 +10,7 @@
 # Final image is small (~150 MB) and contains no build tooling.
 
 # ── Stage 1: builder ────────────────────────────────────────────────────────
-FROM registry.access.redhat.com/ubi9/ubi:latest AS builder
+FROM registry.access.redhat.com/ubi10/ubi:10.2-1791444044 AS builder
 WORKDIR /build
 
 RUN dnf install -y python3 python3-pip && \
@@ -26,7 +26,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 RUN pip install --no-cache-dir kafka-python==2.0.6
 
 # ── Stage 2: runtime ────────────────────────────────────────────────────────
-FROM registry.access.redhat.com/ubi9/ubi-minimal:latest
+FROM registry.access.redhat.com/ubi10/ubi-minimal:10.2-1791444377
 
 RUN microdnf install -y python3 && \
     microdnf clean all && \

@@ -1,5 +1,7 @@
 # Phase D — "Data Mesh on OpenShift" implementation deck plan
 
+> **2026-10-09 (r29):** podman, rootless, registry and port-forward content here is historical (podman era); superseded by r29 (Docker Engine, published NodePorts) — see `reconciliation-plan.md` Section D, r29.
+
 Spine: **the four principles**, each → the pieces that realize it. OpenShift-forward.
 Idealized production-shaped code snippets throughout. Gotchas → Appendix A only.
 Reuses the 101 design system (Red Hat brand). Target 1.5–3 h.

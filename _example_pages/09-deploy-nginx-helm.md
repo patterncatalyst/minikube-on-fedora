@@ -19,7 +19,7 @@ upgrade, history, uninstall.
 ```
 chart/
 ├── Chart.yaml            # nginx-helm 0.1.0, app nginx 1.20.1
-├── values.yaml           # defaults: 1 replica, ClusterIP:80,
+├── values.yaml           # defaults: 1 replica, NodePort 80 -> 30080,
 │                         # placeholder content title/message
 └── templates/
     ├── _helpers.tpl      # fullname/labels/selectorLabels templates
@@ -29,12 +29,14 @@ chart/
     │                     # when ConfigMap content changes (triggers
     │                     # Pod rollout on `helm upgrade` even when
     │                     # only values changed)
-    └── service.yaml      # ClusterIP, port-forward target
+    └── service.yaml      # NodePort (values: service.nodePort, 30080)
 ```
 
 ## What it tests
 
-Eight §9 claims:
+Eight §9 claims (the served-HTML checks go through
+`http://127.0.0.1:18080/`, the host port the `minikube` profile
+publishes for nodePort 30080 via `--ports=127.0.0.1:18080:30080`):
 
 1. helm 4.x can lint a chart with `apiVersion: v2` cleanly
 2. `helm template` renders all three resource kinds (ConfigMap,
@@ -50,7 +52,7 @@ Eight §9 claims:
 7. After upgrade rollout, the served HTML contains the
    **upgrade-time** title — old content gone
 8. `helm uninstall` removes Deployment + Service + ConfigMap with
-   no leftovers
+   no leftovers (and frees the shared nodePort 30080)
 
 ## Running
 
@@ -61,8 +63,9 @@ Eight §9 claims:
 Expected duration: 30-60 seconds. Most of it is the rollout-after-
 upgrade phase.
 
-If `nginx-custom:v1` isn't cached, add 2-4 minutes for the first
-build (auto-built from §6's Containerfile).
+If `nginx-custom:v1` isn't loaded, add 2-4 minutes for the first
+build (`docker build` from §6's Containerfile, then `minikube image
+load`).
 
 ## What you should see
 
@@ -102,12 +105,17 @@ The cleanup label selector relies on the
 applies to all resources — that's how the post-uninstall
 leftover check works.
 
+The release Service is `type: NodePort` with `nodePort: 30080`. That
+slot is shared with §6, §8 and §12-http, one at a time: the demo
+calls `require_free_nodeport 30080` and fails with a "delete X first"
+message if another Service holds it. The demo pins every `kubectl`
+and `helm` call to the `minikube` context.
+
 ## Cleanup
 
 `demo.sh` installs a `trap cleanup EXIT` that:
 
-1. Kills the background `kubectl port-forward` process
-2. Runs `helm uninstall nginx-helm` (idempotent — succeeds even
+1. Runs `helm uninstall nginx-helm` (idempotent — succeeds even
    if no release exists)
 
 `nginx-custom:v1` stays in the cluster's image cache.
@@ -115,9 +123,9 @@ leftover check works.
 Manual cleanup if needed:
 
 ```bash
-helm uninstall nginx-helm
+helm --kube-context minikube uninstall nginx-helm
 # verify:
-kubectl get all,configmap -l app.kubernetes.io/instance=nginx-helm
+kubectl --context minikube get all,configmap -l app.kubernetes.io/instance=nginx-helm
 # should return nothing
 ```
 
@@ -130,16 +138,21 @@ kubectl get all,configmap -l app.kubernetes.io/instance=nginx-helm
    or a value reference that doesn't resolve. The template output
    is full Go-template error messages with file:line markers
 3. **`helm install` succeeds but Deployment never goes Available**
-   — typically image not cached (the pre-flight should have
-   built it; check `minikube image ls`)
+   — typically image not loaded (the pre-flight should have
+   built and loaded it; check `minikube -p minikube image ls`; the
+   chart uses `pullPolicy: Never`)
 4. **First curl returns wrong content** — values weren't
    templated as expected. `helm get values nginx-helm` shows
    what helm thought your values were
 5. **Upgrade rollout doesn't happen / served HTML still shows
    old title** — likely the `checksum/configmap` annotation isn't
-   working. `kubectl get deployment nginx-helm -o yaml | grep
+   working. `kubectl --context minikube get deployment nginx-helm -o yaml | grep
    checksum` to confirm the annotation is present and changing
    across revisions
+7. **`nodePort 30080 is held by Service ...`** or **`does not
+   publish nodePort 30080`** — another example holds the shared slot,
+   or the profile was created without the port map. Run the command
+   the script prints
 6. **`helm uninstall` leaves resources behind** — check the chart
    for any resource that doesn't have the standard labels (every
    resource the chart creates should include the

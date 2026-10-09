@@ -1,0 +1,31 @@
+# examples/17-capstone/host-access/postgres-host.yaml
+#
+# Companion NodePort Service owned by this repo. Reaches the CloudNativePG primary (psql from the host).
+# It selects the same Pods as the upstream Service, so helm upgrade,
+# istioctl install or an addon re-apply never reverts it. Published by the
+# mof-capstone profile as 127.0.0.1:5432 (see CAPSTONE_PORTS in
+# scripts/lib/env.sh).
+# Selector: CloudNativePG instance-pod labels cnpg.io/cluster + cnpg.io/instanceRole=primary
+# (operator 1.30 documents these; the bare `role` label is deprecated in favour of
+# cnpg.io/instanceRole). Pod labels come from the operator, not the chart, so this
+# is not verifiable offline.
+#   verify live: kubectl --context mof-capstone get svc -n capstone capstone-postgres-rw -o jsonpath='{.spec.selector}'
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: capstone-postgres-host
+  namespace: capstone
+  labels:
+    app.kubernetes.io/managed-by: minikube-on-fedora
+spec:
+  type: NodePort
+  selector:
+    cnpg.io/cluster: capstone-postgres
+    cnpg.io/instanceRole: primary
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+      nodePort: 30432
+      protocol: TCP

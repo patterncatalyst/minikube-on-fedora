@@ -2,11 +2,12 @@
 #
 # Single-node KRaft Kafka cluster managed by Strimzi.
 # - Combined controller + broker roles in one Pod (development sizing)
-# - Kafka 4.1.0 pinned: Strimzi 0.51 supports ONLY Kafka 4.1.0, 4.1.1,
-#   and 4.2.0. The 3.x line was dropped entirely in Strimzi 0.51
+# - Kafka 4.3.1 pinned: Strimzi 1.2.0 supports Kafka 4.2.x and 4.3.x.
+#   The 3.x line and ZooKeeper are gone, and only the kafka.strimzi.io/v1
+#   API is accepted
 # - metadataVersion omitted: Strimzi defaults it to match the Kafka
 #   version on first cluster creation, which is safer than guessing
-#   the right `4.1-IV?` minor (KRaft metadata version naming follows
+#   the right `4.3-IV?` minor (KRaft metadata version naming follows
 #   a pattern but specific IV numbers aren't stable across releases)
 # - Internal listener only (KEDA scaler reaches Kafka in-cluster)
 # - Replication factor 1 everywhere (single broker can't replicate)
@@ -49,7 +50,7 @@ metadata:
     strimzi.io/kraft: enabled
 spec:
   kafka:
-    version: 4.1.0
+    version: 4.3.1
     listeners:
       - name: plain
         port: 9092

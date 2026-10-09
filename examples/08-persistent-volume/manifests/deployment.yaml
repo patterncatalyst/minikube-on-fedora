@@ -21,7 +21,7 @@ spec:
       # The timestamp lets the demo prove persistence by matching
       # it across Pod restarts.
       - name: seed-content
-        image: registry.access.redhat.com/ubi9/ubi-minimal
+        image: registry.access.redhat.com/ubi10/ubi-minimal:10.2-1791444377
         command:
           - "/bin/sh"
           - "-c"
@@ -33,7 +33,7 @@ spec:
             else
               echo "[seed-content] seeding fresh content into PV"
               cat > /content/index.html <<EOF
-            <h1>Test Page for nginx on UBI 9 Minimal (from PV)</h1>
+            <h1>Test Page for nginx on UBI 10 Minimal (from PV)</h1>
             <p>This file was written into the PersistentVolume at:</p>
             <p>$(date -u +%Y-%m-%dT%H:%M:%SZ)</p>
             <p>If this timestamp is unchanged after a Pod restart, the PV is doing its job.</p>
@@ -47,7 +47,7 @@ spec:
         image: nginx-custom:v1
         # Same image as §6/§7 — generic nginx; content comes from
         # the volume mount below, not the image
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Never
         ports:
         - containerPort: 8080
         readinessProbe:

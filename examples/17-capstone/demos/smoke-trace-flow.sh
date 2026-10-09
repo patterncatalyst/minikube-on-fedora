@@ -17,23 +17,15 @@
 # Run from examples/17-capstone/:  ./demos/smoke-trace-flow.sh
 
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/lib/env.sh"   # PROFILE, NS, ports; pins kubectl/helm to the profile
 
-NS="capstone"
 OBS_NS="observability"
 HOST="graphql-gateway.capstone"
 PROXY_SVC="keda-add-ons-http-interceptor-proxy"
-GQL_PORT="8082"
-TEMPO_PORT="3201"
-GQL_PF=""
-TEMPO_PF=""
+GQL_PORT="$HOST_PORT_INTERCEPTOR"   # KEDA interceptor, published NodePort on 127.0.0.1
+TEMPO_PORT="$HOST_PORT_TEMPO"       # Tempo query API, published NodePort on 127.0.0.1
 
 step() { printf '\n==> %s\n' "$1"; }
-cleanup() {
-    [[ -n "$GQL_PF" ]] && kill "$GQL_PF" 2>/dev/null
-    [[ -n "$TEMPO_PF" ]] && kill "$TEMPO_PF" 2>/dev/null
-    true
-}
-trap cleanup EXIT
 dump() {
     step "DIAGNOSTIC DUMP"
     kubectl get deploy,pods -n "$NS" -l app.kubernetes.io/name=graphql-gateway 2>&1
@@ -55,17 +47,18 @@ kubectl get deploy graphql-gateway -n "$NS" \
 printf '    ✓ interceptor, Tempo, and OTEL-enabled gateway present\n'
 
 # ─── Drive a GraphQL query through the interceptor ───────────────────────────
-step "Port-forwarding the KEDA interceptor ($GQL_PORT → $PROXY_SVC:8080)"
-kubectl port-forward -n keda "svc/$PROXY_SVC" "${GQL_PORT}:8080" >/dev/null 2>&1 &
-GQL_PF=$!
+step "Reaching the KEDA interceptor on 127.0.0.1:${GQL_PORT} (published NodePort -> $PROXY_SVC:8080)"
+# The gateway is called through the interceptor (Host: $HOST), never directly on
+# 127.0.0.1:${HOST_PORT_GATEWAY}: at zero replicas that NodePort has no endpoints.
+require_published_port "$PROFILE" "$NODE_PORT_INTERCEPTOR" "$HOST_PORT_INTERCEPTOR"
 for _ in $(seq 1 15); do
     curl -s -o /dev/null --max-time 2 "http://127.0.0.1:${GQL_PORT}/" && break
     sleep 1
 done
 
 step "Sending a GraphQL query (wakes the gateway from zero, fans out to backends)"
-# Pre-warm the gateway. KEDA HTTP's interceptor returns 502 with
-# X-Keda-Http-Cold-Start: true if its cold-start budget expires before the
+# Pre-warm the gateway. KEDA HTTP's interceptor returns 504 with
+# X-Keda-Http-Cold-Start: true if its readiness timeout expires before the
 # workload is ready (uvicorn cold start can outrun the default ~15s
 # DialRetryTimeout). So we ping the interceptor once with a cheap GET, ignore
 # its response (whatever it is — that request's job was to trigger the
@@ -96,9 +89,8 @@ printf '    ✓ gateway processed the query (HTTP 200) — a trace should now be
 GW_LOG="$(kubectl logs -n "$NS" -l app.kubernetes.io/name=graphql-gateway --tail=120 2>/dev/null)"
 
 # ─── Confirm the trace landed in Tempo ───────────────────────────────────────
-step "Port-forwarding Tempo ($TEMPO_PORT → tempo:3200) and searching for the trace"
-kubectl port-forward -n "$OBS_NS" svc/tempo "${TEMPO_PORT}:3200" >/dev/null 2>&1 &
-TEMPO_PF=$!
+step "Searching Tempo (127.0.0.1:${TEMPO_PORT}, published NodePort) for the trace"
+require_published_port "$PROFILE" "$NODE_PORT_TEMPO" "$HOST_PORT_TEMPO"
 for _ in $(seq 1 15); do
     curl -s -o /dev/null --max-time 2 "http://127.0.0.1:${TEMPO_PORT}/ready" && break
     sleep 1

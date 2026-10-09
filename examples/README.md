@@ -48,4 +48,4 @@ Keeping them separate lets you:
   Markdown
 - Update the example without dragging through the prose
 - Share the example as a standalone artifact (anyone can clone the
-  repo and `podman build examples/foo/`)
+  repo and `docker build examples/foo/`)

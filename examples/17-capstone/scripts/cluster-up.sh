@@ -9,10 +9,12 @@
 #      (minikube stop/start), which clears the stuck port and preserves etcd's
 #      data dir. This script detects the wedge and cycles automatically.
 #
-#   2. Missing registry images. The in-cluster registry does NOT persist images
-#      across `minikube stop/start`. Locally-built images vanish and pods land in
-#      ImagePullBackOff "not found". This script diffs the registry catalog against
-#      services/ and rebuilds ONLY the missing images, then bounces stuck pods.
+#   2. Missing node images. Images are built with Docker and loaded into the
+#      node's containerd store (`minikube image load`); they normally survive
+#      `minikube stop/start`, but a recreated profile or a pruned store loses them
+#      and pods land in ErrImageNeverPull (pullPolicy: Never). This script diffs
+#      `minikube -p mof-capstone image ls` against services/ and rebuilds ONLY the
+#      missing images, then bounces stuck pods.
 #
 # This is for an ALREADY-PROVISIONED cluster (operators + helm releases installed
 # by the first-time setup-* sequence; they survive a node cycle). It does not
@@ -23,12 +25,12 @@
 #   ./scripts/cluster-up.sh
 
 set -uo pipefail
-export MINIKUBE_ROOTLESS=true   # CAP-010
 
-PROFILE="capstone"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/env.sh"
+
 TAG="v1"
 SERVICES=(graphql-gateway inventory-service notification-service order-service payment-service shipping-service)
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 step() { printf '\n==> %s\n' "$1"; }
 ok()   { printf '    \xe2\x9c\x93 %s\n' "$1"; }
@@ -37,7 +39,7 @@ fail() { printf '\nERROR: %s\n' "$1" >&2; exit 1; }
 
 command -v minikube >/dev/null || fail "minikube not in PATH"
 command -v kubectl  >/dev/null || fail "kubectl not in PATH"
-command -v podman   >/dev/null || fail "podman not in PATH"
+require_docker_engine
 
 # ─── 1. Ensure the profile is running ────────────────────────────────────────
 step "Ensuring the '$PROFILE' profile is running"
@@ -47,6 +49,9 @@ else
     printf '    starting (this also clears a stopped/wedged node)...\n'
     minikube start -p "$PROFILE" >/dev/null 2>&1 \
         || fail "minikube start failed — run ./scripts/setup-capstone-profile.sh for first-time provisioning"
+    for _e in ${CAPSTONE_PORTS//,/ }; do
+        require_published_port "$PROFILE" "$(cut -d: -f3 <<<"$_e")" "$(cut -d: -f2 <<<"$_e")"
+    done
     ok "profile started"
 fi
 
@@ -81,15 +86,14 @@ else
     fi
 fi
 
-# ─── 3. Rebuild ONLY images missing from the registry ────────────────────────
-step "Checking the in-cluster registry for missing images"
-HOST_PORT="$(podman port "$PROFILE" 2>/dev/null | awk -F'[:]' '/5000\/tcp/ {print $NF; exit}')"
-[[ -n "$HOST_PORT" ]] || fail "could not find registry host port — is the registry addon enabled? (minikube addons enable registry -p $PROFILE)"
-HOST_REG="127.0.0.1:${HOST_PORT}"
+# ─── 3. Rebuild ONLY images missing from the node ────────────────────────────
+step "Checking the node for missing images (minikube -p $PROFILE image ls)"
+node_images="$(minikube -p "$PROFILE" image ls 2>/dev/null || true)"
+[[ -n "$node_images" ]] || fail "could not list images in profile $PROFILE (is the node up?)"
 
 missing=()
 for svc in "${SERVICES[@]}"; do
-    if curl -fsS --max-time 4 "http://${HOST_REG}/v2/${svc}/tags/list" 2>/dev/null | grep -q "\"${TAG}\""; then
+    if grep -qE "(^|/)${svc}:${TAG}\$" <<<"$node_images"; then
         :
     else
         missing+=("$svc")
@@ -109,17 +113,17 @@ else
 fi
 
 # ─── 4. Bounce pods stuck on image pulls so they re-pull now-present images ──
-step "Restarting any pods stuck on image pulls"
+step "Restarting any pods stuck on missing images"
 stuck="$(kubectl get pods -n capstone 2>/dev/null \
-    | grep -iE 'ImagePullBackOff|ErrImagePull' | awk '{print $1}' || true)"
+    | grep -iE 'ImagePullBackOff|ErrImagePull|ErrImageNeverPull' | awk '{print $1}' || true)"
 if [[ -n "$stuck" ]]; then
     printf '%s\n' "$stuck" | while read -r pod; do
         [[ -n "$pod" ]] && kubectl delete pod -n capstone "$pod" >/dev/null 2>&1 \
             && printf '    restarted %s\n' "$pod"
     done
-    ok "bounced stuck pods (they will re-pull the rebuilt images)"
+    ok "bounced stuck pods (they will start from the rebuilt images)"
 else
-    ok "no pods stuck on image pulls"
+    ok "no pods stuck on missing images"
 fi
 
 # ─── 5. Wait for workloads to settle ─────────────────────────────────────────

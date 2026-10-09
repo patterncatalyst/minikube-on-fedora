@@ -3,14 +3,13 @@
 # smoke-order.sh — the r21 walking-skeleton verification (r21a-corrected).
 #
 # Proves the entire spine end-to-end:
-#   image build (host podman) → load into profile → helm deploy →
+#   image build (Docker Engine) → load into profile → helm deploy →
 #   operator-managed Postgres → service connects → REST works →
 #   data round-trips through Postgres → assertions pass
 #
 # r21a changes:
-#   - builds + pushes via scripts/build-image.sh (host podman build →
-#     in-cluster registry), the proven path under rootless-podman +
-#     containerd (CAP-007/009). No more `minikube image load`.
+#   - builds and loads via scripts/build-image.sh (docker build →
+#     `minikube image load` into the profile's containerd store; no registry).
 #   - on failure, LEAVES the failed resources in place and dumps a
 #     diagnostic bundle inline (pod status, describe events, logs) instead
 #     of tearing everything down — so a failed run hands you the evidence
@@ -20,15 +19,13 @@
 #   ./demos/smoke-order.sh
 #
 # Prerequisites:
-#   - capstone minikube profile running (scripts/setup-capstone-profile.sh)
+#   - mof-capstone minikube profile running (scripts/setup-capstone-profile.sh)
 #   - CloudNativePG operator installed (scripts/setup-postgres-operator.sh)
-#   - kubectl context = capstone
+#   - kubectl/helm are pinned to the profile context by scripts/lib/env.sh
 
 set -uo pipefail   # NOT -e: we manage failures explicitly so we can diagnose
-export MINIKUBE_ROOTLESS=true   # CAP-010: mandatory for rootless-podman host ops
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/lib/env.sh"   # PROFILE, NS, ports; pins kubectl/helm to the profile
 
-NS="capstone"
-PROFILE="capstone"
 RELEASE_PG="capstone-postgres"
 RELEASE_ORDER="order-service"
 PG_CHART="charts/capstone/charts/postgres"
@@ -36,7 +33,7 @@ ORDER_CHART="charts/capstone/charts/order-service"
 SERVICE_DIR="services/order-service"
 IMAGE_NAME="order-service"
 IMAGE_TAG="v1"
-PORT_FORWARD_PID=""
+BASE_PORT="$HOST_PORT_ORDER"   # published NodePort on 127.0.0.1
 SUCCESS=0
 
 step() { printf '\n==> %s\n' "$1"; }
@@ -56,23 +53,21 @@ dump_diagnostics() {
         printf '\n--- logs (previous, if crash-looped) ---\n'
         kubectl logs -n "$NS" "$pod" --previous --tail=60 2>&1 || true
     fi
-    printf '\n--- registry catalog ---\n'
-    curl -fsS "http://$(podman port "$PROFILE" | awk -F: '/5000\/tcp/{print $NF; exit}')/v2/_catalog" 2>&1 || echo "(could not query registry catalog)"
+    printf '\n--- images in the node ---\n'
+    minikube -p "$PROFILE" image ls 2>&1 | grep -E "(^|/)${IMAGE_NAME}:" || echo "(${IMAGE_NAME} not found in the node)"
     printf '\nResources left running. To clean up manually:\n'
-    printf '  helm uninstall %s -n %s\n' "$RELEASE_ORDER" "$NS"
+    printf '  helm uninstall %s inventory-service -n %s\n' "$RELEASE_ORDER" "$NS"
     printf '  helm uninstall %s -n %s   # also removes Postgres\n' "$RELEASE_PG" "$NS"
 }
 
 fail() {
     printf '\n✗ FAILED: %s\n' "$1" >&2
-    [[ -n "$PORT_FORWARD_PID" ]] && kill "$PORT_FORWARD_PID" 2>/dev/null
     dump_diagnostics
     exit 1
 }
 
 cleanup_on_success() {
-    [[ -n "$PORT_FORWARD_PID" ]] && kill "$PORT_FORWARD_PID" 2>/dev/null || true
-    helm uninstall "$RELEASE_ORDER" -n "$NS" 2>/dev/null || true
+    helm uninstall "$RELEASE_ORDER" inventory-service -n "$NS" 2>/dev/null || true
     if (( PURGE_DB )); then
         helm uninstall "$RELEASE_PG" -n "$NS" 2>/dev/null || true
     fi
@@ -94,16 +89,15 @@ PURGE_DB=0
 # ─── Pre-flight ──────────────────────────────────────────────────────────────
 
 step "Pre-flight checks"
-[[ "$(kubectl config current-context 2>/dev/null)" == "$PROFILE" ]] \
-    || fail "kubectl context is not '$PROFILE' — run: kubectl config use-context $PROFILE"
+minikube status -p "$PROFILE" >/dev/null 2>&1 || fail "profile '$PROFILE' not running — ./scripts/setup-capstone-profile.sh"
 kubectl get crd clusters.postgresql.cnpg.io >/dev/null 2>&1 \
     || fail "CloudNativePG CRDs not found — run scripts/setup-postgres-operator.sh first"
 command -v helm >/dev/null || fail "helm not in PATH"
 
-# ─── Build + push the image (r21c: host podman build → in-cluster registry) ──
+# ─── Build + load the image (docker build → minikube image load) ─────────────
 
-step "Building and pushing ${IMAGE_NAME}:${IMAGE_TAG} to the in-cluster registry"
-./scripts/build-image.sh "$SERVICE_DIR" "$IMAGE_NAME" "$IMAGE_TAG" || fail "image build/push failed"
+step "Building and loading ${IMAGE_NAME}:${IMAGE_TAG} into ${PROFILE}"
+./scripts/build-image.sh "$SERVICE_DIR" "$IMAGE_NAME" "$IMAGE_TAG" || fail "image build/load failed"
 
 # ─── Deploy Postgres (Cluster CR; operator provisions it) ────────────────────
 
@@ -114,7 +108,7 @@ helm upgrade --install "$RELEASE_PG" "$PG_CHART" -n "$NS" --create-namespace \
 step "Waiting for the Postgres cluster primary to be Ready"
 pg_ready=0
 for i in $(seq 1 60); do
-    if kubectl get pods -n "$NS" -l "cnpg.io/cluster=$RELEASE_PG,role=primary" \
+    if kubectl get pods -n "$NS" -l "cnpg.io/cluster=$RELEASE_PG,cnpg.io/instanceRole=primary" \
         -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null \
         | grep -q "True"; then
         printf '    primary pod Ready after ~%ds\n' "$((i*5))"
@@ -124,6 +118,18 @@ for i in $(seq 1 60); do
     sleep 5
 done
 (( pg_ready )) || fail "Postgres primary did not become Ready within 300s"
+
+# ─── Deploy inventory-service ────────────────────────────────────────────────
+# POST /orders checks stock with inventory-service over gRPC (r23), so the
+# order spine needs it running; another smoke's cleanup may have removed it.
+
+step "Building + loading inventory-service"
+./scripts/build-image.sh services/inventory-service inventory-service v1 || fail "inventory build/load failed"
+step "Deploying inventory-service (seeds demo stock)"
+helm upgrade --install inventory-service charts/capstone/charts/inventory-service -n "$NS" \
+    || fail "helm install of inventory-service chart failed"
+kubectl rollout status deployment/inventory-service -n "$NS" --timeout=120s \
+    || fail "inventory-service did not roll out"
 
 # ─── Deploy order-service ────────────────────────────────────────────────────
 
@@ -135,14 +141,22 @@ step "Waiting for order-service to roll out"
 kubectl rollout status deployment/order-service -n "$NS" --timeout=180s \
     || fail "order-service did not roll out (see diagnostics below)"
 
+step "Assert the Deployment uses the bare image with pullPolicy Never, present in the node"
+img=$(kubectl get deployment order-service -n "$NS" -o jsonpath='{.spec.template.spec.containers[0].image}')
+pol=$(kubectl get deployment order-service -n "$NS" -o jsonpath='{.spec.template.spec.containers[0].imagePullPolicy}')
+[[ "$img" == "${IMAGE_NAME}:${IMAGE_TAG}" ]] || fail "order-service image is '$img' — must be the bare '${IMAGE_NAME}:${IMAGE_TAG}'"
+[[ "$pol" == "Never" ]] || fail "order-service imagePullPolicy is '$pol' — must be Never"
+minikube -p "$PROFILE" image ls 2>/dev/null | grep -qE "(^|/)${IMAGE_NAME}:${IMAGE_TAG}\$" \
+    || fail "${IMAGE_NAME}:${IMAGE_TAG} not in 'minikube -p $PROFILE image ls'"
+printf '    ✓ %s (pullPolicy Never, present in the node)\n' "$img"
+
 # ─── Exercise the REST surface ───────────────────────────────────────────────
 
-step "Port-forwarding order-service to 127.0.0.1:18080"
-kubectl port-forward -n "$NS" service/order-service 18080:80 >/dev/null 2>&1 &
-PORT_FORWARD_PID=$!
-sleep 3
+step "Waiting for order-service on 127.0.0.1:${BASE_PORT} (published NodePort)"
+require_published_port "$PROFILE" "$NODE_PORT_ORDER" "$HOST_PORT_ORDER"
+wait_for_http "http://127.0.0.1:${BASE_PORT}/health" 60 || fail "order-service not answering on 127.0.0.1:${BASE_PORT}"
 
-BASE="http://127.0.0.1:18080"
+BASE="http://127.0.0.1:${BASE_PORT}"
 
 step "Assert /health returns ok"
 health=$(curl -fsS "$BASE/health") || fail "/health unreachable"
@@ -155,7 +169,7 @@ echo "$healthz" | grep -q '"status":"ready"' || fail "/healthz not ready: $healt
 step "POST a new order"
 created=$(curl -fsS -X POST "$BASE/orders" \
     -H 'Content-Type: application/json' \
-    -d '{"customer_id":"cust-1001","item_sku":"SKU-ABC-42","quantity":3,"amount":"59.97"}') \
+    -d '{"customer_id":"cust-1001","item_sku":"WIDGET-001","quantity":3,"amount":"59.97"}') \
     || fail "POST /orders failed"
 order_id=$(echo "$created" | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])') \
     || fail "could not parse order id from: $created"
@@ -171,7 +185,7 @@ listing=$(curl -fsS "$BASE/orders") || fail "GET /orders failed"
 echo "$listing" | grep -q "$order_id" || fail "list does not contain new order"
 
 step "Verify the row actually persisted in Postgres (direct query)"
-pg_pod=$(kubectl get pods -n "$NS" -l "cnpg.io/cluster=$RELEASE_PG,role=primary" \
+pg_pod=$(kubectl get pods -n "$NS" -l "cnpg.io/cluster=$RELEASE_PG,cnpg.io/instanceRole=primary" \
     -o jsonpath='{.items[0].metadata.name}')
 row_count=$(kubectl exec -n "$NS" "$pg_pod" -- \
     psql -U postgres -d capstone -tAc \

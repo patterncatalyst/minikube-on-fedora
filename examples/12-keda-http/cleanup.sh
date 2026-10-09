@@ -6,7 +6,8 @@
 # trap (which only removes the Deployment + Service + HTTPScaledObject).
 #
 # Removes:
-#   - nginx-http Deployment + Service + HTTPScaledObject (default)
+#   - nginx-http Deployment + Service + HTTPScaledObject, and the
+#     keda-interceptor-host companion Service (default)
 #   - With --remove-operators: KEDA + HTTP add-on + the keda namespace
 #
 # Usage:
@@ -34,19 +35,22 @@ for arg in "$@"; do
 done
 
 PROFILE_NAME="minikube"
-kubectl config use-context "${PROFILE_NAME}" >/dev/null 2>&1 || \
+kubectl config get-contexts -o name 2>/dev/null | grep -qx "${PROFILE_NAME}" || \
     fail "kubectl context '${PROFILE_NAME}' not configured"
+# Every kubectl / helm call below targets the minikube context explicitly
+pin_context "${PROFILE_NAME}"
 
 # ── Tier 1: demo workload ───────────────────────────────────────────────────
-step "removing demo workload (nginx Deployment + Service + HTTPScaledObject)"
+step "removing demo workload (nginx Deployment + Service + HTTPScaledObject + interceptor-host)"
 kubectl delete httpscaledobject nginx-http-scaler -n default \
     --ignore-not-found=true --wait=true >/dev/null 2>&1 || true
 kubectl delete service nginx-http -n default \
     --ignore-not-found=true --wait=true >/dev/null 2>&1 || true
 kubectl delete deployment nginx-http -n default \
     --ignore-not-found=true --wait=true >/dev/null 2>&1 || true
-# Kill any stray port-forwards from previous demo runs
-pkill -f "kubectl port-forward.*keda-add-ons-http-interceptor" 2>/dev/null || true
+# Companion NodePort Service (frees the shared nodePort 30080)
+kubectl delete -f "${SCRIPT_DIR}/host-access/interceptor-host.yaml" \
+    --ignore-not-found=true >/dev/null 2>&1 || true
 pass "demo workload removed"
 
 if [[ "${REMOVE_OPERATORS}" != "true" ]]; then

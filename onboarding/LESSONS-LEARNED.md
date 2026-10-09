@@ -1,107 +1,103 @@
 # Lessons learned
 
-What the Hummingbird tutorial campaign taught about three things:
-**Podman and containers**, **Jekyll on GitHub Pages**, and
-**working with AI assistants on long-running technical projects**.
+What the Hummingbird tutorial campaign taught about four things:
+**Docker Engine and containers**, **Jekyll on GitHub Pages**,
+**working with AI assistants on long-running technical projects**,
+and **why the minikube path moved off rootless podman**.
 This document is meant to be readable by you and by an AI assistant
 working with you. The opinions here are empirical, not theoretical.
 
 ---
 
-## Part 1 — Podman and Podman Compose
+## Part 1 — Docker Engine and Docker Compose
 
-### Use Podman, not Docker, when writing container tutorials in 2026
+### Use Docker Engine on Fedora and RHEL when writing container tutorials
 
-Three reasons:
+Reasons:
 
-1. Podman is the default on Fedora and RHEL. Most readers of a
-   Red-Hat-ecosystem-adjacent tutorial will have it pre-installed.
-2. Podman is rootless by default. Docker requires explicit setup to
-   match this security posture.
-3. Podman commands and Containerfile syntax are nearly
-   indistinguishable from Docker — readers transfer skills both
-   directions.
+1. `docker-ce` installs from Docker's own dnf repository on Fedora and
+   RHEL and runs as a system service on `/var/run/docker.sock`, so
+   every tool that expects a Docker daemon (minikube's docker driver,
+   Testcontainers, Compose) works without shims.
+2. minikube's docker driver is the most exercised minikube path: the
+   node is a container on Docker Engine, ports can be published at
+   creation, and `minikube image load` works as documented.
+3. Docker commands and Containerfile syntax are what most readers
+   already know, so skills transfer directly.
 
-Podman Desktop on macOS provides a GUI and a managed Linux VM that
-runs the actual container engine. It works well in 2026; the rough
-edges from earlier years are mostly resolved.
+The tutorial targets Docker Engine
+on Fedora and RHEL hosts and VMs, with the docker context set to
+`default`. Why the tutorial left rootless podman is recorded in
+Part 4.
 
 ### Containerfile vs. Dockerfile
 
-`Containerfile` is the canonical name in the Podman world. `Dockerfile`
-also works and is recognized by Podman. Use `Containerfile` in
-tutorials targeting Podman; the syntax is otherwise identical.
+`Containerfile` is the vendor-neutral name; `Dockerfile` is the
+Docker default. Docker builds either one: pass the file name with
+`-f`, as in `docker build -f Containerfile -t my-image:v1 .`. The
+tutorial uses `Containerfile` throughout so the same files also build
+with other OCI tools.
 
-### `podman` and `docker` are command-compatible
+### Docker daemon notes
 
-Most `docker <verb>` invocations work as `podman <verb>` — `pull`,
-`run`, `build`, `images`, `ps`, `logs`, `exec`, `inspect`, `tag`,
-`push`. Behavioral differences exist but are minor for tutorial
-purposes. Differences worth knowing:
+- Docker runs a system daemon (`sudo systemctl enable --now docker`).
+  Add yourself to the `docker` group to avoid `sudo`, then log out and
+  back in. Membership in that group is root-equivalent on the host.
+- `docker context show` must print `default`. A leftover context from
+  another install makes minikube talk to the wrong daemon, so every
+  script runs `require_docker_engine` before it touches a cluster.
+- Starting `dockerd` can set the iptables FORWARD policy to DROP,
+  which affects libvirt VMs on the same host. See the FAQ.
+- `docker build` uses BuildKit; `RUN` defaults to `/bin/sh -c`, which
+  matters when the runtime image has no shell.
 
-- Podman has no daemon by default. There's no `podmand` to start.
-- Podman pods are a unit between container and Compose stack —
-  multiple containers sharing a network namespace. Useful for
-  tutorial examples illustrating sidecars.
-- Podman builds with **buildah** under the hood, exposed via
-  `podman build`. Buildah's `RUN` instruction defaults to
-  `/bin/sh -c` — relevant when the runtime image has no shell.
-
-### SELinux and the `:Z` (or `-Z`) flag
+### SELinux and the `:Z` flag
 
 On Fedora-family hosts, SELinux blocks containers from accessing
 host directories by default. The `:Z` suffix on a volume mount
 relabels the host directory so the container can use it:
 
 ```bash
-podman run -v $(pwd)/data:/data:Z my-image
+docker run -v $(pwd)/data:/data:Z my-image
 ```
 
-For directly bind-mounted directories (common in podman-compose),
-the same applies as `-Z` flag or as `:Z` in the volumes block.
+For bind-mounted directories in a Compose file, the same applies as
+`:Z` in the volumes block. Always include it in tutorial examples;
+it is required on Fedora and RHEL.
 
-On macOS and non-SELinux Linux distros, `:Z` is a **no-op** — it
-doesn't error, it just does nothing useful. Always include it in
-tutorial examples; it's correct on Fedora and harmless elsewhere.
+### Docker Compose
 
-### Podman Compose
+`docker compose` is the Compose v2 plugin for the Docker CLI.
 
-`podman-compose` is the Docker Compose-compatible CLI for Podman.
+- On Fedora and RHEL with Docker's repository configured:
+  `sudo dnf install -y docker-compose-plugin`
 
-- On Fedora 43+: `sudo dnf install -y podman-compose`
-- On macOS: ships with Podman Desktop
-- On Ubuntu: `pip install podman-compose` or via apt
-
-The compose-file format is the same as Docker Compose. Most
-docker-compose.yml files work unmodified, with the exception of
-`version: "3.x"` declarations (modern compose ignores them, neither
-tool requires them, leave them out).
+Most `docker-compose.yml` files work unmodified, apart from
+`version: "3.x"` declarations (modern Compose ignores them; leave
+them out).
 
 Caveats:
 
-- **`networks:` is sometimes finicky.** On older podman-compose
-  versions, custom networks don't get cleaned up cleanly across
-  `up`/`down` cycles. Use `podman-compose down -v` for a full
-  reset rather than `podman-compose down`.
 - **`depends_on:` doesn't wait for healthchecks** unless you use
   the `condition: service_healthy` syntax. Tutorial examples that
   need a database to be ready before the app starts must define a
   healthcheck on the database and reference it in the dependency.
-- **Service-name DNS works the same as Docker Compose.** A service
-  named `db` is reachable as `db` from sibling services on the same
-  network.
+- **Service-name DNS** works as expected: a service named `db` is
+  reachable as `db` from sibling services on the same network.
+- **Use `docker compose down -v`** for a full reset that also drops
+  named volumes.
 
 ### Distroless runtimes change debugging
 
 If your tutorial uses distroless base images (Hummingbird, Google
-distroless, Chainguard), readers cannot `podman exec ... /bin/sh`
+distroless, Chainguard), readers cannot `docker exec ... /bin/sh`
 into a running container. Cover the **debug sidecar pattern** early:
 
 ```bash
-podman run -it --rm \
+docker run -it --rm \
   --pid container:my-running-container \
   --network container:my-running-container \
-  registry.access.redhat.com/ubi9/ubi-minimal:latest \
+  registry.access.redhat.com/ubi10/ubi-minimal:10.2-1791444377 \
   /bin/bash
 ```
 
@@ -141,7 +137,7 @@ These came up repeatedly across the Hummingbird examples:
    mid-run, the container is left running. Pattern:
 
    ```bash
-   trap "podman rm -f my-test-container >/dev/null 2>&1 || true" EXIT
+   trap "docker rm -f my-test-container >/dev/null 2>&1 || true" EXIT
    ```
 
 5. **Containerfile RUN in the runtime stage of a multi-stage build
@@ -245,7 +241,7 @@ In a fenced code block, the language hint after the backticks
 controls syntax highlighting:
 
     ```bash
-    podman run -d quay.io/example/image:latest
+    docker run -d quay.io/example/image:v1
     ```
 
 Rouge supports basically every language you'd write a tutorial about.
@@ -271,7 +267,7 @@ include line.
 
 Browsers cache SVGs more aggressively than HTML. After deploying a
 diagram update, a normal page reload may still show the old version.
-Hard reload (Ctrl+Shift+R / ⌘+Shift+R) or test in an incognito window
+Hard reload (Ctrl+Shift+R) or test in an incognito window
 when verifying diagram changes.
 
 GitHub Pages CDN can also hold a stale SVG up to ~10 minutes after
@@ -294,6 +290,20 @@ manifests, which only the action's maintainer can update.
 
 ---
 
+### gRPC's c-ares resolver can eat a 3-second deadline
+
+On the docker-driver `mof-capstone` profile, every in-stock `POST /orders`
+returned `503 inventory-service unreachable ... DEADLINE_EXCEEDED`, while a
+plain TCP connection from the order pod to `inventory-service:50051` worked
+at once. gRPC Python resolves names with its bundled c-ares resolver, which
+walks the pod's DNS search list itself and can take about 3 s for a short
+Service name: exactly the order client's 3 s `CheckStock` deadline.
+`GRPC_DNS_RESOLVER=native`, set in the order-service and graphql-gateway
+Containerfiles, makes gRPC use the system resolver like every other library
+in the pod. The same fix was found earlier in the Python data mesh project.
+The lesson: when a gRPC deadline fails but the server is fast, time name
+resolution separately from the call.
+
 ## Part 3 — Working with AI assistants on long technical projects
 
 ### The reconciliation plan is the most important file
@@ -308,7 +318,7 @@ Conventions that worked:
 
 - `verified` — tested end-to-end, by a human, in this session
 - `verified (Fedora 43)` — tested on one platform, others pending
-- `verified (Fedora 43 + macOS)` — tested cross-platform
+- `verified (Fedora 44 + RHEL 10)` — tested on both host families
 - `in flight` — currently being worked on
 - `unverified` — claim taken from sources, not tested
 - `out of scope` — deliberately not testing in this iteration
@@ -418,11 +428,223 @@ functional, not promotional, and worth leaving alone.
 
 ---
 
+## Part 4 — Why this tutorial moved off rootless podman (minikube v1.38.1)
+
+<!-- policy-exempt:start -->
+Earlier revisions of this tutorial ran minikube on rootless Podman
+with `--driver=podman`. It worked, but it needed a growing pile of
+workarounds. The tutorial now runs `--driver=docker
+--container-runtime=containerd` (runc) on Docker Engine. Each entry
+below gives the symptom, the cause, and what the Docker path does
+now. Entries marked "maintainer-reported" were observed by the
+maintainer while building the tutorial; the rest come from the
+project record (`_plans/capstone-decisions.md`, the pre-migration
+chapters). Version context of these problems: minikube v1.38.1,
+Kubernetes v1.35, Fedora 44.
+
+### Node iptables FORWARD DROP breaks pod and NodePort traffic (maintainer-reported)
+
+- **Symptom:** pods could not reach each other or the outside, and
+  NodePort traffic stalled, with every component reporting healthy.
+- **Cause:** the node's iptables FORWARD policy was DROP, so
+  forwarded pod and NodePort packets were discarded.
+- **Docker path now:** minikube's docker driver sets the node's
+  network up itself, and the NodePorts are published by Docker at
+  profile creation. The related host-side interaction is the other
+  direction: `dockerd` may set the host FORWARD policy to DROP and
+  affect libvirt VMs (see the FAQ).
+
+### The runc "paused" check fails with mixed runtimes (maintainer-reported)
+
+- **Symptom:** `minikube start` on an existing profile fails with an
+  opaque error from the runc "paused" state check.
+- **Cause:** the profile had been created under one driver and
+  runtime pairing and started under another. The Podman path pairs
+  with crun; containerd on the Docker path pairs with runc. Mixing
+  them leaves state the wrong runtime cannot read.
+- **Docker path now:** one pairing only (docker driver, containerd,
+  runc). To change driver or runtime, delete the profile and create a
+  new one.
+
+### hostpath-provisioner directories are 0755, non-root pods cannot write (maintainer-reported)
+
+- **Symptom:** a Pod running as a non-root user (UID 1001) could not
+  write to its PersistentVolume; the application failed with
+  "permission denied" on the mount.
+- **Cause:** minikube's hostpath provisioner creates the directory
+  with mode 0755, owned by root, so a non-root user has no write
+  permission.
+- **Docker path now:** the hostpath directories are writable by
+  non-root Pods (§8 uses UID 1001 and works). The Pod securityContext
+  still sets `fsGroup` explicitly.
+
+### cgroup delegation and rootless setup friction (maintainer-reported)
+
+- **Symptom:** a fresh Fedora user could not start the cluster until
+  cgroup v2 controller delegation, `subuid`/`subgid` ranges, and the
+  user-level Podman socket were all configured.
+- **Cause:** a rootless node depends on host-level setup (controller
+  delegation to the user's systemd slice, subordinate ID ranges, the
+  user socket) that is easy to miss and fails in non-obvious ways.
+- **Docker path now:** the Docker daemon runs as a system service.
+  Setup is `systemctl enable --now docker` and membership in the
+  `docker` group.
+
+### Rootful needs sudo (`PROVIDER_PODMAN_NOT_RUNNING`)
+
+- **Symptom:** `Exiting due to PROVIDER_PODMAN_NOT_RUNNING: "sudo -n
+  -k podman version ..." exit status 1: sudo: a password is
+  required`.
+- **Cause:** minikube defaults to rootful Podman and shells out
+  through `sudo`.
+- **Docker path now:** no `sudo` per command. Group membership
+  grants access to the socket.
+
+### The docker in-cluster runtime fails under rootless
+
+- **Symptom:** `--container-runtime=docker` on a rootless node does
+  not start the cluster.
+- **Cause:** the Docker runtime inside the node needs privileges the
+  rootless node does not have, leaving containerd as the only
+  workable inner runtime.
+- **Docker path now:** containerd (runc) is the one runtime, chosen
+  explicitly on every `minikube start`.
+
+### Driver auto-detect and `rootless=true` disagree
+
+- **Symptom:** `Using rootless Docker driver was required, but the
+  current Docker does not seem rootless`.
+- **Cause:** with both Docker and Podman installed, minikube
+  auto-detected Docker while the persisted `rootless true` setting
+  demanded a rootless driver.
+- **Docker path now:** no persisted minikube config. Every profile
+  states `--driver=docker` explicitly, and `minikube config view`
+  stays empty.
+
+### `MINIKUBE_ROOTLESS` was required in every shell (CAP-010)
+
+- **Symptom:** intermittent "unknown state" from `minikube status`,
+  `minikube ssh` aborting, and `image load` failing.
+- **Cause:** when `MINIKUBE_ROOTLESS` was unset in the current shell,
+  minikube routed host operations through `sudo podman`, which cannot
+  see a rootless user's node container. The variable was set where
+  the profile was created, so the breakage looked random.
+- **Docker path now:** no such variable, no `minikube config set`.
+
+### The node IP is not routable, forcing tunnels and port-forwards
+
+- **Symptom:** `curl $(minikube ip):<nodePort>` timed out; the
+  ingress gateway had no host-routable address.
+- **Cause:** the rootless network (slirp4netns or pasta) puts the
+  node behind user-space NAT.
+- **Docker path now:** NodePorts are published to `127.0.0.1` at
+  profile creation (`--ports=127.0.0.1:<host>:<nodePort>`). Third-party
+  UIs get companion NodePort Services. No tunnels, no port-forwards.
+
+### Port-forwards died with their pod (CAP-035)
+
+- **Symptom:** demos failed halfway when a Pod restarted; the
+  port-forward silently went away.
+- **Cause:** a port-forward is bound to one Pod, not to the Service.
+  The project record calls these "the flaky bits all session".
+- **Docker path now:** published NodePorts survive Pod restarts, and
+  demos assert them with `docker port <profile> <nodePort>/tcp`.
+
+### `minikube image build` and `image load` were unreliable, leading to a registry with two addresses (CAP-007, CAP-009)
+
+- **Symptom:** `minikube image build` exited 0 but the image never
+  entered containerd; `image load` reported "image not found" even
+  with a fully qualified `localhost/` name.
+- **Cause:** both go through the rootless Podman socket, which failed
+  the lookup. The workaround was the in-cluster registry addon, which
+  has two addresses: a dynamic host port for pushing and
+  `localhost:5000` inside the cluster.
+- **Docker path now:** `docker build` on the host, then
+  `minikube image load`. No registry, no two addresses, bare image
+  names with `imagePullPolicy: Never`, and a `rollout restart` after
+  each load.
+
+### The podman `pids_limit` of 2048 capped the node (CAP-036, CAP-041)
+
+- **Symptom:** the last meshed Pod failed with `fork/exec
+  /proc/self/fd/6: resource temporarily unavailable`.
+- **Cause:** Podman applied a default `pids-limit` of 2048 to the
+  node container's root cgroup, a cap on all processes in the
+  cluster. The first diagnosis (CAP-036) measured the wrong cgroup
+  and was withdrawn; the creation-time fix is CAP-041.
+- **Docker path now:** Docker sets no default PID cap on the node
+  container. Check `docker inspect <profile>` (`PidsLimit`) if a node
+  ever refuses to fork.
+
+### Idle `/dev` decay wedged kube-proxy (CAP-040)
+
+- **Symptom:** after about 17 hours idle, Services refused
+  connections while Pod IPs worked, and webhooks failed.
+- **Cause:** a device node present at node creation vanished from
+  the rootless node container's `/dev`, and kube-proxy crash-looped
+  on `error creating device nodes`.
+- **Docker path now:** the node is a Docker container with its own
+  `/dev`. If ClusterIP routing ever breaks while Pod IPs answer,
+  check kube-proxy first.
+
+### Orphaned Podman volumes after failed starts
+
+- **Symptom:** a failed `minikube start` left a volume behind, and
+  the next start with the same profile name failed or reused stale
+  state.
+- **Cause:** the failed start left its Podman volume behind.
+- **Docker path now:** `minikube delete -p <profile>` removes the
+  profile and its volume. Never run `docker system prune --volumes`
+  to clean up: it deletes the volume of every stopped profile.
+
+### Registry images were lost on stop and start
+
+- **Symptom:** after `minikube stop` and `start`, Pods went
+  `ImagePullBackOff` for images pushed to the registry addon.
+- **Cause:** images pushed to the registry addon did not survive a
+  stop and start of the profile.
+- **Docker path now:** images loaded with `minikube image load` live
+  in the node's containerd store, which survives stop and start.
+
+### minikube issue #8426 log noise
+
+- **Symptom:** `Error downloading kic artifacts: not yet
+  implemented, see issue #8426` during every start.
+- **Cause:** an `ErrNotImplemented` that minikube logs at error
+  level on the Podman driver; the cluster comes up fine.
+- **Docker path now:** the line does not appear.
+
+### Runtime pairing rules
+
+- **Symptom:** advice contradicted itself: rootless Podman wants
+  containerd, rootful Podman wants CRI-O, and the Docker runtime is
+  deprecated.
+- **Cause:** the right inner runtime depended on the outer driver
+  and the privilege mode.
+- **Docker path now:** one pairing, written down once.
+
+### Rules now
+
+- Docker Engine only (`docker-ce`, context `default`); Docker
+  Desktop is never required.
+- `--driver=docker --container-runtime=containerd`; runc is the
+  runtime. Never mix runtimes: do not reuse a profile across drivers
+  or runtimes.
+- NodePorts and their loopback host ports are fixed at profile
+  creation. A missing port means delete and recreate the profile.
+- Pass an explicit `--context` (`--kube-context`, `-p`) on every
+  command.
+- Profile names are unique per host.
+- Use the newest UBI image with the newest runtime that supports it.
+<!-- policy-exempt:end -->
+
+---
+
 ## TL;DR for the next project
 
 If you read nothing else:
 
-1. **Use Podman, write Containerfiles, target Fedora-family.**
+1. **Use Docker Engine, write Containerfiles, target Fedora and RHEL.**
 2. **Always include `:Z` on volume mounts, always use `127.0.0.1`
    in tests, always wait-for-HTTP not sleep.**
 3. **Pin Jekyll in your Gemfile, deploy via the GitHub Actions
@@ -437,13 +659,7 @@ If you read nothing else:
 
 Everything else is project-specific detail.
 
-# Lessons learned — additions from r1–r18
-
-> Merge instructions: review against the existing
-> `onboarding/LESSONS-LEARNED.md` (formerly at the repo root)
-> and integrate the items below that aren't already covered.
-> Some may duplicate existing notes; deduplicate as you see fit.
-> Once merged, delete this file.
+# Project-process additions from r1–r18
 
 ---
 
@@ -531,7 +747,7 @@ consistently and keep the whole command together.
 
 ### `127.0.0.1` not `localhost`
 `localhost` can resolve to either IPv4 or IPv6 depending on
-the system; some port-forward / proxy stacks bind only IPv4.
+the system; some proxy stacks bind only IPv4.
 `127.0.0.1` is unambiguous. Use it everywhere in commands and
 in code examples.
 
@@ -564,16 +780,17 @@ from the failure log alone, no re-run needed.
 ### Image cache doesn't cross profiles
 Minikube profiles each have their own image cache. If §11
 builds `nginx-custom:v1` on the `istio` profile, that build
-isn't visible to the default `minikube` profile. Either build
-on both profiles, push to a registry, or keep workloads on
-one profile.
+isn't visible to the default `minikube` profile. Either run
+`docker build` once and `minikube image load` it into each profile,
+or keep workloads on one profile.
 
-### Rootless podman driver puts ingress IPs on the slirp4netns side
-Under rootless podman, the ingress gateway's IP isn't
-host-routable. Use `kubectl port-forward` (consistent with §6
-and §9), or `minikube tunnel -p PROFILE` if you need a stable
-external IP. Plan demo scripts around port-forward to keep
-things simple.
+### Published NodePorts replace host-side forwarding
+Every host-facing Service is a NodePort published to `127.0.0.1`
+when the profile is created (`--ports=127.0.0.1:<host>:<nodePort>`).
+Third-party UIs get a companion NodePort Service that selects the
+same Pods, so upgrades never revert it. Ports are fixed at creation:
+a missing port means delete and recreate the profile. The earlier
+earlier rootless approach is explained in Part 4.
 
 ### `fs.inotify.max_user_instances` matters for multi-cluster
 Fedora's default is sized for one minikube cluster. Starting a
@@ -596,27 +813,32 @@ sidecar"), not a regular container. JSONPath queries against
 count toward readiness totals).
 
 ### Strimzi pins Kafka versions narrowly
-Strimzi 0.51 supports ONLY Kafka 4.1.0, 4.1.1, 4.2.0.
+Strimzi 0.51 supported ONLY Kafka 4.1.0, 4.1.1, 4.2.0 (the repo now
+runs Strimzi 1.2.0 with Kafka 4.3.1, v1 API only).
 Specifying 3.x in the manifest produces a `READY=False` Kafka
 CR with an opaque reason; `kubectl describe kafka` is needed
 to surface the actual error. We caught this in r13's first run
-and pinned 4.1.0 thereafter.
+and pinned an explicit supported version thereafter.
 
 ## Image / packaging
 
 ### UBI base images for Fedora-adjacent users
-We chose `registry.access.redhat.com/ubi9/ubi-minimal` over
-Alpine or scratch. Trade-off: ~80 MB larger but no
+We chose `registry.access.redhat.com/ubi10/ubi-minimal`
+(pinned, currently `10.2-1791444377`; the full image is
+`ubi10/ubi:10.2-1791444044`) over Alpine or scratch. Trade-off: ~80 MB larger but no
 subscription-manager required on Fedora, production-grade
 security posture, and matches what readers see in OpenShift
 contexts. Worth it for this audience.
 
-### Multi-stage builds: ubi9 builder → ubi9-minimal runtime
+### Multi-stage builds: ubi10 builder → ubi10-minimal runtime
 Builder stage has compilers and dev headers; runtime stage is
 minimal. `USER 1001:0` in the runtime stage matches
 OpenShift's restricted SCC. This pattern appears in every
 custom image in the tutorial (nginx in §6, order-processor in
-§12 Kafka).
+§12 Kafka). The capstone Python services run on
+`ubi10/python-314-minimal:10.2-1791464217` (fallback
+`ubi9/python-314`; asyncpg moved to 0.32 to get a cp314 wheel).
+Always pin the tag.
 
 ## Tooling
 
@@ -652,9 +874,9 @@ file second (after `README.md`) to understand the actual state.
 
 ### PRD reconciliation document closes out the project
 `_plans/prd-reconciliation.md` records what shipped vs. what
-was planned, with rationale for each divergence (macOS dropped,
-UBI instead of Hummingbird, vendor-neutral relaxed for §13,
-"we" voice not strictly avoided, Podman not version-pinned).
+was planned, with rationale for each divergence (UBI instead of
+Hummingbird, vendor-neutral relaxed for §13, "we" voice not
+strictly avoided, container engine not version-pinned).
 Worth writing at project close; gives future contributors the
 intent vs. reality picture in one document.
 
@@ -695,6 +917,7 @@ declared done:
 Not on the list: "every section reads perfectly" (that's
 infinite work). The discipline is knowing when to ship.
 
+<!-- policy-exempt:start -->
 # PRD additions — r18
 
 > Merge instructions: review the additions below against the
@@ -757,7 +980,7 @@ demo (§5, §10), or summary navigation (§0, §16).
 - **Maintaining vendor-neutral language** — the PRD's
   vendor-neutral stance was deliberately relaxed for §13
   (Alternatives to minikube), where honest comparison of kind /
-  k3s / microk8s / MicroShift is more useful to the reader than
+  k3s / MicroShift is more useful to the reader than
   refusing to take a position. See
   `_plans/prd-reconciliation.md` for the full rationale
 - **Eliminating first-person plural ("we") voice** — the audit
@@ -765,27 +988,24 @@ demo (§5, §10), or summary navigation (§0, §16).
   awkward phrasing. The 7 surviving instances in §11 and §12 are
   contextual (rhetorical "if we had one", quoted upstream text,
   introducing tutorial choices) and judged not worth changing
-- **Pinning Podman to a specific version** — the prereq script
-  reports the installed version and warns if features used by
-  the tutorial are absent; specific version pinning would have
-  made the tutorial fragile to Fedora's rebase cadence
+- **Pinning the container engine to a specific version** — the
+  prereq script reports the installed Docker Engine version;
+  §1 records the version the tutorial was verified with
 
 ## Add to "Audience" section
 
 The shipped audience definition (Fedora 44 developer, basic
-Kubernetes literacy, wants local cluster without Docker Desktop
+Kubernetes literacy, wants local cluster without a desktop app
 or managed cloud) is more concrete than the PRD's
 `TODO:` placeholders. Specifically:
 
 - **Primary**: Fedora 44 desktop/workstation user with basic
   container experience (knows what an image is, can run
-  `podman build`)
-- **Secondary**: Linux developers on other distributions (most
-  material applies; only Fedora 44 is tested) and helm/Istio/KEDA
-  learners wanting a low-friction local environment
-- **Explicitly not served**: complete Kubernetes beginners,
-  Windows users without WSL, anyone needing macOS-tested
-  instructions
+  `docker build`)
+- **Secondary**: RHEL users, and Fedora or RHEL VMs, plus
+  helm/Istio/KEDA learners wanting a low-friction local environment
+- **Explicitly not served**: complete Kubernetes beginners, and
+  platforms other than Fedora and RHEL
 
 ## Add a "Project state" section near the end
 
@@ -803,3 +1023,4 @@ status:
 - **Closed**: project considered feature-complete as of r18.
   Any future work happens as new iterations (r19+) addressing
   specific findings from continued use of the tutorial
+<!-- policy-exempt:end -->

@@ -1,8 +1,8 @@
-# graphql-gateway Containerfile — UBI 9 multi-stage build (CAP-005).
+# graphql-gateway Containerfile — UBI 10 multi-stage build, Python 3.14 (CAP-005, CAP-050).
 # Builder runs as root (writes /opt/venv); runtime is non-root USER 1001:0.
 # Copies the committed gRPC client stubs (gen/) for the inventory call (CAP-013).
 
-FROM registry.access.redhat.com/ubi9/python-312:latest AS builder
+FROM registry.access.redhat.com/ubi10/python-314-minimal:10.2-1791464217 AS builder
 USER 0
 WORKDIR /build
 RUN pip install --no-cache-dir "poetry==1.8.4" "poetry-plugin-export==1.8.0"
@@ -23,7 +23,7 @@ RUN /opt/venv/bin/pip install --no-cache-dir \
         "opentelemetry-exporter-otlp" \
     && /opt/venv/bin/opentelemetry-bootstrap -a install
 
-FROM registry.access.redhat.com/ubi9/python-312:latest AS runtime
+FROM registry.access.redhat.com/ubi10/python-314-minimal:10.2-1791464217 AS runtime
 WORKDIR /opt/app-root/src
 COPY --from=builder --chown=1001:0 /opt/venv /opt/venv
 COPY --chown=1001:0 app/ ./app/
@@ -32,6 +32,11 @@ COPY --chown=1001:0 gen/ ./gen/
 ENV PATH="/opt/venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1
+# gRPC clients resolve names with the system resolver (getaddrinfo), like every
+# other library here. gRPC's bundled c-ares resolver took ~3 s for short
+# Service names on the docker-driver profile, which equals the 3 s CheckStock
+# deadline (see onboarding/LESSONS-LEARNED.md).
+ENV GRPC_DNS_RESOLVER=native
 USER 1001:0
 EXPOSE 8080
 # r29c: opentelemetry-instrument activates the auto-instrumentations installed

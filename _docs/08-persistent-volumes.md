@@ -93,8 +93,12 @@ standard (default)   k8s.io/minikube-hostpath   Delete          Immediate       
 
 The default StorageClass is `standard`. It backs PVs with
 directories on the minikube node's filesystem (under
-`/tmp/hostpath-provisioner/`). Not production-grade, perfect for
-local development.
+`/tmp/hostpath-provisioner/`, inside the node container, not on your
+host). Not production-grade, perfect for local development. The
+directories are writable by the non-root seed container and nginx on
+Docker Engine; the hostPath permission failures that rootless Podman
+produced are recorded in [LESSONS-LEARNED, Part
+4](https://github.com/patterncatalyst/minikube-on-fedora/blob/main/onboarding/LESSONS-LEARNED.md).
 
 When a PVC has no `storageClassName`, the default StorageClass
 handles it.
@@ -164,20 +168,22 @@ spec:
     spec:
       initContainers:
       - name: seed-content
-        image: registry.access.redhat.com/ubi9/ubi-minimal
+        image: registry.access.redhat.com/ubi10/ubi-minimal:10.2-1791444377
         command:
           - "/bin/sh"
           - "-c"
           - |
             set -e
             if [ -f /content/index.html ]; then
-              echo "content already exists; leaving it alone"
+              echo "[seed-content] content already exists; persistence is working"
+              cat /content/index.html
             else
-              echo "seeding fresh content into PV"
+              echo "[seed-content] seeding fresh content into PV"
               cat > /content/index.html <<EOF
-            <h1>Test Page for nginx on UBI 9 Minimal (from PV)</h1>
+            <h1>Test Page for nginx on UBI 10 Minimal (from PV)</h1>
             <p>This file was written into the PersistentVolume at:</p>
             <p>$(date -u +%Y-%m-%dT%H:%M:%SZ)</p>
+            <p>If this timestamp is unchanged after a Pod restart, the PV is doing its job.</p>
             EOF
             fi
         volumeMounts:
@@ -186,7 +192,9 @@ spec:
       containers:
       - name: nginx
         image: nginx-custom:v1
-        imagePullPolicy: IfNotPresent
+        # Same image as §6/§7 — generic nginx; content comes from
+        # the volume mount below, not the image
+        imagePullPolicy: Never
         ports:
         - containerPort: 8080
         readinessProbe:
@@ -195,6 +203,19 @@ spec:
             port: 8080
           initialDelaySeconds: 2
           periodSeconds: 5
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 10
+        resources:
+          requests:
+            cpu: "100m"
+            memory: "64Mi"
+          limits:
+            cpu: "500m"
+            memory: "256Mi"
         volumeMounts:
         - name: content
           mountPath: /usr/share/nginx/html
@@ -239,16 +260,25 @@ metadata:
   labels:
     app: nginx-pv
 spec:
-  type: ClusterIP
+  type: NodePort
   selector:
     app: nginx-pv
   ports:
   - port: 80
     targetPort: 8080
+    # Published to 127.0.0.1:18080 at profile creation
+    # (--ports=127.0.0.1:18080:30080). Shared slot with §6, §9, §12-http.
+    nodePort: 30080
+    protocol: TCP
 ```
 
-Standard ClusterIP Service like §6. We'll reach it via
-`kubectl port-forward` — a familiar pattern by now.
+A NodePort Service on 30080, the same slot §6 used and the one the
+`minikube` profile publishes to `127.0.0.1:18080`. **Delete §6's
+`nginx` Service first** (`kubectl delete -f
+examples/06-deploy-nginx-kubectl/manifests/`): two Services cannot
+hold the same nodePort, and the demo's preflight stops with a "delete
+X first" message if one does. Commands in this chapter assume the
+`minikube` kubectl context from §4.
 
 ## Apply, observe, persist, verify
 
@@ -271,10 +301,9 @@ nginx-content   Bound    pvc-a83b…    100Mi      RWO            standard
 `STATUS: Bound` means a PV was provisioned and the PVC is using
 it. `kubectl get pv` shows the auto-created PV itself.
 
-Port-forward and curl:
+Curl the published port:
 
 ```bash
-kubectl port-forward service/nginx-pv 18080:80 &
 curl http://127.0.0.1:18080/
 ```
 
@@ -295,6 +324,11 @@ ready, curl again:
 kubectl wait --for=condition=Ready pod -l app=nginx-pv --timeout=60s
 curl http://127.0.0.1:18080/
 ```
+
+Nothing needs re-attaching: the NodePort routes to whichever Pod is
+Ready, so the second request just works. (Right after the old Pod is
+deleted there can be a second or two with no ready endpoint; the demo
+polls instead of assuming.)
 
 **The timestamp matches.** The new Pod's initContainer found the
 file already in the PVC, left it alone; nginx serves the content
@@ -327,19 +361,23 @@ storage-provisioner.
 `examples/08-persistent-volume/demo.sh` runs the §8 happy path
 **with** persistence verification:
 
-1. Pre-flight: cluster up; image cached (auto-build from §6 if
-   not); `standard` StorageClass present
-2. Clears any prior `nginx-pv` resources
+1. Pre-flight: Docker Engine, `minikube` profile with published
+   ports, pinned context; `standard` StorageClass present; image
+   loaded (auto-build and load from §6 if not)
+2. Clears any prior `nginx-pv` resources and checks nodePort 30080
+   is free
 3. Applies the manifests
 4. Waits for the PVC to bind and the Deployment to be Available
-5. Port-forwards the Service to localhost
+5. Confirms `docker port minikube 30080/tcp` and waits for
+   `http://127.0.0.1:18080/`
 6. Curls; captures the timestamp from the HTML
 7. **Deletes the Pod;** waits for the Deployment's replacement
    to be Ready
-8. Re-establishes port-forward (the old one died with the Pod)
+8. Polls `http://127.0.0.1:18080/` until the replacement Pod answers
 9. Curls again; **verifies the timestamp matches** — persistence
    confirmed
-10. Cleans up Deployment + Service + PVC + tunnel on exit
+10. Cleans up Deployment + Service + PVC on exit, freeing nodePort
+    30080
 
 ```bash
 cd examples/08-persistent-volume

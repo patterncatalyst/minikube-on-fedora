@@ -25,7 +25,7 @@ This tutorial's manifests were written and tested in **Pulsar**
 — the community-maintained successor to Atom, which GitHub
 discontinued in 2022 after the Microsoft acquisition. A group of
 contributors forked the editor and continues to ship it under the
-Pulsar name. Cross-platform (Linux, macOS, Windows), open source,
+Pulsar name. Open source,
 fast keyboard-driven workflow, plugin-friendly. The official
 Fedora `.rpm` is at [pulsar-edit.dev](https://pulsar-edit.dev/).
 
@@ -282,8 +282,9 @@ another, debugging gets noticeably faster.
 A productive minikube session commonly has several long-running
 things side by side:
 
-- `kubectl port-forward …` (one terminal, locked to the
-  port-forward)
+- Nothing needs a terminal held open for access: services are on
+  published ports (§7), reachable at `127.0.0.1` from any shell or
+  browser
 - `k9s` (one terminal, full-screen TUI)
 - An interactive shell for running kubectl commands
 - A `stern` log stream (one terminal, scrolling)

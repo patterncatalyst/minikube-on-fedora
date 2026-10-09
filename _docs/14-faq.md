@@ -12,31 +12,44 @@ tutorial's development — none are hypothetical.
 
 ## Installation and startup
 
-### Q: `minikube start` fails with podman socket errors
+### Q: `minikube start` fails with docker daemon or context errors
 
-The most common cause is that the rootless podman socket isn't
-running. Check with `systemctl --user status podman.socket`. If
-it's inactive, `systemctl --user enable --now podman.socket`
-starts it persistently. The Podman driver in minikube needs
-the user-level socket, not the system one.
+minikube follows the active Docker context, so it needs the Docker
+Engine daemon running on its default socket. Check in this order:
+
+```bash
+sudo systemctl enable --now docker     # daemon not running
+docker context show                    # must print: default
+docker context use default             # fix a leftover context
+sudo usermod -aG docker "$USER"        # "permission denied" on the socket
+```
+
+After `usermod`, log out and back in (or `newgrp docker`) so the
+group applies. If `docker context show` keeps reverting, look for a
+`DOCKER_HOST` export in `~/.bashrc` or `~/.zshrc`. The repo's demo
+scripts run the same checks (`require_docker_engine`) and print the
+fix for whichever one fails.
 
 ### Q: minikube starts but `kubectl` can't reach it
 
 Almost always the kubectl context is pointing at a different
 cluster. Run `kubectl config current-context` to see which one
 kubectl is using, and `kubectl config get-contexts` to see all
-of them. `kubectl config use-context minikube` switches back.
-If `minikube` isn't in the context list at all, the cluster
-didn't actually start — re-run `minikube start -p minikube`
-and watch the output for errors.
+of them. Pass `--context minikube` on the command, or run
+`kubectl config use-context minikube` to switch. If `minikube`
+isn't in the context list at all, the cluster didn't actually
+start — re-run `minikube start -p minikube` and watch the output
+for errors.
 
 ### Q: my minikube cluster is unbearably slow
 
 Two common causes: (1) the cluster is sized too small — check
 `minikube profile list` for current CPU/memory allocation, and
 recreate with bigger numbers if needed (`minikube delete -p
-minikube` then `minikube start -p minikube --memory=8g --cpus=6
---container-runtime=containerd --rootless=true`); (2) the host
+minikube`, then `minikube start -p minikube --driver=docker
+--container-runtime=containerd --kubernetes-version=v1.36.5
+--memory=8192 --cpus=6 --ports=127.0.0.1:18080:30080,127.0.0.1:18081:30808,127.0.0.1:18090:30900`,
+the `CORE_PORTS` map from `scripts/lib/_helpers.sh`); (2) the host
 machine is swapping — `free -h` will tell you. Kubernetes
 control plane components are CPU- and memory-hungry; less than
 4 GB for the cluster causes constant pressure.
@@ -44,12 +57,13 @@ control plane components are CPU- and memory-hungry; less than
 ### Q: I want to start completely over
 
 ```bash
-minikube delete --all --purge
-rm -rf ~/.minikube ~/.kube
+minikube delete -p minikube
 ```
 
-This nukes every minikube profile, its disk images, and your
-kubectl config. Useful when something has gotten genuinely
+For a wholesale reset, `minikube delete --all --purge` followed by
+`rm -rf ~/.minikube ~/.kube` removes **every** minikube profile on the
+host, including profiles other projects use, plus your kubectl
+config. Useful when something has gotten genuinely
 wedged. The next `minikube start` recreates everything from
 scratch.
 
@@ -68,42 +82,45 @@ you haven't configured, or your minikube profile can't reach
 the internet (try `minikube ssh -p minikube -- ping -c 2
 8.8.8.8`).
 
-### Q: I thought Podman uses crun — why does the diagram show containerd?
+### Q: why containerd with runc, and why not mix runtimes?
 
-Both are correct, and they live at different layers. On the
-host, **rootless Podman** uses **crun** to run containers — one
-of which is the "minikube node" container. Inside that
-container, Kubernetes is installed with its own CRI
-runtime that the kubelet talks to. The `--container-runtime`
-flag we passed in §3 chose **containerd** for that inner
-layer; alternatives are `cri-o` (recommended for rootful
-Podman, but problematic in rootless mode) or `docker`
-(deprecated). So Podman+crun runs the outer node container;
-containerd inside that container runs the actual Pods.
+minikube's docker driver runs each Kubernetes node as a container
+on Docker Engine. Inside the node, the kubelet talks to a CRI
+runtime; this tutorial passes `--container-runtime=containerd`, and
+containerd runs Pods with **runc**. That pairing is the one
+minikube documents for the docker driver and the one every example
+here uses.
 
-The minikube docs spell out the recommendation:
-[rootless Podman → containerd, rootful Podman → CRI-O](https://minikube.sigs.k8s.io/docs/drivers/podman/).
-We're rootless, so containerd is the right inner choice.
+<!-- policy-exempt:start -->
+Don't mix runtimes. Pairings are fixed: the retired Podman path
+ran containers with crun and needed containerd on top of it, while
+the Docker path runs containerd with runc. Switching a profile's
+runtime or driver in place leaves state from the old pairing
+behind, and the symptom is an opaque `runc` "paused" check failure
+at start. If you change driver or runtime, `minikube delete -p
+[profile]` first and create a fresh profile.
+<!-- policy-exempt:end -->
 
 ### Q: my image built locally but Kubernetes can't find it
 
-Locally-built images live in your host's container runtime
-(Docker or Podman). Kubernetes inside minikube uses a
-*different* container runtime — containerd, running inside
-the minikube node container, not on your host. To make
-local images visible, either:
+Locally-built images live in Docker Engine on your host. The
+Kubernetes node is a container running its own containerd, which
+doesn't see the host's images. Build with Docker, then load the
+image into the profile:
 
 ```bash
-# Build directly into the minikube profile (recommended)
-minikube -p minikube image build -t myimage:v1 -f Containerfile .
-
-# Or push from your host into minikube
+docker build -f Containerfile -t myimage:v1 .
 minikube -p minikube image load myimage:v1
 ```
 
-`imagePullPolicy: IfNotPresent` in your Deployment manifest
-keeps Kubernetes from trying to pull from a public registry
-when the image is local.
+Use a pinned tag (not `latest`) and `imagePullPolicy: IfNotPresent`
+(or `Never`) in the Deployment so Kubernetes uses the loaded image
+instead of trying a public registry. Don't run
+`eval $(minikube docker-env)` with containerd: that variable points
+the docker CLI at a Docker daemon inside the node, and a containerd
+node doesn't run one, so builds land nowhere useful. After loading a
+new image under an existing tag, `kubectl --context minikube rollout
+restart deployment/[name]` makes the Pods pick it up.
 
 ### Q: Pod is Running but the app inside isn't responding
 
@@ -130,13 +147,32 @@ flag if the container ran out of memory.
 
 ## Networking
 
-### Q: `kubectl port-forward` works but the NodePort URL doesn't
+### Q: the NodePort URL doesn't answer
 
-Rootless minikube networking puts the cluster IP behind
-slirp4netns, which isn't routable from the host directly. Use
-`minikube service [name] --url -p minikube` instead of trying
-to hit the NodePort by IP — it sets up a tunnel for you. See
-§7 for the full pattern.
+This tutorial reaches every Service through a NodePort published on
+`127.0.0.1` when the profile is created. Check what the node
+actually publishes:
+
+```bash
+docker port minikube
+```
+
+You should see lines such as `30080/tcp -> 127.0.0.1:18080`. If
+the NodePort you need isn't listed, the profile was created without
+it, and published ports can't be added later. Delete and recreate the
+profile with `--ports` (the commands are in §3 and §4):
+
+```bash
+minikube delete -p minikube
+minikube start -p minikube --driver=docker --container-runtime=containerd \
+    --kubernetes-version=v1.36.5 \
+    --ports=127.0.0.1:18080:30080,127.0.0.1:18081:30808,127.0.0.1:18090:30900
+```
+
+If the port is published but still silent, the Service has no ready
+endpoints: `kubectl --context minikube get endpoints [name]`. Also
+confirm only one Service holds the shared NodePort 30080 (§6, §8,
+§9, and §12's HTTP demo take turns; delete the previous one first).
 
 ### Q: requests through the KEDA HTTP interceptor return 404
 
@@ -150,11 +186,17 @@ do not.
 
 ### Q: I can't reach the cluster from another machine on my LAN
 
-By design — minikube creates a single-machine cluster bound to
-loopback. If you need LAN-accessible workloads, you're past
-minikube's scope; look at k3s or kind running on a server, or
-expose specific services via `kubectl port-forward --address
-0.0.0.0` (development only — that bypasses your firewall).
+By default every published port binds to `127.0.0.1`, so only the
+host itself can reach it. When the host is a VM (or you need
+another machine to reach a demo), publish on the VM's own address
+at profile creation: in the `--ports` map, replace `127.0.0.1` with the
+VM's address (for example `192.168.122.50:18080:30080`), using the address of the
+interface the other machine can reach. Ports are fixed at creation, so this means
+recreating the profile. If the host runs firewalld, also allow the
+port (`sudo firewall-cmd --add-port=18080/tcp`, then add
+`--permanent` once it works). Publish only the Services you intend
+to share: the dashboard, Kiali, and Grafana should stay on
+`127.0.0.1`.
 
 ## Storage
 
@@ -186,14 +228,15 @@ dynamically-provisioned, `Retain` for hand-created).
 ### Q: `kubectl` is talking to the wrong cluster
 
 This is the daily papercut when running both `minikube` and
-`istio` profiles. Two fixes:
+`istio` profiles. The repo's scripts and chapters pass
+`--context` on every command, and you can do the same:
 
 ```bash
-# Switch context explicitly
-kubectl config use-context minikube
-kubectl config use-context istio
+kubectl --context minikube get pods
+kubectl --context istio get pods
 
-# Or, see at a glance which one you're on (add to your shell prompt)
+# Or switch the default and check it at a glance
+kubectl config use-context istio
 kubectl config current-context
 ```
 
@@ -223,6 +266,10 @@ reboot.
 minikube delete -p istio                  # removes only the istio profile
 minikube profile list                     # confirm the minikube profile is still there
 ```
+
+Always name the profile. Profile names must be unique per host; if
+another project already uses a name, pick a different one for this
+tutorial (the capstone uses `mof-capstone` for that reason).
 
 ## Updates and rollouts
 
@@ -266,10 +313,11 @@ For helm-managed deployments, `helm rollback [release] [revision]` is the equiva
 
 ### Q: Strimzi says "Unsupported Kafka.spec.kafka.version"
 
-Strimzi 0.51 supports **only Kafka 4.1.0, 4.1.1, and 4.2.0** —
-the entire 3.x line was dropped. If you have an older manifest
-pinning Kafka 3.9.x, edit `kafka-cluster.yaml` to use
-`version: 4.1.0` and remove any explicit `metadataVersion`
+Strimzi 1.2.0 supports Kafka **4.2.x and 4.3.x** (this repo pins
+4.3.1) — the entire 3.x line was dropped, and only the
+`kafka.strimzi.io/v1` API is accepted. If you have an older manifest
+pinning Kafka 3.9.x or `v1beta2`, edit `kafka-cluster.yaml` to use
+`apiVersion: kafka.strimzi.io/v1`, `version: 4.3.1` and remove any explicit `metadataVersion`
 field (Strimzi defaults it to match the Kafka version when not
 specified). See §12 prose for the full context.
 
@@ -306,20 +354,26 @@ shows why KEDA disagrees with the current state.
 ### Q: my disk is filling up — what should I clean?
 
 ```bash
-# Old minikube profile disk images
-minikube delete --all --purge
-
-# Unused podman images (host)
-podman image prune -a
+# Unused Docker images (host)
+docker image prune -a
 
 # Containerd images inside the running minikube
 minikube -p minikube ssh -- sudo crictl rmi --prune
+
+# Whole profiles you no longer need
+minikube delete -p istio
 ```
 
 The minikube image cache inside the profile is the most common
 culprit — `nginx-custom`, `order-processor`, and the Kafka /
 Istio images all accumulate. The `crictl rmi --prune` is safe;
 it removes images that aren't currently in use by any Pod.
+
+> **Do not run `docker system prune --volumes`.** A stopped minikube
+> profile is a stopped container plus a Docker volume that holds its
+> state. The prune treats both as unused and deletes them, taking the
+> cluster with them. `docker image prune` is safe because it only
+> touches images.
 
 ### Q: I want to upgrade kubectl/helm/minikube
 
@@ -329,16 +383,55 @@ sudo dnf upgrade -y kubectl
 
 # helm
 sudo dnf upgrade -y helm
-
-# minikube (binary install, not from dnf)
-curl -LO https://storage.googleapis.com/minikube/releases/latest/minikube-linux-amd64
-sudo install minikube-linux-amd64 /usr/local/bin/minikube
 ```
 
+minikube is pinned on purpose: the chapters, the port maps, and the
+flag set are tested against v1.39.0, installed from the release RPM
+in §2. Upgrading it is a deliberate change, not a routine update.
+To move, install the newer RPM the same way as §2 and re-run the
+demos before relying on it.
+
 After upgrading minikube, existing profiles continue working
-on the old K8s version. To upgrade the Kubernetes version
-inside a profile: `minikube start -p minikube
---kubernetes-version=v1.36.1` (or whatever current is).
+on the old Kubernetes version. The tutorial pins
+`--kubernetes-version=v1.36.5`; a different version means a new
+profile.
+
+### Q: pods or VMs lose network after Docker starts (iptables FORWARD DROP)
+
+Docker Engine's daemon sets the host `iptables` FORWARD policy to
+DROP and manages its own chains. On a host that also runs libvirt
+VMs, traffic to and from the VM bridge can stop flowing once
+`dockerd` starts. Check:
+
+```bash
+sudo iptables -S FORWARD | head -1      # -P FORWARD DROP
+sudo iptables -S DOCKER-USER
+```
+
+If the libvirt bridge (`virbr0`) is affected, accept its traffic in
+the `DOCKER-USER` chain, which Docker leaves alone:
+
+```bash
+sudo iptables -I DOCKER-USER -i virbr0 -j ACCEPT
+sudo iptables -I DOCKER-USER -o virbr0 -m conntrack --ctstate RELATED,ESTABLISHED -j ACCEPT
+```
+
+Those rules last until reboot; persist them through your firewall
+tooling once they work. This is a host-level interaction between two
+packet filters rather than a minikube fault, so verify it on your
+own machine before relying on it.
+
+<!-- policy-exempt:start -->
+### Q: Why did this tutorial move off rootless podman?
+
+An earlier revision ran minikube on rootless Podman. It worked, but
+the node had no host-routable address, which forced tunnels and
+port-forwards for every demo, and the pairing rules for runtime,
+storage, and image loading kept producing failures that had nothing
+to do with Kubernetes. Docker Engine with `--ports` published at
+creation removes those workarounds. The symptom-by-symptom record is
+[LESSONS-LEARNED, Part 4](https://github.com/patterncatalyst/minikube-on-fedora/blob/main/onboarding/LESSONS-LEARNED.md).
+<!-- policy-exempt:end -->
 
 ## Cleanup recipes
 
@@ -382,9 +475,9 @@ cd examples/11-istio && ./cleanup.sh --remove-istio --remove-profile
 ### Full reset — back to a fresh Fedora
 
 ```bash
-minikube delete --all --purge          # all profiles + their disk images
-rm -rf ~/.minikube ~/.kube             # config and state
-podman image prune -a                  # host-cached container images
+minikube delete -p minikube            # repeat for -p istio and any other tutorial profile
+rm -rf ~/.minikube ~/.kube             # config and state (affects every minikube profile)
+docker image prune -a                  # host-cached container images
 helm repo remove kedacore strimzi      # if you added them
 ```
 

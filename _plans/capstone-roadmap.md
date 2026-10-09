@@ -4,6 +4,8 @@ description: The post-observability plan — feature demos, narrative restructur
 render_with_liquid: false
 ---
 
+> **2026-10-09 (r29):** podman, rootless, registry and port-forward content here is historical (podman era); superseded by r29 (Docker Engine, published NodePorts) — see `reconciliation-plan.md` Section D, r29.
+
 This is the working roadmap for finishing the §17 capstone after the
 observability arc (through r30). Each phase is its own iteration set with its
 own decision-log entries and verification. Sequencing is driven by dependencies:

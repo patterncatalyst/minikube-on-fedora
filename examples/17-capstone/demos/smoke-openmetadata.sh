@@ -9,7 +9,7 @@
 #   * the openmetadata Deployment is rolled out
 #   * the server answers its version API (proves it booted AND reached its
 #     Postgres backend — OpenMetadata won't serve without a working DB)
-#   * the version it reports is the pinned 1.12.8
+#   * the version it reports is the pinned 2.0.5
 #   * the dedicated `openmetadata` database really exists in capstone-postgres
 #     and was populated by the server's migrations (sanity that Postgres reuse,
 #     not bundled MySQL, is what's backing it)
@@ -19,19 +19,16 @@
 #   ./demos/smoke-openmetadata.sh
 #
 # Prerequisites:
-#   - capstone profile running, kubectl context = capstone
+#   - mof-capstone profile running (kubectl/helm are pinned to it by scripts/lib/env.sh)
 #   - scripts/setup-openmetadata.sh has been run (OpenMetadata installed)
 
 set -uo pipefail   # NOT -e: failures are handled explicitly so we can diagnose
-export MINIKUBE_ROOTLESS=true   # CAP-010
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/lib/env.sh"   # PROFILE, NS, ports; pins kubectl/helm to the profile
 
-NS="capstone"
-PROFILE="capstone"
 PG_CLUSTER="capstone-postgres"
 OM_DB="openmetadata"
-EXPECTED_VERSION="1.12.8"
-LOCAL_PORT="8585"
-PORT_FORWARD_PID=""
+EXPECTED_VERSION="2.0.5"
+LOCAL_PORT="$HOST_PORT_OPENMETADATA"   # published NodePort on 127.0.0.1
 SUCCESS=0
 
 step() { printf '\n==> %s\n' "$1"; }
@@ -58,24 +55,15 @@ dump_diagnostics() {
 
 fail() {
     printf '\n✗ FAILED: %s\n' "$1" >&2
-    [[ -n "$PORT_FORWARD_PID" ]] && kill "$PORT_FORWARD_PID" 2>/dev/null
     dump_diagnostics
     exit 1
 }
 
-on_exit() {
-    [[ -n "$PORT_FORWARD_PID" ]] && kill "$PORT_FORWARD_PID" 2>/dev/null || true
-    # This smoke never tears OpenMetadata down — it's a platform install. On
-    # success we simply stop the port-forward (handled above).
-    :
-}
-trap on_exit EXIT
 
 # ─── Pre-flight ──────────────────────────────────────────────────────────────
 
 step "Pre-flight checks"
-[[ "$(kubectl config current-context 2>/dev/null)" == "$PROFILE" ]] \
-    || fail "kubectl context is not '$PROFILE' — run: kubectl config use-context $PROFILE"
+minikube status -p "$PROFILE" >/dev/null 2>&1 || fail "profile '$PROFILE' not running — ./scripts/setup-capstone-profile.sh"
 command -v kubectl >/dev/null || fail "kubectl not in PATH"
 kubectl get deployment openmetadata -n "$NS" >/dev/null 2>&1 \
     || fail "openmetadata Deployment not found — run scripts/setup-openmetadata.sh first"
@@ -90,10 +78,9 @@ printf '    ✓ deployment available\n'
 # ─── Version API (proves booted + DB-backed) ─────────────────────────────────
 
 step "Querying the server version API (proves it booted and reached Postgres)"
-kubectl port-forward -n "$NS" svc/openmetadata "${LOCAL_PORT}:8585" >/dev/null 2>&1 &
-PORT_FORWARD_PID=$!
-# Give the forward a moment to establish.
-sleep 4
+require_published_port "$PROFILE" "$NODE_PORT_OPENMETADATA" "$HOST_PORT_OPENMETADATA"
+wait_for_http "http://127.0.0.1:${LOCAL_PORT}/api/v1/system/version" 120 \
+    || fail "no response from 127.0.0.1:${LOCAL_PORT} (the openmetadata-host NodePort) — is the server serving?"
 
 VERSION_JSON="$(curl -fsS "http://127.0.0.1:${LOCAL_PORT}/api/v1/system/version" 2>/dev/null || echo '')"
 [[ -n "$VERSION_JSON" ]] \
@@ -108,7 +95,7 @@ printf '    ✓ version %s serving over the API\n' "$EXPECTED_VERSION"
 
 step "Confirming the openmetadata database exists in ${PG_CLUSTER} and was populated"
 PG_PRIMARY="$(kubectl get pods -n "$NS" \
-    -l "cnpg.io/cluster=${PG_CLUSTER},role=primary" \
+    -l "cnpg.io/cluster=${PG_CLUSTER},cnpg.io/instanceRole=primary" \
     -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")"
 [[ -n "$PG_PRIMARY" ]] || fail "no capstone-postgres primary pod found"
 
@@ -129,6 +116,5 @@ SUCCESS=1
 step "SUCCESS"
 printf 'OpenMetadata %s is deployed, Postgres-backed, and serving its API.\n' "$EXPECTED_VERSION"
 printf 'Open the UI with:\n'
-printf '  kubectl port-forward -n %s svc/openmetadata 8585:8585\n' "$NS"
-printf '  http://127.0.0.1:8585  (admin@open-metadata.org / admin)\n'
+printf '  http://127.0.0.1:%s   (credentials: see openmetadata/om-app-values.yaml)\n' "$LOCAL_PORT"
 printf '\nNext (r27b): register Postgres + Kafka, ingest, and declare lineage.\n'

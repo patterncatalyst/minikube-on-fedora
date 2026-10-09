@@ -19,7 +19,7 @@
 # and the lineage PUT is idempotent, so re-running is safe.
 #
 # Prerequisites:
-#   * capstone profile running, kubectl context = capstone
+#   * mof-capstone profile running (kubectl is pinned to its context)
 #   * scripts/setup-openmetadata.sh has been run (the server is up and serving)
 #   * the data sources exist: the capstone-postgres Cluster with the service
 #     schemas, and the capstone-kafka cluster with the order-placed topic
@@ -34,10 +34,11 @@
 
 set -euo pipefail
 
-NS="capstone"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/env.sh"
+
 JOB_TIMEOUT="10m"
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ING_DIR="$SCRIPT_DIR/../openmetadata/ingestion"
 
 # ─── Pre-flight ──────────────────────────────────────────────────────────────
@@ -53,15 +54,6 @@ for f in postgres.yaml kafka.yaml get_token.py lineage.py \
          job-postgres.yaml job-kafka.yaml job-lineage.yaml; do
     [[ -f "$ING_DIR/$f" ]] || { printf 'ERROR: missing %s\n' "$ING_DIR/$f" >&2; exit 1; }
 done
-
-current_context="$(kubectl config current-context 2>/dev/null || echo "")"
-if [[ "$current_context" != "capstone" ]]; then
-    printf 'WARNING: current kubectl context is "%s", not "capstone".\n' "$current_context" >&2
-    printf 'Switch with: kubectl config use-context capstone\n' >&2
-    printf 'Continue anyway? [y/N] ' >&2
-    read -r answer
-    [[ "$answer" =~ ^[Yy] ]] || exit 1
-fi
 
 kubectl get deployment openmetadata -n "$NS" >/dev/null 2>&1 || {
     printf 'ERROR: openmetadata Deployment not found in %s.\n' "$NS" >&2
@@ -110,8 +102,7 @@ run_job om-declare-lineage job-lineage.yaml
 
 printf '\n==> Catalog populated and lineage declared.\n\n'
 printf 'Browse it:\n'
-printf '  kubectl port-forward -n %s svc/openmetadata 8585:8585\n' "$NS"
-printf '  open http://127.0.0.1:8585  (admin@open-metadata.org / admin)\n'
+printf '  open http://127.0.0.1:%s  (credentials: see openmetadata/om-app-values.yaml)\n' "$HOST_PORT_OPENMETADATA"
 printf '  → Services shows capstone-postgres (Database) and capstone-kafka (Messaging)\n'
 printf '  → the order-placed topic'\''s Lineage tab shows orders upstream, notifications downstream\n\n'
 printf 'Verify end-to-end:\n'

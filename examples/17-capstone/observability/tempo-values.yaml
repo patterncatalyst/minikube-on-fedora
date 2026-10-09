@@ -8,7 +8,7 @@
 # already receive itself. Instrumented services (r29c) send OTLP straight here.
 #
 # Used by scripts/setup-observability.sh:
-#   helm upgrade --install tempo grafana/tempo \
+#   helm upgrade --install tempo grafana-community/tempo \
 #       -n observability -f observability/tempo-values.yaml
 
 tempo:

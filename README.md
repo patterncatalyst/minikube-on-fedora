@@ -13,13 +13,14 @@ The published tutorial lives at:
 
 ## What this tutorial teaches
 
-A developer who works on Fedora with Podman, podman-compose, and
-Podman Desktop will, by the end:
+A developer who works on Fedora or RHEL with Docker Engine will, by
+the end:
 
 - Install minikube on Fedora 44 from standard repositories where
   possible
-- Start a local Kubernetes cluster with the podman driver
-  (rootless, containerd runtime)
+- Start a local Kubernetes cluster with the docker driver
+  (containerd runtime) and reach services on published loopback
+  ports
 - Deploy applications imperatively with `kubectl` and
   declaratively with helm charts (using public charts and
   authoring a small one)
@@ -38,14 +39,13 @@ familiarity with Kubernetes concepts (Pod, Deployment, Service)
 who wants a single coherent reference for getting work done on a
 local cluster.
 
-**Secondary**: developers on Fedora derivatives (RHEL, Rocky, Alma);
-developers on macOS who occasionally need local Kubernetes
-(advisory notes only, not a tested platform); readers learning
+**Secondary**: developers on RHEL (hosts or VMs); readers learning
 helm/Istio/KEDA who want a low-friction local environment.
 
 **Not for**: complete Kubernetes newcomers (read the upstream
 "Learn Kubernetes Basics" walkthrough first), production cluster
-operators, or Windows users (WSL not tested).
+operators, or anyone on a platform other than Fedora or RHEL
+(hosts or VMs), which are the only supported targets.
 
 ## Project layout
 
@@ -179,12 +179,17 @@ lives in
 Default status for any new claim is `unverified`; promotion to
 `verified` requires a real test run by a human on Fedora 44.
 
-As of project close-out, **107 facts are verified**.
+As of project close-out, **107 facts are verified**. <!-- policy-exempt:start -->
+They were verified on the podman-era setup.
+<!-- policy-exempt:end -->
+The r29 runtime migration (Docker Engine, docker driver, published
+NodePorts) rows are pending live verification and stay `unverified`
+until then.
 
 What shipped vs. what was originally planned — including the
-five major divergences (macOS dropped, UBI instead of
+five major divergences (non-Fedora/RHEL platforms dropped, UBI instead of
 Hummingbird, vendor-neutral relaxed for §13, "we" voice not
-strictly avoided, Podman not version-pinned) — is documented in
+strictly avoided, container runtime not version-pinned) — is documented in
 [`_plans/prd-reconciliation.md`](_plans/prd-reconciliation.md).
 
 ## Contributing
@@ -205,6 +210,5 @@ Apache License, Version 2.0. See [`LICENSE`](LICENSE).
 
 The 2023 predecessor of this tutorial lives at
 [github.com/patterncatalyst/minikube](https://github.com/patterncatalyst/minikube)
-for historical reference; it covers Kubernetes 1.22 and the
-docker / containerd driver path, which are stale for current
-work.
+for historical reference; it covers Kubernetes 1.22, which is
+stale for current work.

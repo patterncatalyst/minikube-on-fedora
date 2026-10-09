@@ -13,20 +13,13 @@
 # Run from examples/17-capstone/:  ./demos/smoke-observability.sh
 
 set -uo pipefail
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/lib/env.sh"   # PROFILE, ports; pins kubectl/helm to the profile
 
-NS="observability"
-PROM_PORT="9090"
-GRAF_PORT="3000"
-PROM_PF=""
-GRAF_PF=""
+NS="observability"   # this demo works in the observability namespace (env.sh's NS is the app namespace)
+PROM_PORT="$HOST_PORT_PROMETHEUS"   # published NodePort on 127.0.0.1
+GRAF_PORT="$HOST_PORT_GRAFANA"      # published NodePort on 127.0.0.1
 
 step() { printf '\n==> %s\n' "$1"; }
-cleanup() {
-    [[ -n "$PROM_PF" ]] && kill "$PROM_PF" 2>/dev/null
-    [[ -n "$GRAF_PF" ]] && kill "$GRAF_PF" 2>/dev/null
-    true
-}
-trap cleanup EXIT
 dump() {
     step "DIAGNOSTIC DUMP (failure — resources left in place)"
     kubectl get deployment,pods -n "$NS" 2>&1
@@ -59,9 +52,8 @@ wait_ready grafana 180          || fail "grafana did not become Ready"
 printf '    ✓ prometheus-server and grafana are Ready\n'
 
 # ─── Prometheus is scraping ──────────────────────────────────────────────────
-step "Port-forwarding Prometheus ($PROM_PORT → prometheus-server:80)"
-kubectl port-forward -n "$NS" svc/prometheus-server "${PROM_PORT}:80" >/dev/null 2>&1 &
-PROM_PF=$!
+step "Reaching Prometheus on 127.0.0.1:${PROM_PORT} (published NodePort)"
+require_published_port "$PROFILE" "$NODE_PORT_PROMETHEUS" "$HOST_PORT_PROMETHEUS"
 for _ in $(seq 1 15); do
     curl -s -o /dev/null --max-time 2 "http://127.0.0.1:${PROM_PORT}/-/ready" && break
     sleep 1
@@ -90,9 +82,8 @@ else
 fi
 
 # ─── Grafana is up with the dashboard provisioned ────────────────────────────
-step "Port-forwarding Grafana ($GRAF_PORT → grafana:80)"
-kubectl port-forward -n "$NS" svc/grafana "${GRAF_PORT}:80" >/dev/null 2>&1 &
-GRAF_PF=$!
+step "Reaching Grafana on 127.0.0.1:${GRAF_PORT} (published NodePort)"
+require_published_port "$PROFILE" "$NODE_PORT_GRAFANA" "$HOST_PORT_GRAFANA"
 for _ in $(seq 1 15); do
     curl -s -o /dev/null --max-time 2 "http://127.0.0.1:${GRAF_PORT}/api/health" && break
     sleep 1
@@ -102,7 +93,7 @@ step "Checking Grafana health and the provisioned dashboard"
 health="$(curl -s --max-time 5 "http://127.0.0.1:${GRAF_PORT}/api/health" 2>/dev/null)"
 printf '%s' "$health" | grep -q '"database": *"ok"' \
     || fail "Grafana /api/health did not report database ok (got: $health)"
-# Read the real admin credentials from the secret — the chart preserves an
+# Read the admin login from the Grafana secret (never printed) — the chart preserves an
 # existing password on upgrade, so it isn't reliably the values default.
 GRAF_USER="$(kubectl get secret grafana -n "$NS" -o jsonpath='{.data.admin-user}' 2>/dev/null | base64 -d)"
 GRAF_PASS="$(kubectl get secret grafana -n "$NS" -o jsonpath='{.data.admin-password}' 2>/dev/null | base64 -d)"
@@ -114,5 +105,5 @@ printf '    ✓ Grafana healthy and the "Capstone — Scaling & Traffic" dashboa
 
 step "SUCCESS"
 printf 'Metrics stack verified. Open the dashboard and drive a demo to watch it move:\n'
-printf '  kubectl port-forward -n %s svc/grafana 3000:80\n' "$NS"
+printf '  open http://127.0.0.1:%s   (login: see the Grafana secret / observability values)\n' "$GRAF_PORT"
 printf '  ./demos/smoke-keda-http.sh   # graphql-gateway replicas 0→1→0\n'

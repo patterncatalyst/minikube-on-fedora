@@ -5,10 +5,13 @@ metadata:
   labels:
     app: nginx-pv
 spec:
-  type: ClusterIP
+  type: NodePort
   selector:
     app: nginx-pv
   ports:
   - port: 80
     targetPort: 8080
+    # Published to 127.0.0.1:18080 at profile creation
+    # (--ports=127.0.0.1:18080:30080). Shared slot with §6, §9, §12-http.
+    nodePort: 30080
     protocol: TCP

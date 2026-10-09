@@ -37,8 +37,10 @@ for arg in "$@"; do
 done
 
 PROFILE_NAME="minikube"
-kubectl config use-context "${PROFILE_NAME}" >/dev/null 2>&1 || \
+kubectl config get-contexts -o name 2>/dev/null | grep -qx "${PROFILE_NAME}" || \
     fail "kubectl context '${PROFILE_NAME}' not configured"
+# Every kubectl / helm call below targets the minikube context explicitly
+pin_context "${PROFILE_NAME}"
 
 # ── Tier 1: demo workload ───────────────────────────────────────────────────
 step "removing demo workload (consumer + ScaledObject)"

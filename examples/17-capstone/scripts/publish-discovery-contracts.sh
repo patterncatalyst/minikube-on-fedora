@@ -14,18 +14,21 @@
 # Idempotent: an artifact that already exists (HTTP 409) is treated as already
 # published. (Production CI would add a new version instead.)
 #
-# Reachable URLs are supplied by the caller (the smoke script sets up
-# port-forwards and passes localhost URLs):
-#   APICURIO_URL   e.g. http://127.0.0.1:18085
-#   ORDER_URL      e.g. http://127.0.0.1:18080
-#   GATEWAY_URL    e.g. http://127.0.0.1:18099
-#   PROTO_PATH     e.g. proto/capstone/inventory/v1/inventory.proto
+# The services are reached on their published NodePorts (CAPSTONE_PORTS in
+# scripts/lib/env.sh). The URLs default to those and can be overridden:
+#   APICURIO_URL   default http://127.0.0.1:18085
+#   ORDER_URL      default http://127.0.0.1:18080
+#   GATEWAY_URL    default http://127.0.0.1:18099  (the gateway must be scaled up)
+#   PROTO_PATH     required, e.g. proto/capstone/inventory/v1/inventory.proto
 
 set -euo pipefail
 
-APICURIO_URL="${APICURIO_URL:?set APICURIO_URL}"
-ORDER_URL="${ORDER_URL:?set ORDER_URL}"
-GATEWAY_URL="${GATEWAY_URL:?set GATEWAY_URL}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/env.sh"
+
+APICURIO_URL="${APICURIO_URL:-http://127.0.0.1:${HOST_PORT_APICURIO}}"
+ORDER_URL="${ORDER_URL:-http://127.0.0.1:${HOST_PORT_ORDER}}"
+GATEWAY_URL="${GATEWAY_URL:-http://127.0.0.1:${HOST_PORT_GATEWAY}}"
 PROTO_PATH="${PROTO_PATH:?set PROTO_PATH}"
 GROUP="${APICURIO_GROUP:-default}"
 

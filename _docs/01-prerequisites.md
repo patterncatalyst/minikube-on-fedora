@@ -12,7 +12,7 @@ their requirements are called out here too so you can plan ahead.
 
 By the end of this section you'll have run a handful of checks
 that confirm everything is in place. No installation happens here
-beyond Podman if you don't already have it — the install of
+beyond Docker Engine if you don't already have it — the install of
 minikube, kubectl, helm, and the supporting toolbox lives in §2.
 
 ## Hardware floor
@@ -42,107 +42,123 @@ nproc && free -h && df -h ~ /
 
 You want at least 4 CPUs, 8 GB total memory, and 20 GB free on
 whichever filesystem holds your home directory. minikube's state
-(the cluster's qcow images, container layers, persistent volume
-data) lives under `~/.minikube/` and grows over time as you pull
+(the node image, container layers, persistent volume data) lives under `~/.minikube/` and Docker's data root
+(`/var/lib/docker`), and grows over time as you pull
 images and create resources.
 
 ## Operating system
 
-This tutorial is written and tested against **Fedora 44** as the
-primary platform. Fedora derivatives (RHEL 9+, Rocky 9+, Alma 9+)
-should work with the same commands; package names occasionally
-differ and you should verify with `dnf info <package>` before
-installing.
+This tutorial is written and tested against **Fedora 44**, on a
+host or in a Fedora VM. **RHEL 9+**, on a host or in a RHEL VM, uses
+the same commands; the one difference is the Docker repo URL below.
+Package names occasionally differ, so verify with `dnf info
+<package>` before installing.
 
-Confirm your Fedora version:
+Confirm your release:
 
 ```bash
-cat /etc/fedora-release
+cat /etc/fedora-release      # Fedora
+cat /etc/redhat-release      # RHEL
 ```
 
-You should see `Fedora release 44 (Forty)` or newer. Earlier
-Fedora versions almost certainly still work — Fedora 43 was the
-target for the prior version of this tutorial — but you may
+On Fedora you should see `Fedora release 44 (Forty)` or newer.
+Earlier Fedora versions almost certainly still work, but you may
 encounter package naming differences in §2.
-
-### macOS note
-
-If you're on macOS, the broad shape of this tutorial applies but
-specific commands won't. Treat the macOS callouts in §1 and §2 as
-advisory pointers, not as a tested path. Podman Desktop on macOS
-bundles its own Linux VM and minikube integrates with it
-differently than on Linux hosts. Use `brew install minikube
-kubectl helm` as a starting point and consult the upstream
-minikube docs for driver-specific guidance on the Apple Silicon
-vs. Intel split.
 
 ## Container engine
 
-minikube is a Kubernetes-running tool, but it isn't a container
-engine itself. It uses an existing engine on your host as its
-**driver** — `podman`, `docker`, `kvm2`, `qemu`, or others. This
-tutorial uses the **podman driver** as the primary path because
-that's what's actually on a typical Fedora workstation.
+minikube isn't a container engine itself. It uses an existing
+engine on your host as its **driver**. This tutorial uses the
+**docker driver** with **Docker Engine** (`docker-ce`) and runs
+Kubernetes with **containerd** and **runc** inside the node. Docker
+Engine only; no desktop app is required or used. Why the tutorial
+moved off rootless Podman is in [LESSONS-LEARNED, Part
+4](https://github.com/patterncatalyst/minikube-on-fedora/blob/main/onboarding/LESSONS-LEARNED.md).
 
-### Podman
+### Docker Engine
 
-Check whether you already have Podman:
+Check whether you already have it:
+
+```bash
+docker --version && docker context show
+```
+
+If `docker` isn't installed, add Docker's repo and install the
+engine packages. On Fedora:
+
+```bash
+sudo dnf -y install dnf-plugins-core
+sudo dnf config-manager addrepo --from-repofile=https://download.docker.com/linux/fedora/docker-ce.repo
+```
+
+On RHEL, use Docker's RHEL repo instead:
+
+```bash
+sudo dnf -y install dnf-plugins-core
+sudo dnf config-manager addrepo --from-repofile=https://download.docker.com/linux/rhel/docker-ce.repo
+```
+
+Then install and start the engine:
+
+```bash
+sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin
+sudo systemctl enable --now docker
+sudo usermod -aG docker $USER
+```
+
+Log out and back in so the new `docker` group applies to your
+shell, then make sure the CLI uses the local engine:
+
+```bash
+docker context use default
+```
+
+Verified with `docker-ce 29.8.2-1.fc44`, `containerd.io 2.3.6`, and
+`docker-buildx-plugin 0.37.1` on the maintainer's Fedora 44 host.
+
+> **Install only Docker's packages.** Do not install Fedora's
+> `moby-engine` or `podman-docker` alongside `docker-ce`. They
+> provide a second `docker` CLI and daemon socket, and the demos'
+> `require_docker_engine` check fails if `podman-docker` is present.
+>
+> **`docker` group membership is root-equivalent.** Anyone in the
+> group can start a privileged container and read or write any file
+> on the host. Add only accounts you would give `sudo`.
+
+Two host effects to know about:
+
+- **Firewall rules.** `dockerd` manages iptables itself and may set
+  the `FORWARD` chain policy to `DROP`. That can break traffic for
+  libvirt VMs on the same host. If your VMs lose connectivity after
+  Docker starts, check `sudo iptables -S FORWARD` and add an
+  accept rule for the libvirt bridge. This is host-specific;
+  verify on yours
+- **SELinux.** Docker Engine's SELinux support is off by default.
+  If you are unsure how your daemon is configured, check:
 
 {% raw %}
 ```bash
-podman --version && podman info --format '{{.Host.OS}} {{.Host.Arch}}'
+docker info --format '{{.SecurityOptions}}'
 ```
 {% endraw %}
 
-You want Podman 5.x or newer; 4.x will work but lacks a couple of
-quality-of-life features used in §3. If `podman` isn't installed:
-
-```bash
-sudo dnf install -y podman podman-compose
-```
-
-Podman runs **rootless by default** on Fedora — none of the
-commands in this tutorial require `sudo`. Confirm rootless is
-working:
-
-```bash
-podman run --rm registry.access.redhat.com/ubi9/ubi-minimal:latest id
-```
-
-You should see `uid=0(root) gid=0(root)` *inside* the container,
-while the process on the host is running as your unprivileged
-user. That's rootless behaving correctly. If this command fails
-with a permission error, your user probably needs `subuid` and
-`subgid` mappings — `cat /etc/subuid /etc/subgid` should show
-your username; if not, the upstream Podman troubleshooting guide
-covers the fix.
-
-### Docker CLI as an alternative
-
-If you have the Docker CLI installed as a familiarity safety net
-or for other tools, minikube works with `--driver=docker` too.
-Both drivers are covered in §3. There's no need to remove or hide
-your Docker CLI to follow this tutorial:
-
-```bash
-docker --version 2>&1 || echo "(Docker CLI not installed — that's fine)"
-```
+  `name=selinux` in the output means the daemon enforces SELinux
+  labels on containers. This tutorial's manifests need no host
+  labelling either way
 
 ### What this tutorial does NOT require
 
-- **No KVM, qemu, or VirtualBox.** The podman driver runs
+- **No KVM or qemu.** The docker driver runs
   Kubernetes nodes as containers on your host, not as VMs. No
   virtualization extensions needed
-- **No SELinux changes or `:Z` volume flags.** Podman handles
-  SELinux labelling correctly out of the box on Fedora. Where this
-  tutorial mounts data into pods (e.g., §8 persistent volumes),
-  the manifests use `hostPath` paths that live *inside* the
-  minikube container, not on your host filesystem — no host
-  labelling concerns
 - **No Red Hat subscription registration.** All container images
   pulled by this tutorial's examples come from public registries
-  (`registry.access.redhat.com/ubi9/...`, `quay.io/...`,
+  (`registry.access.redhat.com/ubi10/...`, `quay.io/...`,
   `ghcr.io/...`) and do not require `subscription-manager`
+- **No host volume mounts.** Where this tutorial mounts data into
+  pods (e.g., §8 persistent volumes), the manifests use `hostPath`
+  paths that live *inside* the minikube container, not on your host
+  filesystem
 
 ## Tooling installed in §2
 
@@ -170,15 +186,12 @@ following along.
 - A terminal you're comfortable with. §10 covers `zsh` integration
   (kubectl completion, kubectx/kubens prompt segments) and
   `warp.dev` workflows specifically
-- **Podman Desktop** — useful for visualizing what's running on
-  the cluster. §10 covers its Kubernetes view pointed at the
-  minikube context
 
 ## Kernel limits for multi-cluster (needed for §11)
 
 The §3 minikube profile is a containerized Linux that runs systemd
 as PID 1. Systemd uses **inotify** watches to manage cgroups — and
-Fedora 44's defaults for `fs.inotify.max_user_instances` and
+the Fedora 44 defaults for `fs.inotify.max_user_instances` and
 `fs.inotify.max_user_watches` are sized for **one** such container.
 
 §3 through §10 all run on a single minikube profile, so the defaults
@@ -230,14 +243,22 @@ from the final container), you're ready for §2:
 
 ```bash
 cat /etc/fedora-release && nproc && free -h && \
-podman --version && \
-podman run --rm registry.access.redhat.com/ubi9/ubi-minimal:latest echo OK
+docker --version && docker context show && \
+docker run --rm registry.access.redhat.com/ubi10/ubi-minimal:10.2-1791444377 echo OK
 ```
 
 The final `OK` printed from inside the container confirms that
-Podman is rootless, can pull from Red Hat's public registry, and
-can run UBI 9 images — which is the floor everything in this
-tutorial builds on.
+Docker Engine works for your user without `sudo`, can pull from
+Red Hat's public registry, and can run UBI 10 images — which is the
+floor everything in this tutorial builds on. On RHEL, replace the
+first `cat` with `cat /etc/redhat-release`.
+
+The repo also ships an audit that reports all of this at once,
+including the Docker Engine, group, and context checks:
+
+```bash
+./scripts/audit-fedora-prereqs.sh
+```
 
 If your hardware is short of the comfortable target and you only
 want to go through §1–§10, that's fine — just plan to skip §11

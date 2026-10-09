@@ -7,28 +7,31 @@
 # prior attempt died midway.
 #
 # Phases:
-#   1.  Pre-flight: istio profile up, kubectl context is `istio`,
-#       istioctl in PATH, ISTIO_CURRENT symlink resolves
-#   2.  Build nginx-custom:v1 on the istio profile (image cache is
-#       per-profile, so it doesn't carry from `minikube`)
-#   3.  Install Istio (idempotent: skipped if already installed)
+#   1.  Pre-flight: Docker Engine, istio profile up with its published
+#       NodePorts, kubectl context is `istio`, istioctl in PATH,
+#       ISTIO_CURRENT symlink resolves
+#   2.  Build nginx-custom:v1 and load it into the istio profile (image
+#       cache is per-profile, so it doesn't carry from `minikube`)
+#   3.  Install Istio (idempotent: skipped if already installed) and
+#       apply the ingressgateway-host companion NodePort Service
 #   4.  Label `default` namespace for sidecar injection
 #   5.  Deploy our nginx-with-sidecar; verify 2/2 containers
 #   6.  Deploy Bookinfo; wait for all Pods Ready
 #   7.  Apply Gateway + VirtualService
-#   8.  Port-forward the ingress gateway; curl /productpage and
-#       confirm the expected markup
+#   8.  Curl /productpage on 127.0.0.1:8080 (published nodePort 30880)
+#       and confirm the expected markup
 #   9.  Apply destination rules + virtual-service-all-v1; curl
 #       productpage N times; confirm responses don't show v2/v3
 #       indicators (no glyphicon-star-empty / glyphicon-star)
 #   10. Apply 50/50 split between v1 and v3; curl 20 times; count
 #       responses that contain `glyphicon-star` (v3 indicator);
 #       expect roughly 8-12 of 20
-#   11. Cleanup all Bookinfo + nginx resources on exit; restore
-#       kubectl context to `minikube`
+#   11. Cleanup all Bookinfo + nginx resources on exit
 #
 # This does NOT install the addons (Kiali, Prometheus, etc.) —
 # they take 5+ minutes to come up. See §11 prose for instructions.
+# Every kubectl / istioctl call is pinned to the `istio` context, so the
+# caller's current kubectl context is never changed.
 
 set -euo pipefail
 
@@ -46,20 +49,13 @@ MANIFESTS_DIR="${SCRIPT_DIR}/manifests"
 ISTIO_DIR="${ISTIO_DIR:-${HOME}/.local/share/istio-current}"
 BOOKINFO_DIR="${ISTIO_DIR}/samples/bookinfo"
 INGRESS_PORT=8080
+HOST_ACCESS_DIR="${SCRIPT_DIR}/host-access"
+CPUS=4
+MEMORY_MB=6144
 WAIT_DEPLOY_SECONDS=300
 
-# ── State for cleanup ───────────────────────────────────────────────────────
-PF_PID=""
-ORIGINAL_CONTEXT=""
-
 cleanup() {
-    info "cleanup: stopping port-forward and removing §11 resources"
-    if [[ -n "${PF_PID}" ]] && kill -0 "${PF_PID}" 2>/dev/null; then
-        kill "${PF_PID}" 2>/dev/null || true
-        wait "${PF_PID}" 2>/dev/null || true
-    fi
-    pkill -f "kubectl port-forward.*istio-ingressgateway" 2>/dev/null || true
-
+    info "cleanup: removing §11 resources"
     # Best-effort delete of routing rules then bookinfo + nginx
     kubectl delete -f "${BOOKINFO_DIR}/networking/" --ignore-not-found=true \
         >/dev/null 2>&1 || true
@@ -67,12 +63,6 @@ cleanup() {
         --ignore-not-found=true >/dev/null 2>&1 || true
     kubectl delete -f "${MANIFESTS_DIR}/" --ignore-not-found=true \
         >/dev/null 2>&1 || true
-
-    # Restore kubectl context to the §6-§9 profile
-    if [[ -n "${ORIGINAL_CONTEXT}" && "${ORIGINAL_CONTEXT}" != "${PROFILE_NAME}" ]]; then
-        info "restoring kubectl context to ${ORIGINAL_CONTEXT}"
-        kubectl config use-context "${ORIGINAL_CONTEXT}" >/dev/null 2>&1 || true
-    fi
 }
 trap cleanup EXIT
 
@@ -109,51 +99,35 @@ pass "inotify limits OK for multi-cluster"
 
 step "pre-flight: istio minikube profile up + tooling in place"
 
-# Save current context so we can restore on exit
-ORIGINAL_CONTEXT=$(kubectl config current-context 2>/dev/null || true)
-info "current kubectl context: ${ORIGINAL_CONTEXT:-<none>}"
+require_docker_engine
 
-# Ensure the istio profile is healthy. Three cases:
-#   (a) profile is running cleanly → skip start
-#   (b) profile exists but isn't running (stopped or partial-start
-#       leftover with stale podman volume) → delete + recreate
-#   (c) profile doesn't exist → create fresh
-if minikube status -p "${PROFILE_NAME}" 2>/dev/null | grep -q "host: Running"; then
-    info "${PROFILE_NAME} profile already running"
-else
-    # If a profile exists in any state, delete it first to avoid the
-    # "volume with name istio already exists" cascade from a previous
-    # failed start.
-    if minikube profile list 2>/dev/null | grep -q "${PROFILE_NAME}"; then
-        info "${PROFILE_NAME} profile exists but isn't healthy; deleting before fresh start"
-        minikube delete -p "${PROFILE_NAME}" >/dev/null 2>&1 || true
-    fi
-    # Belt-and-suspenders: clean up any orphaned podman volume
-    if podman volume exists "${PROFILE_NAME}" 2>/dev/null; then
-        info "removing stale podman volume '${PROFILE_NAME}'"
-        podman volume rm "${PROFILE_NAME}" 2>/dev/null || true
-    fi
-    info "starting ${PROFILE_NAME} profile (6 GB / 4 CPU)"
-    minikube start -p "${PROFILE_NAME}" \
-        --memory=6g \
-        --cpus=4 \
-        --container-runtime=containerd \
-        --rootless=true \
-        --delete-on-failure
-fi
+# ensure_profile creates the profile with ISTIO_PORTS published (5 nodePorts
+# on 127.0.0.1), starts it if stopped, and fails with the delete-and-recreate
+# command if an existing profile was created without them.
+ensure_profile "${PROFILE_NAME}" "${ISTIO_PORTS}" "${CPUS}" "${MEMORY_MB}"
 
-# Switch kubectl to the istio profile
-kubectl config use-context "${PROFILE_NAME}" >/dev/null
+# Pin every kubectl / helm / istioctl call to the istio profile's context
+pin_context "${PROFILE_NAME}"
 kubectl get nodes >/dev/null
-pass "istio profile reachable; kubectl context = ${PROFILE_NAME}"
+pass "istio profile reachable; kubectl context pinned to ${PROFILE_NAME}"
 
 # istioctl in PATH
 if ! command -v istioctl >/dev/null 2>&1; then
     info "istioctl not in PATH — run scripts/setup-istio.sh first"
     fail "istioctl missing"
 fi
-info "istioctl: $(istioctl version --remote=false 2>/dev/null | head -1)"
-pass "istioctl available"
+# The istioctl binary and ~/.local/share/istio-current are shared with other
+# repos, so confirm the client matches the version this chapter pins
+# (ISTIO_VERSION in scripts/setup-istio.sh) instead of using whatever is there.
+PINNED_ISTIO_VERSION="${ISTIO_VERSION:-$(sed -n 's/^ISTIO_VERSION="${ISTIO_VERSION:-\([^}]*\)}"$/\1/p' "${REPO_ROOT}/scripts/setup-istio.sh")}"
+[[ -n "${PINNED_ISTIO_VERSION}" ]] || fail "cannot read ISTIO_VERSION from scripts/setup-istio.sh"
+ISTIOCTL_VERSION="$(istioctl version --remote=false 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+[^ ]*' | head -1 || true)"
+info "istioctl: ${ISTIOCTL_VERSION:-unknown} (pinned: ${PINNED_ISTIO_VERSION})"
+if [[ "${ISTIOCTL_VERSION}" != "${PINNED_ISTIO_VERSION}" ]]; then
+    info "istioctl ${ISTIOCTL_VERSION:-unknown} does not match the pinned ${PINNED_ISTIO_VERSION}"
+    fail "run scripts/setup-istio.sh to install Istio ${PINNED_ISTIO_VERSION}"
+fi
+pass "istioctl ${ISTIOCTL_VERSION} matches the pinned version"
 
 # Istio source dir
 if [[ ! -d "${BOOKINFO_DIR}" ]]; then
@@ -172,8 +146,8 @@ if ! minikube image ls -p "${PROFILE_NAME}" 2>/dev/null | grep -q "${IMAGE_TAG}"
     if [[ ! -f "${SECTION6_DIR}/Containerfile" ]]; then
         fail "${SECTION6_DIR}/Containerfile not found — examples/06 missing?"
     fi
-    minikube -p "${PROFILE_NAME}" image build -t "${IMAGE_TAG}" \
-        -f Containerfile "${SECTION6_DIR}"
+    build_and_load "${IMAGE_TAG}" "${SECTION6_DIR}" "${PROFILE_NAME}" \
+        || fail "build_and_load ${IMAGE_TAG} failed"
 fi
 pass "${IMAGE_TAG} available on istio profile"
 
@@ -198,6 +172,13 @@ if ! kubectl wait --for=condition=Available --timeout=180s \
 fi
 kubectl get pods -n istio-system | sed 's/^/    /'
 pass "Istio control plane and gateway ready"
+
+# Companion NodePort Service for the ingress gateway. Owned by this repo
+# (never patch the istioctl-managed Service: a reinstall would revert it).
+# The istio profile publishes nodePort 30880 as 127.0.0.1:8080.
+step "applying ingressgateway-host companion NodePort Service"
+kubectl apply -f "${HOST_ACCESS_DIR}/ingressgateway-host.yaml"
+require_published_port "${PROFILE_NAME}" 30880 "${INGRESS_PORT}"
 
 # The MutatingWebhookConfiguration that performs sidecar injection
 # registers separately from istiod's Pod readiness. `kubectl wait
@@ -342,20 +323,19 @@ if echo "${ANALYZE_OUTPUT}" | grep -qi 'error'; then
 fi
 pass "Gateway + VirtualService applied; istioctl analyze clean"
 
-# ── Phase 8: Port-forward ingress + curl productpage ────────────────────────
-step "port-forwarding istio-ingressgateway to 127.0.0.1:${INGRESS_PORT}"
-kubectl port-forward -n istio-system service/istio-ingressgateway \
-    "${INGRESS_PORT}:80" >/dev/null 2>&1 &
-PF_PID=$!
-for _ in {1..30}; do
-    if curl -fsS --max-time 2 "http://127.0.0.1:${INGRESS_PORT}/productpage" \
-            >/dev/null 2>&1; then
-        break
-    fi
-    sleep 1
-done
-if ! kill -0 "${PF_PID}" 2>/dev/null; then
-    fail "port-forward died before becoming reachable"
+# ── Phase 8: Reach productpage through the published NodePort ───────────────
+step "waiting for productpage on http://127.0.0.1:${INGRESS_PORT}/ (nodePort 30880)"
+require_published_port "${PROFILE_NAME}" 30880 "${INGRESS_PORT}"
+if ! wait_for_http "http://127.0.0.1:${INGRESS_PORT}/productpage" 60; then
+    info "ingressgateway-host Service:"
+    kubectl get svc -n istio-system ingressgateway-host -o wide 2>&1 | sed 's/^/    /' || true
+    info "its endpoints (empty means the selector matches no Pod):"
+    kubectl get endpoints -n istio-system ingressgateway-host 2>&1 | sed 's/^/    /' || true
+    info "gateway Service selector:"
+    kubectl get svc -n istio-system istio-ingressgateway \
+        -o jsonpath='{.spec.selector}' 2>&1 | sed 's/^/    /' || true
+    echo
+    fail "productpage not reachable on 127.0.0.1:${INGRESS_PORT} within 60s"
 fi
 pass "ingress gateway reachable at http://127.0.0.1:${INGRESS_PORT}/"
 
@@ -452,23 +432,26 @@ pass "${SPLIT_DISTINCT} distinct response patterns across 20 samples — split i
 step "SUCCESS — Istio install + sidecar injection + Bookinfo routing all verified"
 echo
 echo "  Cluster: minikube profile '${PROFILE_NAME}' (separate from §6-§9)"
+echo "  Access:  127.0.0.1:${INGRESS_PORT} -> nodePort 30880 (ingressgateway-host)"
 echo "  Sidecar: nginx-istio Pod has istio-proxy injected"
 echo "           (native sidecar mode — KEP-753, Istio 1.29+/K8s 1.28+)"
 echo "  Bookinfo: 4 services × 6 Pods, all sidecar-injected"
 echo "  Routing: v1-pin verified (${V1_DISTINCT} distinct hash/10)"
 echo "           split verified (${SPLIT_DISTINCT} distinct patterns/20)"
 echo
-echo "  Cleanup on exit removes Bookinfo + nginx + routing rules and"
-echo "  restores kubectl context to '${ORIGINAL_CONTEXT}'. Istio itself"
-echo "  stays installed on the ${PROFILE_NAME} profile; uninstall with"
-echo "  'istioctl uninstall --purge -y' (see §11 prose)."
+echo "  Cleanup on exit removes Bookinfo + nginx + routing rules. Istio"
+echo "  and ingressgateway-host stay on the ${PROFILE_NAME} profile; see"
+echo "  ./cleanup.sh --remove-istio and §11 prose."
 echo
 echo "  To explore further:"
-echo "    - kubectl apply -f ${BOOKINFO_DIR}/networking/virtual-service-ratings-test-delay.yaml"
+echo "    - kubectl --context ${PROFILE_NAME} apply -f ${BOOKINFO_DIR}/networking/virtual-service-ratings-test-delay.yaml"
 echo "      (fault injection — 7s delay on ratings)"
-echo "    - kubectl apply -f ${ISTIO_DIR}/samples/addons"
+echo "    - kubectl --context ${PROFILE_NAME} apply -f ${ISTIO_DIR}/samples/addons"
+echo "      kubectl --context ${PROFILE_NAME} apply -f ${HOST_ACCESS_DIR}/"
 echo "      (Kiali, Prometheus, Grafana, Jaeger; ~5 min to come up)"
-echo "    - istioctl dashboard kiali"
-echo "      (visualize the mesh)"
+echo "    - Kiali      http://127.0.0.1:20001/kiali"
+echo "      Grafana    http://127.0.0.1:3000/"
+echo "      Prometheus http://127.0.0.1:19090/"
+echo "      Jaeger     http://127.0.0.1:16686/jaeger/"
 echo
 exit 0

@@ -17,7 +17,7 @@
 # releases. Idempotent — re-running upgrades in place and re-provisions safely.
 #
 # Prerequisites:
-#   * capstone profile running, kubectl context = capstone
+#   * mof-capstone profile running (kubectl/helm are pinned to its context)
 #   * CloudNativePG operator installed (./setup-postgres-operator.sh) AND the
 #     capstone-postgres Cluster already bootstrapped (the postgres subchart;
 #     e.g. after a smoke that deploys Postgres). This script provisions INTO
@@ -26,16 +26,19 @@
 # Usage:
 #   ./setup-openmetadata.sh
 #
-# After it completes, reach the UI with:
-#   kubectl port-forward -n capstone svc/openmetadata 8585:8585
-#   # then open http://127.0.0.1:8585  (default login admin@open-metadata.org / admin)
+# After it completes, apply the companion NodePort Service and open the UI:
+#   kubectl apply -f host-access/openmetadata-host.yaml   # bootstrap-capstone.sh does this
+#   open http://127.0.0.1:8585   (credentials: see openmetadata/om-app-values.yaml)
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/env.sh"
+
 # ─── Configuration ───────────────────────────────────────────────────────────
 
-NS="capstone"
-OM_CHART_VERSION="1.12.8"          # pin both deps and server to this release
+# NS (capstone) and PROFILE (mof-capstone) come from lib/env.sh.
+OM_CHART_VERSION="2.0.5"          # pin both deps and server to this release
 PG_CLUSTER="capstone-postgres"     # the CloudNativePG Cluster name (postgres subchart)
 
 OM_DB="openmetadata"               # dedicated database for OpenMetadata's own store
@@ -47,7 +50,6 @@ OM_DB_SECRET="openmetadata-db-app-secret"   # NOT "openmetadata-db-secret":
                                             # password from THIS separate secret.
 OM_DB_SECRET_KEY="openmetadata-db-password"
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 VALUES_DIR="$SCRIPT_DIR/../openmetadata"
 DEPS_VALUES="$VALUES_DIR/om-deps-values.yaml"
 APP_VALUES="$VALUES_DIR/om-app-values.yaml"
@@ -68,20 +70,11 @@ for f in "$DEPS_VALUES" "$APP_VALUES"; do
     fi
 done
 
-current_context=$(kubectl config current-context 2>/dev/null || echo "")
-if [[ "$current_context" != "capstone" ]]; then
-    printf 'WARNING: current kubectl context is "%s", not "capstone".\n' "$current_context" >&2
-    printf 'Switch with: kubectl config use-context capstone\n' >&2
-    printf 'Continue anyway? [y/N] ' >&2
-    read -r answer
-    [[ "$answer" =~ ^[Yy] ]] || exit 1
-fi
-
 # Confirm the Postgres cluster is present and has a primary, since we provision
-# into it. The CNPG operator labels the primary pod role=primary.
+# into it. The CNPG operator labels the primary pod cnpg.io/instanceRole=primary.
 printf '==> Locating the capstone-postgres primary\n'
 PG_PRIMARY="$(kubectl get pods -n "$NS" \
-    -l "cnpg.io/cluster=${PG_CLUSTER},role=primary" \
+    -l "cnpg.io/cluster=${PG_CLUSTER},cnpg.io/instanceRole=primary" \
     -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || echo "")"
 if [[ -z "$PG_PRIMARY" ]]; then
     printf 'ERROR: no primary pod for CloudNativePG cluster "%s" in namespace "%s".\n' \
@@ -162,9 +155,9 @@ kubectl rollout status deployment/openmetadata -n "$NS" --timeout=10m
 printf '\n'
 printf '==> OpenMetadata is up.\n'
 printf '\n'
-printf 'Reach the UI:\n'
-printf '  kubectl port-forward -n %s svc/openmetadata 8585:8585\n' "$NS"
-printf '  open http://127.0.0.1:8585   (login: admin@open-metadata.org / admin)\n'
+printf 'Reach the UI (companion NodePort Service, published on 127.0.0.1:%s):\n' "$HOST_PORT_OPENMETADATA"
+printf '  kubectl apply -f host-access/openmetadata-host.yaml   # bootstrap-capstone.sh does this\n'
+printf '  open http://127.0.0.1:%s   (credentials: see openmetadata/om-app-values.yaml)\n' "$HOST_PORT_OPENMETADATA"
 printf '\n'
 printf 'Verify end-to-end:\n'
 printf '  ./demos/smoke-openmetadata.sh\n'

@@ -10,7 +10,7 @@ layout: tutorial
 
 The first runnable example in this tutorial. A smoke test that
 exercises the §3 happy path end-to-end: start a minikube cluster
-with the podman driver, verify it's healthy, list nodes and
+with the docker driver and containerd runtime on Docker Engine, verify it's healthy, list nodes and
 system pods, tear down cleanly.
 
 This isn't a workload-deployment example (those start in §6).
@@ -19,18 +19,23 @@ the start sequence from §3 work together on this machine.**
 
 ## What it tests
 
-Five claims from §1, §2, and §3:
+Six claims from §1, §2, and §3:
 
 1. `minikube` is installed and on `PATH`
 2. `kubectl` is installed and on `PATH`
-3. `minikube start --driver=podman` succeeds without requiring
-   KVM, qemu, or any virtualization layer
-4. `minikube status` reports all components `Running`
-5. `kubectl` can talk to the new cluster and list nodes and
+3. `minikube start --driver=docker --container-runtime=containerd`
+   succeeds on Docker Engine without requiring KVM, qemu, or any
+   virtualization layer
+4. The profile reports driver `docker` and runtime `containerd`,
+   the node reports `containerd://`, and `docker port driver-check
+   30079/tcp` shows `127.0.0.1:18079` (the NodePort is published at
+   profile creation with `--ports=127.0.0.1:18079:30079`)
+5. `minikube status` reports all components `Running`
+6. `kubectl` can talk to the new cluster and list nodes and
    system pods
 
 On success, the corresponding reconciliation rows in Section B
-(podman-driver-works-without-KVM, kubectl-1.35.x-against-1.35.x)
+(docker-driver-works-without-KVM, kubectl-1.36.x-against-1.36.x)
 and Section C (this example) flip to `verified (Fedora 44)`.
 
 ## Running
@@ -82,15 +87,19 @@ The most likely failure modes, in order:
 
 1. **`minikube: command not found`** — §2 install of minikube
    didn't take. Fix: rerun `sudo dnf install -y
-   https://storage.googleapis.com/minikube/releases/latest/minikube-latest.x86_64.rpm`
-2. **Podman can't pull the kicbase image** — usually a transient
+   https://github.com/kubernetes/minikube/releases/download/v1.39.0/minikube-1.39.0-0.x86_64.rpm`
+2. **`require_docker_engine` fails** — the docker context is not
+   `default` or the daemon is stopped. Follow the fix line the
+   script prints (`docker context use default`,
+   `sudo systemctl enable --now docker`)
+3. **Docker can't pull the kicbase image** — usually a transient
    network issue. Rerun. Persistent failures point to
    `registry.k8s.io` reachability problems
-3. **`minikube start` times out around "Verifying Kubernetes
+4. **`minikube start` times out around "Verifying Kubernetes
    components"** — typically resource starvation on the host.
    Confirm `free -h` shows enough headroom; the demo asks for
    4 CPU / 8 GB which is well below the §1 floor
-4. **`kubectl get nodes` errors with "connection refused"** —
+5. **`kubectl get nodes` errors with "connection refused"** —
    kubectl's context isn't pointing at the new profile. The
    script uses explicit `--context driver-check` to avoid this,
    so if it surfaces, paste the error in the iteration thread

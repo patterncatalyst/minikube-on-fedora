@@ -3,8 +3,9 @@
 # examples/03-driver-check/demo.sh
 #
 # Smoke test for the §3 happy path:
-#   1. start minikube on the `driver-check` profile (podman driver)
-#   2. verify minikube status reports all components Running
+#   1. start minikube on the `driver-check` profile (docker driver, containerd)
+#   2. verify the driver, runtime and published port, and that minikube
+#      status reports all components Running
 #   3. verify kubectl can list nodes and system pods
 #   4. tear down on exit (success or failure)
 #
@@ -23,7 +24,7 @@ source "${REPO_ROOT}/scripts/lib/_helpers.sh"
 
 # ── Config ──────────────────────────────────────────────────────────────────
 PROFILE="driver-check"
-KUBE_VERSION="${KUBE_VERSION:-v1.35.1}"  # default match for minikube v1.38.x
+# KUBE_VERSION and DRIVER_CHECK_PORTS come from scripts/lib/_helpers.sh
 CPUS="${CPUS:-4}"
 MEMORY_MB="${MEMORY_MB:-8192}"
 NODE_WAIT_SECONDS=120
@@ -31,9 +32,8 @@ POD_WAIT_SECONDS=180
 
 # ── Cleanup trap ────────────────────────────────────────────────────────────
 cleanup() {
-    info "cleanup: deleting profile ${PROFILE} and its volume"
+    info "cleanup: deleting profile ${PROFILE}"
     minikube delete -p "${PROFILE}" >/dev/null 2>&1 || true
-    podman volume rm "${PROFILE}" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
@@ -41,32 +41,47 @@ trap cleanup EXIT
 step "pre-flight: required tools on PATH"
 command -v minikube >/dev/null 2>&1 || fail "minikube not on PATH — see §2"
 command -v kubectl  >/dev/null 2>&1 || fail "kubectl not on PATH — see §2"
-command -v podman   >/dev/null 2>&1 || fail "podman not on PATH — see §1"
-pass "minikube, kubectl, podman all present"
+command -v jq       >/dev/null 2>&1 || fail "jq not on PATH — see §1"
+pass "minikube, kubectl, jq present"
 
-step "pre-flight: clear any pre-existing ${PROFILE} profile and volume"
+step "pre-flight: Docker Engine"
+require_docker_engine
+
+step "pre-flight: clear any pre-existing ${PROFILE} profile"
 minikube delete -p "${PROFILE}" >/dev/null 2>&1 || true
-# minikube delete doesn't always reap orphaned volumes from failed starts.
-# Sweep explicitly so a previous failure doesn't block this run.
-podman volume rm "${PROFILE}" >/dev/null 2>&1 || true
-pass "no stale ${PROFILE} profile or volume"
+pass "no stale ${PROFILE} profile"
 
 # ── Start ───────────────────────────────────────────────────────────────────
-step "starting cluster (profile=${PROFILE}, driver=podman/rootless, runtime=containerd, k8s=${KUBE_VERSION})"
+step "starting cluster (profile=${PROFILE}, driver=docker, runtime=containerd, k8s=${KUBE_VERSION})"
 minikube start \
     --profile "${PROFILE}" \
-    --driver=podman \
-    --rootless \
+    --driver=docker \
     --container-runtime=containerd \
     --delete-on-failure \
     --cpus="${CPUS}" \
     --memory="${MEMORY_MB}" \
     --kubernetes-version="${KUBE_VERSION}" \
+    --ports="${DRIVER_CHECK_PORTS}" \
     --wait=all
 
 pass "minikube start completed"
 
 # ── Verify ──────────────────────────────────────────────────────────────────
+step "checking driver, container runtime and published port"
+driver=$(minikube profile list -o json \
+    | jq -r --arg n "${PROFILE}" '.valid[] | select(.Name == $n) | .Config.Driver')
+runtime=$(minikube profile list -o json \
+    | jq -r --arg n "${PROFILE}" '.valid[] | select(.Name == $n) | .Config.KubernetesConfig.ContainerRuntime')
+[[ "${driver}" == "docker" ]] || fail "driver is '${driver}', expected docker"
+[[ "${runtime}" == "containerd" ]] || fail "container runtime is '${runtime}', expected containerd"
+require_published_port "${PROFILE}" 30079 18079
+published=$(docker port "${PROFILE}" 30079/tcp)
+echo "    docker port ${PROFILE} 30079/tcp -> ${published}"
+node_rt=$(kubectl --context "${PROFILE}" get nodes \
+    -o jsonpath='{.items[0].status.nodeInfo.containerRuntimeVersion}')
+[[ "${node_rt}" == containerd://* ]] || fail "node containerRuntimeVersion is '${node_rt}', expected containerd://..."
+pass "driver=docker, runtime=${node_rt}, 127.0.0.1:18079 -> nodePort 30079"
+
 step "checking minikube status"
 status_out=$(minikube status -p "${PROFILE}" || true)
 echo "${status_out}" | sed 's/^/    /'
@@ -102,10 +117,13 @@ kubectl --context "${PROFILE}" get pods -n kube-system | sed 's/^/    /'
 pass "all kube-system pods Ready"
 
 # ── Done ────────────────────────────────────────────────────────────────────
-step "SUCCESS — minikube + kubectl + podman driver all working"
+step "SUCCESS — minikube + kubectl + docker driver + containerd + published port all working"
 echo
 echo "  The driver-check profile will be torn down momentarily."
-echo "  To work with minikube interactively, start a separate cluster:"
-echo "    minikube start            # uses your default profile and config"
+echo "  To work with minikube interactively, create the default profile with"
+echo "  its published ports (§3):"
+echo "    minikube start -p minikube --driver=docker --container-runtime=containerd \\"
+echo "      --kubernetes-version=$KUBE_VERSION --cpus=6 --memory=16384 \\"
+echo "      --ports=$CORE_PORTS"
 echo
 exit 0

@@ -26,7 +26,7 @@ spec:
         image: nginx-custom:v1
         # Same image as §6/§7/§8/§9. NOT cross-profile cached —
         # demo.sh rebuilds it on the istio profile if missing.
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Never
         ports:
         - containerPort: 8080
         readinessProbe:

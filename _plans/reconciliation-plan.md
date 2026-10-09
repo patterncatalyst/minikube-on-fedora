@@ -9,6 +9,8 @@ what has been verified end-to-end** on real hardware. It is the
 single authoritative list of things to check, fix, or expand
 before the tutorial is declared production-ready.
 
+> **2026-10-09 (r29):** Rows naming the podman driver, rootless mode, the in-cluster registry or port-forwards are historical (podman era); superseded by r29 — see Section D, r29.
+
 ## How to use this document
 
 - When adding new tutorial content that makes a verifiable claim,
@@ -41,6 +43,8 @@ recorded.
 
 ## A. Pinned tool versions
 
+> **2026-10-09 (r29):** Rows naming the podman driver, rootless mode, the in-cluster registry or port-forwards are historical (podman era); superseded by r29 — see Section D, r29.
+
 The versions this tutorial is written against. Every claim later
 in the document implicitly assumes these.
 
@@ -60,8 +64,25 @@ in the document implicitly assumes these.
 | unverified              | istioctl         | TBD           | §11 install commands  | `istioctl version` matches                                 |
 | **verified (Fedora 44)** | KEDA             | 2.19.0        | §12 helm install args | r13b user run: `helm list -n keda` shows `keda  keda  1  ...  2.19.0  2.19.0` |
 | **verified (Fedora 44)** | KEDA HTTP add-on | 0.12.2        | §12 helm install args | r13b user run: install output confirmed `KEDA HTTP add-on 0.12.2 installed` (BETA — see prose) |
+| unverified              | Docker Engine (docker-ce) | 29.8.2-1.fc44 | §1/§2 prereq | observed installed on the maintainer's Fedora 44 host; `docker version` (r29, 2026-10-09) |
+| unverified              | containerd.io | 2.3.6 | §1/§2 prereq | observed installed on the maintainer's Fedora 44 host; `rpm -q containerd.io` (r29, 2026-10-09) |
+| unverified              | docker-buildx-plugin | 0.37.1 | §1/§2 prereq | observed installed on the maintainer's Fedora 44 host; `docker buildx version` (r29, 2026-10-09) |
+| unverified              | minikube | v1.38.1 (pinned RPM) | §2 install | `minikube version --short` (r29, 2026-10-09) |
+| unverified              | kubectl | v1.35.9 | §2 install | `kubectl version --client` (r29, 2026-10-09) |
+| unverified              | krew | v0.5.0 | §2 install | `kubectl krew version` (r29, 2026-10-09) |
+| unverified              | hey | v0.1.5 | §2 install | `hey -h` / `go install` pin (r29, 2026-10-09) |
+| unverified              | Kubernetes | v1.35.1 | `--kubernetes-version` in every profile | `kubectl version` (r29, 2026-10-09) |
+| unverified              | UBI image ubi10/ubi | 10.2-1791444044 | example Containerfiles | `docker image inspect` (r29, 2026-10-09) |
+| unverified              | UBI image ubi10/ubi-minimal | 10.2-1791444377 | example Containerfiles | `docker image inspect` (r29, 2026-10-09) |
+| unverified              | UBI image ubi10/python-314-minimal | 10.2-1791464217 | capstone services | `docker image inspect` (r29, 2026-10-09) |
+| unverified              | asyncpg | 0.32.0 | capstone services | `pip show asyncpg` in the built image (cp314 wheel) (r29, 2026-10-09) |
+| unverified              | prometheus-community/prometheus (chart) | 29.36.1 | `examples/17-capstone/scripts/setup-observability.sh` | `helm list -n observability` (r29, 2026-10-09) |
+| unverified              | grafana-community/tempo (chart) | 3.1.0 | `examples/17-capstone/scripts/setup-observability.sh` | `helm list -n observability` (r29, 2026-10-09) |
+| unverified              | grafana-community/grafana (chart) | 13.4.0 | `examples/17-capstone/scripts/setup-observability.sh` | `helm list -n observability` (r29, 2026-10-09) |
 
 ## B. Per-section claims
+
+> **2026-10-09 (r29):** Rows naming the podman driver, rootless mode, the in-cluster registry or port-forwards are historical (podman era); superseded by r29 — see Section D, r29.
 
 Claims made in prose that are not yet end-to-end verified. New
 rows added as sections get drafted; rows are promoted to
@@ -164,6 +185,15 @@ Fedora 44.
 | **verified (Fedora 44)** | KEDA Pod count after `setup-keda.sh` completes: **10 Pods** in the `keda` namespace — 1 keda-operator, 1 keda-admission-webhooks, 1 keda-operator-metrics-apiserver (KEDA core, 3 Pods), 1 keda-add-ons-http-controller-manager, 3 keda-add-ons-http-external-scaler (replicated by default), 3 keda-add-ons-http-interceptor (replicated by default) (HTTP add-on, 7 Pods) | §12 | r13b user run: the r13 plan row said 7 Pods which assumed single replicas for all components. The HTTP add-on's helm chart actually deploys the external-scaler and interceptor with 3 replicas each by default for HA. Row corrected on promotion |
 | **verified (Fedora 44)** | KEDA does not conflict with HPA — KEDA `ScaledObject` creates its own HPA backed by KEDA's metrics-apiserver, and the AKS docs explicitly warn against mixing pre-existing HPAs on the same target. The §12 demos use ONLY KEDA, no manual HPAs | §12 | r13b user run: KEDA-managed HPA reconciliation worked cleanly. The full 0→N→0 lifecycle would have failed silently or noisily if there were an HPA conflict, so the demo passing constitutes evidence |
 | **verified (Fedora 44)** | The §12 prose embeds a screenshot at `assets/screenshots/strimzi-kafka-cluster-ready.png` showing the converged Kafka cluster state: `kafka/my-kafka READY=True KAFKA VERSION=4.1.0 METADATA VERSION=4.1-IV1`, `kafkanodepool/dual-role 1 ["controller","broker"] [0]`, and three Running Pods (broker, entity-operator, cluster-operator). Caption walks readers through each row | §12 | r13b user-provided screenshot from successful demo run |
+| unverified              | Each profile runs `--driver=docker --container-runtime=containerd` on Docker Engine | §1, §3 | r29 migration; live run pending |
+| unverified              | NodePorts published to 127.0.0.1 at profile creation are reachable: core 18080/18081/18090; istio 8080/20001/3000/9090/16686; mof-capstone 17 ports | §3, §5–§12, §17 | r29; `--ports=127.0.0.1:<host>:<nodePort>`; live run pending |
+| unverified              | `docker build` + `minikube image load` with `imagePullPolicy: Never` runs the image in-cluster | §6, §17 | r29; replaces the in-cluster registry; live run pending |
+| unverified              | Companion NodePort Services expose third-party UIs (no port-forward, tunnel or `minikube service`) | §5, §11, §12, §17 | r29; live run pending |
+| unverified              | The Kubernetes dashboard is reachable through NodePort 30900 at 127.0.0.1:18090 | §5 | r29; companion Service `dashboard-host`; live run pending |
+| unverified              | The capstone profile is named `mof-capstone` (namespace stays `capstone`) | §17 | r29; the name `capstone` collided with another project's profile; live run pending |
+| unverified              | Loaded images survive `minikube stop/start` | §3, §17 | r29; live run pending |
+| unverified              | The 7 capstone services build on UBI 10 Python 3.14 (ubi10/python-314-minimal, asyncpg 0.32.0) | §17 | build-verified (local image build 2026-10-09); in-cluster unverified |
+| unverified              | Shared nodePort 30080 slot (§6, §8, §9, §12-http) is guarded by a preflight that fails with "delete X first" if another Service holds it | §6, §8, §9, §12 | r29 decision D1; live run pending |
 
 ## C. Testing matrix
 
@@ -3561,3 +3591,31 @@ final reader shouldn't see. Items:
   Phase A (review-service add/back-out) remains available to verify via
   smoke-discovery → ingest-openmetadata → demo-add-data-product.sh up. Next: Phase C
   (§17 page restructure + narrative + diagrams + the selective-injection decision).
+
+### r29 (2026-10-09) — Docker Engine + published NodePorts
+
+Migration branch `feat/docker-engine-nodeports` (plan: `_plans/docker-engine-nodeports-plan.md`).
+minikube moves from rootless podman to Docker Engine (`--driver=docker`,
+containerd/runc). Port-forwards, tunnels and the in-cluster registry are replaced by
+NodePorts published to 127.0.0.1 at profile creation, companion NodePort Services for
+third-party UIs, and `docker build` + `minikube image load`. The capstone profile is
+renamed `mof-capstone`. Base images move to UBI 10 (services on Python 3.14, asyncpg
+0.32.0); tool and chart versions are pinned. All new Section A and B rows are
+`unverified` pending a live run. Decisions: CAP-048, CAP-049, CAP-050.
+
+Commits (oldest first):
+
+- b6852cc chore(r29): plan Docker Engine + NodePort migration; drop stale copies and bytecode
+- f3ea500 docs(r29): top-level docs and topology diagram for Docker Engine + published NodePorts
+- 7f4923a chore(r29): pin UBI base images in example Containerfiles
+- 1b5616c feat(r29): Docker Engine preflight, port maps, profile helpers and strict policy audit
+- d421b9e feat(r29): core examples on Docker Engine with published NodePorts
+- d842776 feat(r29): Istio and KEDA examples reach the cluster through companion NodePorts
+- ad4d730 fix(r29): pin hey to its newest release v0.1.5
+- 74d18ce feat(r29): capstone profile mof-capstone on Docker Engine with published NodePorts
+- 21568b4 feat(r29): UBI 10 base images; capstone services on Python 3.14 (asyncpg 0.32)
+- 3ae9922 docs(r29): capstone prose for mof-capstone, image load and published ports
+- d00fa53 docs(r29): chapters 6-10 use image load and published NodePorts
+- 275aa19 fix(r29): nginx test page and comments name UBI 10
+- ac1de35 fix(r29): §7 test page names UBI 10
+- df79047 docs(r29): chapters 0-5 for Docker Engine, pinned installs and published ports

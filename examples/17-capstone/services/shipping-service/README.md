@@ -21,5 +21,7 @@ helm upgrade --install shipping-service charts/capstone/charts/shipping-service 
 kubectl rollout status deployment/shipping-service -n capstone --timeout=120s
 ```
 
+The image is built with Docker Engine and loaded into the `mof-capstone` profile (bare name, `imagePullPolicy: Never`). Once deployed, the service is reachable on the host at `http://127.0.0.1:18084` through its published NodePort.
+
 Or run the health smoke test, which does all of the above and asserts the
 probes: `./demos/smoke-service.sh shipping`

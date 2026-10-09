@@ -3,16 +3,18 @@
 # examples/08-persistent-volume/demo.sh
 #
 # End-to-end smoke test for §8 with persistence verification:
-#   1. cluster up; image cached (auto-build if not); standard SC present
-#   2. clear any prior nginx-pv resources
-#   3. apply PVC + Deployment + Service
+#   1. Docker Engine + default profile with published ports; image
+#      loaded (auto-build if not); standard SC present
+#   2. clear any prior nginx-pv resources; check nodePort 30080 is free
+#   3. apply PVC + Deployment + NodePort Service
 #   4. wait for PVC Bound + Deployment Available
-#   5. port-forward and curl; capture the initContainer-written timestamp
+#   5. curl 127.0.0.1:18080; capture the initContainer-written timestamp
 #   6. delete the Pod; wait for Deployment to redeploy
-#   7. re-establish port-forward (old one died with the Pod)
-#   8. curl again; verify timestamp matches → PV persisted across Pod
-#      lifecycle
-#   9. cleanup tunnel + manifests on exit
+#   7. poll 127.0.0.1:18080 until the page returns (the NodePort routes
+#      to the replacement Pod; no connection to re-establish)
+#   8. verify timestamp matches → PV persisted across Pod lifecycle
+#   9. cleanup manifests on exit
+#
 
 set -euo pipefail
 
@@ -28,33 +30,31 @@ PVC_NAME="nginx-content"
 IMAGE_TAG="nginx-custom:v1"
 MANIFESTS_DIR="${SCRIPT_DIR}/manifests"
 SECTION6_DIR="${REPO_ROOT}/examples/06-deploy-nginx-kubectl"
+NODE_PORT=30080
 LOCAL_PORT=18080
+PROFILE="minikube"
+CPUS=6
+MEMORY_MB=16384
 WAIT_DEPLOY_SECONDS=180
 WAIT_REPLACEMENT_SECONDS=90
 
-# ── State for cleanup ───────────────────────────────────────────────────────
-PF_PID=""
-
 cleanup() {
-    info "cleanup: stopping port-forward and removing ${APP_NAME} resources"
-    if [[ -n "${PF_PID}" ]] && kill -0 "${PF_PID}" 2>/dev/null; then
-        kill "${PF_PID}" 2>/dev/null || true
-        wait "${PF_PID}" 2>/dev/null || true
-    fi
-    pkill -f "kubectl port-forward service/${APP_NAME}" 2>/dev/null || true
+    info "cleanup: removing ${APP_NAME} resources (frees nodePort ${NODE_PORT})"
+    # Skip until pin_context has run, so an early failure never touches
+    # whatever cluster happens to be current.
+    [[ -n "${PINNED_CONTEXT}" ]] || return 0
     kubectl delete -f "${MANIFESTS_DIR}/" --ignore-not-found=true \
         >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
 # ── Pre-flight: cluster up ──────────────────────────────────────────────────
-step "pre-flight: cluster is up and kubectl can reach it"
-if ! minikube status >/dev/null 2>&1; then
-    info "no cluster; starting"
-    minikube start
-fi
+step "pre-flight: Docker Engine, profile and kubectl context"
+require_docker_engine
+ensure_profile "${PROFILE}" "${CORE_PORTS}" "${CPUS}" "${MEMORY_MB}"
+pin_context "${PROFILE}"
 kubectl get nodes >/dev/null
-pass "cluster reachable"
+pass "cluster reachable (context ${PROFILE})"
 
 # ── Pre-flight: standard StorageClass present ───────────────────────────────
 step "pre-flight: 'standard' StorageClass present and default"
@@ -67,13 +67,13 @@ pass "'standard' StorageClass available"
 
 # ── Pre-flight: image cached ────────────────────────────────────────────────
 step "pre-flight: ${IMAGE_TAG} image in cluster cache"
-if ! minikube image ls 2>/dev/null | grep -q "${IMAGE_TAG}"; then
+if ! minikube -p "${PROFILE}" image ls 2>/dev/null | grep -q "${IMAGE_TAG}"; then
     info "image not present; building from §6's Containerfile"
     if [[ ! -f "${SECTION6_DIR}/Containerfile" ]]; then
         fail "${SECTION6_DIR}/Containerfile not found — examples/06 missing?"
     fi
-    if ! minikube image build -t "${IMAGE_TAG}" -f Containerfile "${SECTION6_DIR}"; then
-        fail "minikube image build failed (see output above)"
+    if ! build_and_load "${IMAGE_TAG}" "${SECTION6_DIR}" "${PROFILE}"; then
+        fail "image build/load failed (see output above)"
     fi
 fi
 pass "${IMAGE_TAG} available"
@@ -88,6 +88,10 @@ for _ in {1..15}; do
     sleep 1
 done
 pass "no stale ${APP_NAME} resources"
+
+step "pre-flight: nodePort ${NODE_PORT} is free"
+require_free_nodeport "${NODE_PORT}"
+pass "nodePort ${NODE_PORT} free"
 
 # ── Apply manifests ─────────────────────────────────────────────────────────
 step "applying PVC, Deployment, and Service"
@@ -117,20 +121,15 @@ fi
 kubectl get deployment,pods,pvc -l "app=${APP_NAME}" | sed 's/^/    /'
 pass "Deployment Available, PVC bound"
 
-# ── Port-forward ────────────────────────────────────────────────────────────
-step "port-forwarding service/${APP_NAME} to 127.0.0.1:${LOCAL_PORT}"
-kubectl port-forward "service/${APP_NAME}" "${LOCAL_PORT}:80" >/dev/null 2>&1 &
-PF_PID=$!
-for _ in {1..15}; do
-    if curl -fsS --max-time 2 "http://127.0.0.1:${LOCAL_PORT}/" >/dev/null 2>&1; then
-        break
-    fi
-    sleep 1
-done
-if ! kill -0 "${PF_PID}" 2>/dev/null; then
-    fail "port-forward died before becoming reachable"
+# ── Published NodePort ──────────────────────────────────────────────────────
+step "checking nodePort ${NODE_PORT} is published on 127.0.0.1:${LOCAL_PORT}"
+require_published_port "${PROFILE}" "${NODE_PORT}" "${LOCAL_PORT}"
+if ! wait_for_http "http://127.0.0.1:${LOCAL_PORT}/" 30; then
+    info "Service and endpoints:"
+    kubectl get svc,endpoints "${APP_NAME}" | sed 's/^/    /'
+    fail "http://127.0.0.1:${LOCAL_PORT}/ did not respond within 30s"
 fi
-pass "port-forward listening on :${LOCAL_PORT}"
+pass "nginx reachable on 127.0.0.1:${LOCAL_PORT} (nodePort ${NODE_PORT})"
 
 # ── Capture initial timestamp ───────────────────────────────────────────────
 step "capturing initial content from PV"
@@ -150,15 +149,6 @@ OLD_POD=$(kubectl get pods -l "app=${APP_NAME}" -o jsonpath='{.items[0].metadata
 info "old Pod: ${OLD_POD}"
 kubectl delete pod "${OLD_POD}" --wait=false >/dev/null
 info "waiting for replacement Pod (up to ${WAIT_REPLACEMENT_SECONDS}s)"
-
-# The port-forward typically dies with the old Pod (kubectl
-# port-forward attaches to a specific Pod, not the Service). Kill
-# it now so we don't leak the process.
-if [[ -n "${PF_PID}" ]] && kill -0 "${PF_PID}" 2>/dev/null; then
-    kill "${PF_PID}" 2>/dev/null || true
-    wait "${PF_PID}" 2>/dev/null || true
-fi
-PF_PID=""
 
 # Wait for the new Pod to be Ready
 if ! kubectl wait --for=condition=Available "deployment/${APP_NAME}" \
@@ -191,20 +181,15 @@ case "${SEED_LOG}" in
         ;;
 esac
 
-# ── Re-establish port-forward to the new Pod and re-curl ────────────────────
-step "re-establishing port-forward to the new Pod"
-kubectl port-forward "service/${APP_NAME}" "${LOCAL_PORT}:80" >/dev/null 2>&1 &
-PF_PID=$!
-for _ in {1..15}; do
-    if curl -fsS --max-time 2 "http://127.0.0.1:${LOCAL_PORT}/" >/dev/null 2>&1; then
-        break
-    fi
-    sleep 1
-done
-if ! kill -0 "${PF_PID}" 2>/dev/null; then
-    fail "port-forward did not re-attach to new Pod"
+# ── Poll the NodePort until the replacement Pod serves it ───────────────────
+# Nothing to reconnect: the NodePort routes to whichever Pod is Ready.
+step "polling 127.0.0.1:${LOCAL_PORT} until the replacement Pod answers"
+if ! wait_for_http "http://127.0.0.1:${LOCAL_PORT}/" 30; then
+    info "Service and endpoints:"
+    kubectl get svc,endpoints "${APP_NAME}" | sed 's/^/    /'
+    fail "NodePort did not route to the replacement Pod within 30s"
 fi
-pass "port-forward reconnected to ${NEW_POD}"
+pass "NodePort routes to ${NEW_POD}"
 
 # ── Capture new timestamp, assert match ─────────────────────────────────────
 step "verifying content persisted across Pod restart"

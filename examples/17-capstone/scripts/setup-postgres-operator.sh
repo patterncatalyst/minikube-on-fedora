@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # setup-postgres-operator.sh — install the CloudNativePG operator into the
-# capstone cluster.
+# mof-capstone cluster.
 #
 # IMPORTANT: installing an operator is a CLUSTER-WIDE action. It:
 #   - registers Custom Resource Definitions (CRDs are always cluster-scoped:
@@ -26,8 +26,11 @@
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/env.sh"
+
 OPERATOR_NS="cnpg-system"
-CHART_VERSION="0.23.0"   # CloudNativePG helm chart version; pin for reproducibility
+CHART_VERSION="0.29.1"   # CloudNativePG helm chart 0.29.1 = operator 1.30.1; pin for reproducibility
 RELEASE_NAME="cnpg"
 
 # ─── Pre-flight ──────────────────────────────────────────────────────────────
@@ -40,16 +43,6 @@ fi
 if ! command -v kubectl >/dev/null 2>&1; then
     printf 'ERROR: kubectl not in PATH. See §2 for installation.\n' >&2
     exit 1
-fi
-
-current_context=$(kubectl config current-context 2>/dev/null || echo "")
-if [[ "$current_context" != "capstone" ]]; then
-    printf 'WARNING: current kubectl context is "%s", not "capstone".\n' "$current_context" >&2
-    printf 'The operator will be installed cluster-wide on THAT cluster.\n' >&2
-    printf 'Switch with: kubectl config use-context capstone\n' >&2
-    printf 'Continue anyway? [y/N] ' >&2
-    read -r answer
-    [[ "$answer" =~ ^[Yy] ]] || exit 1
 fi
 
 # ─── Install ─────────────────────────────────────────────────────────────────

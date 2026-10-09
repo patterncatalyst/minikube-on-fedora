@@ -1,0 +1,26 @@
+# examples/11-istio/host-access/ingressgateway-host.yaml
+#
+# Companion NodePort Service owned by this repo. Reaches the Istio ingress gateway.
+# It selects the same Pods as the upstream Service, so re-applying the
+# addon or running istioctl install never reverts it. Published by the
+# istio profile as 127.0.0.1:8080 (see ISTIO_PORTS in scripts/lib/_helpers.sh).
+# Selector: labels from the gateways/istio-ingress chart values in the Istio 1.31.1 release (istioctl install --set profile=demo); verify live: kubectl get svc -n istio-system istio-ingressgateway -o jsonpath='{.spec.selector}'
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ingressgateway-host
+  namespace: istio-system
+  labels:
+    app.kubernetes.io/managed-by: minikube-on-fedora
+spec:
+  type: NodePort
+  selector:
+    istio: ingressgateway
+    app: istio-ingressgateway
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+      nodePort: 30880
+      protocol: TCP

@@ -5,7 +5,7 @@
 # configuration; flip `enabled: false` to omit a component from a
 # partial-stack deploy.
 #
-# Resource defaults are sized for a 24 GB / 16 CPU `capstone` minikube
+# Resource defaults are sized for a 24 GB / 16 CPU `mof-capstone` minikube
 # profile (see scripts/setup-capstone-profile.sh). Adjust if you've
 # given the profile more or less.
 
@@ -16,8 +16,9 @@ global:
   # Single namespace for the capstone deploy. Istio injection is enabled here.
   namespace: capstone
 
-  # Image-pull policy across all services. IfNotPresent works for both
-  # locally-built (minikube image cache) and registry-sourced images.
+  # Image-pull policy across all services. The service subcharts set their own
+  # pullPolicy: Never (images are loaded into the mof-capstone profile with
+  # `minikube image load`); this global applies to anything that does not.
   imagePullPolicy: IfNotPresent
 
   # OTLP endpoint for all services. Points at the OTEL Collector service
@@ -41,7 +42,9 @@ strimziCluster:
   enabled: true
   # Kafka cluster CR — the Strimzi operator must already be installed
   # (per §12 pattern). The cluster runs in the capstone namespace.
-  version: "4.1.0"
+  # NOTE: this block is not read by any template. The Kafka version is set in
+  # charts/kafka/values.yaml (`version`, a subchart value; override with
+  # `--set kafka.version=...`), where the Kafka CR template consumes it.
   replicas: 1   # single-broker dev cluster, NOT production-shaped
   storage:
     size: 10Gi

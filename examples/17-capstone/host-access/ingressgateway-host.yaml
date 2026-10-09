@@ -1,0 +1,28 @@
+# examples/17-capstone/host-access/ingressgateway-host.yaml
+#
+# Companion NodePort Service owned by this repo. Reaches the Istio ingress gateway.
+# It selects the same Pods as the upstream Service, so helm upgrade,
+# istioctl install or an addon re-apply never reverts it. Published by the
+# mof-capstone profile as 127.0.0.1:8080 (see CAPSTONE_PORTS in
+# scripts/lib/env.sh).
+# Selector: labels of the default-profile istio-ingressgateway Deployment (istioctl install, same as examples/11-istio/host-access/).
+#   verify live: kubectl --context mof-capstone get svc -n istio-system istio-ingressgateway -o jsonpath='{.spec.selector}'
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ingressgateway-host
+  namespace: istio-system
+  labels:
+    app.kubernetes.io/managed-by: minikube-on-fedora
+spec:
+  type: NodePort
+  selector:
+    istio: ingressgateway
+    app: istio-ingressgateway
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+      nodePort: 30880
+      protocol: TCP

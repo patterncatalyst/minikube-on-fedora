@@ -3,12 +3,12 @@
 # scripts/setup-keda.sh
 #
 # One-time install of KEDA core + the KEDA HTTP add-on into the
-# `keda` namespace on the current kubectl context. Idempotent —
-# safe to re-run.
+# `keda` namespace on the pinned kube context (KUBE_CONTEXT, default
+# `minikube`). Idempotent — safe to re-run.
 #
 # Pinned versions:
-#   KEDA core:        2.19.0    (latest stable, Feb 2026)
-#   KEDA HTTP add-on: 0.12.2    (latest, Feb 2026 — note: BETA)
+#   KEDA core:        2.21.0
+#   KEDA HTTP add-on: 0.16.0    (note: BETA)
 #
 # After this script returns successfully, both `examples/12-keda-kafka`
 # and `examples/12-keda-http` demos can run. The HTTP add-on is only
@@ -18,9 +18,10 @@
 
 set -euo pipefail
 
-KEDA_VERSION="${KEDA_VERSION:-2.19.0}"
-KEDA_HTTP_VERSION="${KEDA_HTTP_VERSION:-0.12.2}"
+KEDA_VERSION="${KEDA_VERSION:-2.21.0}"
+KEDA_HTTP_VERSION="${KEDA_HTTP_VERSION:-0.16.0}"
 NAMESPACE="${NAMESPACE:-keda}"
+KUBE_CONTEXT="${KUBE_CONTEXT:-minikube}"
 
 # Color helpers
 if [[ -t 1 ]]; then
@@ -37,9 +38,8 @@ step()  { echo -e "${YELLOW}━━${NC} $*"; }
 step "pre-flight"
 command -v helm >/dev/null 2>&1 || fail "helm not in PATH — see §2"
 command -v kubectl >/dev/null 2>&1 || fail "kubectl not in PATH — see §2"
-kubectl get nodes >/dev/null 2>&1 || fail "kubectl cannot reach a cluster"
-CURRENT_CONTEXT=$(kubectl config current-context)
-info "kubectl context: ${CURRENT_CONTEXT}"
+kubectl --context "${KUBE_CONTEXT}" get nodes >/dev/null 2>&1 || fail "kubectl cannot reach context ${KUBE_CONTEXT} — start the profile first (§4)"
+info "kube context (pinned): ${KUBE_CONTEXT}"
 info "helm: $(helm version --short)"
 pass "tooling available"
 
@@ -56,17 +56,17 @@ pass "kedacore helm repo ready"
 
 # ── Step 2: Install KEDA core ───────────────────────────────────────────────
 step "installing KEDA core ${KEDA_VERSION} into namespace ${NAMESPACE}"
-if helm status keda -n "${NAMESPACE}" >/dev/null 2>&1; then
-    INSTALLED=$(helm status keda -n "${NAMESPACE}" -o json | python3 -c \
+if helm status --kube-context "${KUBE_CONTEXT}" keda -n "${NAMESPACE}" >/dev/null 2>&1; then
+    INSTALLED=$(helm status --kube-context "${KUBE_CONTEXT}" keda -n "${NAMESPACE}" -o json | python3 -c \
         'import json,sys; print(json.load(sys.stdin)["chart"]["metadata"]["version"])' 2>/dev/null || echo "unknown")
     info "KEDA core already installed (version ${INSTALLED}); upgrading if needed"
-    helm upgrade keda kedacore/keda \
+    helm upgrade --kube-context "${KUBE_CONTEXT}" keda kedacore/keda \
         --version "${KEDA_VERSION}" \
         -n "${NAMESPACE}" \
         --wait \
         --timeout 5m
 else
-    helm install keda kedacore/keda \
+    helm install --kube-context "${KUBE_CONTEXT}" keda kedacore/keda \
         --version "${KEDA_VERSION}" \
         -n "${NAMESPACE}" \
         --create-namespace \
@@ -78,17 +78,17 @@ pass "KEDA core ${KEDA_VERSION} installed"
 # ── Step 3: Install KEDA HTTP add-on ────────────────────────────────────────
 step "installing KEDA HTTP add-on ${KEDA_HTTP_VERSION} into namespace ${NAMESPACE}"
 info "(beta — official upstream notes this is not yet recommended for production)"
-if helm status keda-add-ons-http -n "${NAMESPACE}" >/dev/null 2>&1; then
-    INSTALLED=$(helm status keda-add-ons-http -n "${NAMESPACE}" -o json | python3 -c \
+if helm status --kube-context "${KUBE_CONTEXT}" keda-add-ons-http -n "${NAMESPACE}" >/dev/null 2>&1; then
+    INSTALLED=$(helm status --kube-context "${KUBE_CONTEXT}" keda-add-ons-http -n "${NAMESPACE}" -o json | python3 -c \
         'import json,sys; print(json.load(sys.stdin)["chart"]["metadata"]["version"])' 2>/dev/null || echo "unknown")
     info "HTTP add-on already installed (version ${INSTALLED}); upgrading if needed"
-    helm upgrade keda-add-ons-http kedacore/keda-add-ons-http \
+    helm upgrade --kube-context "${KUBE_CONTEXT}" keda-add-ons-http kedacore/keda-add-ons-http \
         --version "${KEDA_HTTP_VERSION}" \
         -n "${NAMESPACE}" \
         --wait \
         --timeout 5m
 else
-    helm install keda-add-ons-http kedacore/keda-add-ons-http \
+    helm install --kube-context "${KUBE_CONTEXT}" keda-add-ons-http kedacore/keda-add-ons-http \
         --version "${KEDA_HTTP_VERSION}" \
         -n "${NAMESPACE}" \
         --wait \
@@ -99,8 +99,8 @@ pass "KEDA HTTP add-on ${KEDA_HTTP_VERSION} installed"
 # ── Step 4: Verify Pods are Running ─────────────────────────────────────────
 step "verifying KEDA Pods are Running"
 sleep 3
-kubectl get pods -n "${NAMESPACE}" | sed 's/^/    /'
-NOT_READY=$(kubectl get pods -n "${NAMESPACE}" --no-headers 2>/dev/null \
+kubectl --context "${KUBE_CONTEXT}" get pods -n "${NAMESPACE}" | sed 's/^/    /'
+NOT_READY=$(kubectl --context "${KUBE_CONTEXT}" get pods -n "${NAMESPACE}" --no-headers 2>/dev/null \
     | awk '$2 != "1/1" && $2 != "2/2" {print $1}' | wc -l)
 if [[ "${NOT_READY}" -ne 0 ]]; then
     info "some Pods aren't fully ready yet; this may be transient — re-run if it persists"

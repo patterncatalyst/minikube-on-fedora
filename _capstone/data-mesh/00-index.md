@@ -66,4 +66,22 @@ for the idea that holds a mesh together, and
 to avoid. Those three cover the shape of the thing without the full implementation
 depth.
 
+## Where the capstone continues
+
+This capstone grew into two standalone reference architectures that
+take the same data mesh further:
+
+- [**Data mesh reference architecture — Python**](https://patterncatalyst.github.io/datamesh-reference-arch-python/)
+  ([repo](https://github.com/patterncatalyst/datamesh-reference-arch-python))
+  is a fork of this capstone, broken out for its own audience. It
+  carries the same services and domain, with its own workshop
+  chapters, demos and an OpenShift Local appendix.
+- [**Data mesh reference architecture — Quarkus**](https://patterncatalyst.github.io/datamesh-reference-arch-quarkus/)
+  ([repo](https://github.com/patterncatalyst/datamesh-reference-arch-quarkus))
+  builds the same mesh with Quarkus and Camel.
+
+Use this capstone to see how §1–§12 fit together on one minikube
+profile; use the reference architectures when the data mesh itself
+is the subject.
+
 Start with [concepts & principles]({{ '/capstone/data-mesh/01-concepts/' | relative_url }}).

@@ -33,15 +33,53 @@ echo "CPUs: $(nproc)"
 free -h
 df -h ~ /
 
-section "container engine: podman"
-maybe podman --version
-# Note: CgroupVersion field was removed from podman info template in
-# podman 5.x; dropped to keep output clean.
-maybe podman info --format \
-  '{{.Host.OS}} {{.Host.Arch}} rootless={{.Host.Security.Rootless}}'
-
-section "container engine: docker CLI (optional)"
+section "container engine: Docker Engine (docker-ce)"
+# Audit only: every probe below tolerates a stopped daemon and reports.
+if command -v rpm >/dev/null 2>&1; then
+    rpm -q docker-ce docker-ce-cli containerd.io docker-buildx-plugin 2>&1 | sed 's/^/  /' || true
+fi
 maybe docker --version
+printf '  systemctl is-active docker: %s\n' "$(systemctl is-active docker 2>&1 || true)"
+CTX=$(docker context show 2>/dev/null || true)
+echo "  docker context: ${CTX:-(none)}"
+if [[ -S /var/run/docker.sock ]]; then
+    echo "  socket: /var/run/docker.sock present"
+else
+    echo "  socket: /var/run/docker.sock MISSING"
+fi
+if id -nG | tr ' ' '\n' | grep -qx docker; then
+    echo "  group: $(id -un) is in the docker group"
+else
+    echo "  group: $(id -un) is NOT in the docker group (sudo usermod -aG docker \$USER, then re-login)"
+fi
+docker info --format '  server={{.ServerVersion}} cgroup={{.CgroupVersion}} root={{.DockerRootDir}}' 2>/dev/null \
+    || echo "  (docker daemon not reachable)"
+
+section "container engine: warnings"
+WARNED=0
+warn() { echo "  WARN: $*"; WARNED=1; }
+if rpm -q moby-engine >/dev/null 2>&1; then
+    warn "moby-engine is installed; the tutorial uses docker-ce (sudo dnf remove moby-engine)"
+fi
+if rpm -q podman-docker >/dev/null 2>&1; then
+    warn "podman-docker is installed and shadows the docker CLI (sudo dnf remove podman-docker)"
+fi
+if [[ -n "${CTX}" && "${CTX}" != "default" ]]; then
+    warn "docker context is '${CTX}', expected 'default' (docker context use default)"
+fi
+if [[ -n "${DOCKER_HOST:-}" ]]; then
+    warn "DOCKER_HOST is set to '${DOCKER_HOST}' (unset it)"
+fi
+MK_CFG=$(minikube config view 2>/dev/null || true)
+if grep -Eiq 'driver|rootless' <<<"${MK_CFG}"; then
+    warn "minikube config sets driver/rootless; the tutorial passes flags per profile:"
+    sed 's/^/        /' <<<"${MK_CFG}" | grep -Ei 'driver|rootless' || true
+    echo "        clear with: minikube config unset <key>"
+fi
+(( WARNED == 0 )) && echo "  (none)"
+
+section "minikube profiles"
+minikube profile list 2>/dev/null || echo "  (minikube not present, or the docker daemon is stopped)"
 
 section "currently installed tutorial tools (PATH)"
 for tool in minikube kubectl helm istioctl stern kubectx kubens yq krew httpie hey gh; do

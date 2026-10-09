@@ -20,9 +20,8 @@
 # examples/17-capstone/:  ./demos/demo-add-data-product.sh up   (then ... down)
 
 set -uo pipefail
-export MINIKUBE_ROOTLESS=true
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/lib/env.sh"   # PROFILE, NS, ports; pins kubectl/helm to the profile
 
-NS="capstone"
 RELEASE="review-service"
 CHART="charts/capstone/charts/review-service"
 SERVICE_DIR="services/review-service"
@@ -33,23 +32,20 @@ ARTIFACT_ID="review-service-openapi"
 REVIEWS_SCHEMA_FQN="capstone-postgres.capstone.reviews"
 REVIEWS_TABLE_FQN="capstone-postgres.capstone.reviews.reviews"
 
-L_REVIEW="18086"; L_APIC="18085"; L_OM="18585"
-PIDS=()
+# Published NodePorts on 127.0.0.1 (ports are fixed when the profile is created)
+L_REVIEW="$HOST_PORT_REVIEW"; L_APIC="$HOST_PORT_APICURIO"; L_OM="$HOST_PORT_OPENMETADATA"
 
 step() { printf '\n==> %s\n' "$1"; }
 ok()   { printf '    \xe2\x9c\x93 %s\n' "$1"; }
 warn() { printf '    \xe2\x9a\xa0 %s\n' "$1"; }
-fail() { printf '\n\xe2\x9c\x97 FAILED: %s\n' "$1" >&2; cleanup; exit 1; }
-cleanup() { for p in "${PIDS[@]:-}"; do [[ -n "$p" ]] && kill "$p" 2>/dev/null; done; }
-trap cleanup EXIT
+fail() { printf '\n\xe2\x9c\x97 FAILED: %s\n' "$1" >&2; exit 1; }
 
-pf() {  # pf <local> <svc> <remote> ; records pid, waits for the tunnel
-    kubectl port-forward -n "$NS" "svc/$2" "$1:$3" >/dev/null 2>&1 &
-    PIDS+=("$!")
-    sleep 2
+reach() {  # reach <nodePort> <hostPort> <health-path> ; asserts the port is published, then polls it
+    require_published_port "$PROFILE" "$1" "$2"
+    wait_for_http "http://127.0.0.1:$2$3" 90
 }
 
-om_token() {  # echoes an admin bearer token from the port-forwarded server
+om_token() {  # echoes an admin bearer token from the OpenMetadata server (login lives in get_token.py)
     OM_HOST="http://127.0.0.1:${L_OM}" python3 openmetadata/ingestion/get_token.py
 }
 
@@ -58,8 +54,7 @@ MODE="${1:-}"
 
 # ─── Pre-flight ──────────────────────────────────────────────────────────────
 step "Pre-flight"
-[[ "$(kubectl config current-context 2>/dev/null)" == "capstone" ]] \
-    || fail "kubectl context is not 'capstone'"
+minikube status -p "$PROFILE" >/dev/null 2>&1 || fail "profile '$PROFILE' not running — ./scripts/setup-capstone-profile.sh"
 for svc in apicurio openmetadata; do
     kubectl get svc "$svc" -n "$NS" >/dev/null 2>&1 \
         || fail "$svc not found — bring the capstone up (./scripts/cluster-up.sh)"
@@ -77,8 +72,8 @@ if [[ "$MODE" == "up" ]]; then
 
     # ── 2. Publish the OpenAPI contract to Apicurio ──────────────────────────
     step "Publishing the OpenAPI contract to Apicurio"
-    pf "$L_REVIEW" review-service 80
-    pf "$L_APIC" apicurio 8080
+    reach "$NODE_PORT_REVIEW" "$HOST_PORT_REVIEW" /health || fail "review-service not answering on 127.0.0.1:${L_REVIEW}"
+    reach "$NODE_PORT_APICURIO" "$HOST_PORT_APICURIO" /apis/registry/v3/system/info || fail "apicurio not answering on 127.0.0.1:${L_APIC}"
     python3 - "$ARTIFACT_ID" "$GROUP" "http://127.0.0.1:${L_REVIEW}" "http://127.0.0.1:${L_APIC}" <<'PY' || fail "publish to Apicurio failed"
 import json, sys, urllib.request, urllib.error
 artifact_id, group, review_url, apicurio = sys.argv[1:5]
@@ -102,7 +97,7 @@ PY
 
     # ── 4. Declare reviews -> products lineage ───────────────────────────────
     step "Declaring lineage (inventory.stock -> reviews.reviews)"
-    pf "$L_OM" openmetadata 8585
+    reach "$NODE_PORT_OPENMETADATA" "$HOST_PORT_OPENMETADATA" /api/v1/system/version || fail "openmetadata not answering on 127.0.0.1:${L_OM}"
     TOKEN="$(om_token)"; [[ -n "$TOKEN" ]] || fail "could not get an OpenMetadata token"
     OM_HOST="http://127.0.0.1:${L_OM}" OM_JWT="$TOKEN" \
         python3 openmetadata/ingestion/reviews_lineage.py up || fail "lineage declaration failed"
@@ -120,16 +115,14 @@ PY
     step "The data product is live. Ways to retrieve it and discover its metadata:"
     cat <<EOF
     Retrieve the data (REST):
-      kubectl port-forward -n $NS svc/review-service 8086:80
-      curl -s localhost:8086/reviews?sku=SKU-ABC-42 | jq
+      curl -s "http://127.0.0.1:${L_REVIEW}/reviews?sku=SKU-ABC-42" | jq
 
     Discover the contract (Apicurio):
-      kubectl port-forward -n $NS svc/apicurio 8085:8080
-      open http://localhost:8085  → artifact '$ARTIFACT_ID' (OpenAPI)
+      open http://127.0.0.1:${L_APIC}  → artifact '$ARTIFACT_ID' (OpenAPI)
 
     Discover the data + lineage (OpenMetadata):
-      kubectl port-forward -n $NS svc/openmetadata 8585:8585
-      open http://localhost:8585  → search 'reviews' → Lineage tab
+      open http://127.0.0.1:${L_OM}  (credentials: see openmetadata/om-app-values.yaml)
+      → search 'reviews' → Lineage tab
         (reviews.reviews linked to inventory.stock)
 
     Replay/clean up:  ./demos/demo-add-data-product.sh down
@@ -140,7 +133,7 @@ else
     step "Backing out the review-service data product"
 
     # 1. lineage edge + 2. catalog entry (best-effort; OM API verify-points)
-    pf "$L_OM" openmetadata 8585
+    reach "$NODE_PORT_OPENMETADATA" "$HOST_PORT_OPENMETADATA" /api/v1/system/version || warn "openmetadata not answering on 127.0.0.1:${L_OM}"
     TOKEN="$(om_token || true)"
     if [[ -n "$TOKEN" ]]; then
         OM_HOST="http://127.0.0.1:${L_OM}" OM_JWT="$TOKEN" \
@@ -156,7 +149,7 @@ else
 
     # 3. Apicurio artifact
     step "Deleting the Apicurio artifact"
-    pf "$L_APIC" apicurio 8080
+    reach "$NODE_PORT_APICURIO" "$HOST_PORT_APICURIO" /apis/registry/v3/system/info || warn "apicurio not answering on 127.0.0.1:${L_APIC}"
     c="$(curl -s -o /dev/null -w '%{http_code}' -X DELETE \
         "http://127.0.0.1:${L_APIC}/apis/registry/v3/groups/${GROUP}/artifacts/${ARTIFACT_ID}")"
     [[ "$c" =~ ^20 || "$c" == "404" ]] && ok "Apicurio artifact removed" || warn "artifact delete returned HTTP $c"
@@ -167,7 +160,7 @@ else
 
     # 5. Drop the Postgres schema (so a future re-ingest won't re-add it)
     step "Dropping the reviews Postgres schema"
-    primary="$(kubectl get pods -n "$NS" -l cnpg.io/cluster=capstone-postgres,role=primary -o name 2>/dev/null | head -1)"
+    primary="$(kubectl get pods -n "$NS" -l cnpg.io/cluster=capstone-postgres,cnpg.io/instanceRole=primary -o name 2>/dev/null | head -1)"
     if [[ -n "$primary" ]]; then
         kubectl exec -n "$NS" "$primary" -c postgres -- \
             psql -U postgres -d capstone -c 'DROP SCHEMA IF EXISTS reviews CASCADE' >/dev/null 2>&1 \

@@ -262,3 +262,20 @@ CloudNativePG, Apicurio, OpenMetadata, Prefect, Strawberry) because a
 working data mesh requires concrete choices. These are presented as
 "a defensible set of choices for this stack," not endorsements, with
 rationale in the decision log.
+
+## r29 addendum (2026-10-09)
+
+What changed versus the PRD:
+
+- **Runtime.** minikube runs on Docker Engine (`--driver=docker`, containerd/runc)
+  instead of rootless podman. Images use `docker build` + `minikube image load`
+  with `imagePullPolicy: Never`; the in-cluster registry is gone.
+- **Access.** Host access is by NodePorts published to 127.0.0.1 at profile
+  creation, plus companion NodePort Services for third-party UIs. No
+  port-forwards, tunnels or `minikube service`. The capstone profile is `mof-capstone`.
+- **Platforms.** Fedora and RHEL (and their VMs) only; Docker Desktop is never required.
+- **UBI 10.** Examples use `ubi10/ubi` and `ubi10/ubi-minimal`; capstone services use
+  `ubi10/python-314-minimal` (fallback `ubi9/python-314`) with asyncpg 0.32.0.
+
+See `reconciliation-plan.md` Section D, r29, and CAP-048 to CAP-050. New rows are `unverified`.
+

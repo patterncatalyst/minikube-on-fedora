@@ -4,6 +4,8 @@ description: Working skeleton for restructuring §17 into a navigable section se
 render_with_liquid: false
 ---
 
+> **2026-10-09 (r29):** podman, rootless, registry and port-forward content here is historical (podman era); superseded by r29 (Docker Engine, published NodePorts) — see `reconciliation-plan.md` Section D, r29.
+
 > **Status: DRAFT skeleton for review.** Drafted while the author was away, from
 > the current `_docs/17-capstone.md` (1241 lines), the 15 diagrams in
 > `presentation/data-mesh-101/diagrams/`, the roadmap's Phase C topics, and the

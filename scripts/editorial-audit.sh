@@ -1,13 +1,34 @@
 #!/usr/bin/env bash
 #
 # editorial-audit.sh — surface common editorial issues across _docs/*.md.
-# All checks are advisory (warnings, not errors). Run output ends with a
-# summary count of findings per category.
+# Checks 1-7 are advisory (warnings, not errors). Check 8 (runtime / access /
+# OS policy) and the version-pin check are advisory by default and fail the
+# run under --strict. Output ends with a summary count of findings per
+# category.
 #
-# Run from the repo root: ./scripts/editorial-audit.sh
+# Run from the repo root:
+#   ./scripts/editorial-audit.sh            # advisory, exit 0
+#   ./scripts/editorial-audit.sh --strict   # exit 1 on any policy / pin finding
+#
+# Policy exemptions (check 8 and the pin check):
+#   - Markdown: lines between <!-- policy-exempt:start --> and
+#     <!-- policy-exempt:end -->, or a line ending in <!-- policy-exempt -->
+#   - Shell / YAML / any file: a line ending in "# policy-exempt"
 
 set -euo pipefail
 cd "$(git rev-parse --show-toplevel)"
+
+STRICT=0
+for arg in "$@"; do
+    case "$arg" in
+        --strict) STRICT=1 ;;
+        -h|--help) sed -n '2,17p' "$0"; exit 0 ;;
+        *) echo "unknown argument: $arg (usage: $0 [--strict])" >&2; exit 2 ;;
+    esac
+done
+
+WORK=$(mktemp -d)
+trap 'rm -rf "$WORK"' EXIT
 
 # ANSI-light formatting (only used to make sections scannable in terminal)
 hdr() { printf '\n=== %s ===\n' "$1"; }
@@ -45,8 +66,8 @@ else
     printf '  (none)\n'
 fi
 
-# 3. "minikube VM" — with the podman driver it's actually a container, not a VM
-hdr "minikube VM references (should be 'minikube node container' under podman driver)"
+# 3. "minikube VM" — with the docker driver the node is a container, not a VM
+hdr "minikube VM references (should be 'minikube node')"
 if grep -rn 'minikube VM' _docs/ 2>/dev/null; then
     counts[minikube-vm]=$(grep -rn 'minikube VM' _docs/ 2>/dev/null | wc -l)
 else
@@ -136,24 +157,121 @@ for f in _docs/*.md; do
             cmd_start = NR + 1
         }
     ' "$f"
-done | tee /tmp/dup-flags.out
-if [[ -s /tmp/dup-flags.out ]]; then
-    counts[dup-flags]=$(wc -l < /tmp/dup-flags.out)
+done | tee "$WORK/dup-flags.out"
+if [[ -s "$WORK/dup-flags.out" ]]; then
+    counts[dup-flags]=$(wc -l < "$WORK/dup-flags.out")
 else
     printf '  (none)\n'
 fi
-rm -f /tmp/dup-flags.out
+
+# 8. Runtime / access / OS policy, plus version pins.
+# Scope: every tracked text file except presentation/, _plans/, lockfiles,
+# screenshots, this script, and .github/workflows/pages.yml (its
+# `runs-on: ubuntu-latest` is CI infrastructure, not tutorial content).
+hdr "Runtime / access / OS policy (check 8)"
+git ls-files -z \
+    | grep -zvE '^(presentation/|_plans/|assets/screenshots/)|\.lock$|^\.github/workflows/pages\.yml$|^scripts/editorial-audit\.sh$' \
+    | while IFS= read -r -d '' f; do
+        [[ -f "$f" ]] && grep -Iq . "$f" 2>/dev/null && printf '%s\n' "$f"
+    done > "$WORK/files.txt" || true
+
+# Build text.txt (line text) and meta.txt (file:line), skipping exempt lines.
+: > "$WORK/text.txt"; : > "$WORK/meta.txt"
+while IFS= read -r f; do
+    awk -v F="$f" -v T="$WORK/text.txt" -v M="$WORK/meta.txt" '
+        /<!-- policy-exempt:start -->/ { skip = 1 }
+        {
+            exempt = skip \
+                  || $0 ~ /#[[:space:]]*policy-exempt[[:space:]]*$/ \
+                  || $0 ~ /<!-- policy-exempt -->[[:space:]]*$/
+            if (!exempt) { print $0 >> T; printf "%s:%d\n", F, FNR >> M }
+        }
+        /<!-- policy-exempt:end -->/ { skip = 0 }
+    ' "$f"
+done < "$WORK/files.txt"
+paste -d'\t' "$WORK/meta.txt" "$WORK/text.txt" > "$WORK/all.tsv" 2>/dev/null || true
+printf '  scanned %d files, %d non-exempt lines\n' "$(wc -l < "$WORK/files.txt")" "$(wc -l < "$WORK/text.txt")"
+
+# scan_pattern LABEL REGEX KIND   (KIND is "policy" or "pin")
+scan_pattern() {
+    local label="$1" re="$2" kind="$3" idx n
+    idx=$(grep -niE -e "$re" "$WORK/text.txt" 2>/dev/null | cut -d: -f1 || true)
+    [[ -z "$idx" ]] && return 0
+    printf '%s\n' "$idx" > "$WORK/idx.txt"
+    n=$(wc -l < "$WORK/idx.txt")
+    counts["$kind:$label"]=$n
+    printf '\n  [%s] %s (%d)\n' "$kind" "$label" "$n"
+    awk -F'\t' 'NR==FNR { want[$1] = 1; next } (FNR in want) { t = $2; for (i = 3; i <= NF; i++) t = t "\t" $i
+                  gsub(/^[[:space:]]+/, "", t); printf "    %s: %s\n", $1, substr(t, 1, 140) }' \
+        "$WORK/idx.txt" "$WORK/all.tsv"
+}
+
+POLICY_PATTERNS=(
+    'port-forward'
+    'minikube tunnel'
+    'minikube service'
+    'kubectl proxy'
+    'istioctl dashboard'
+    'minikube dashboard'
+    'ssh -L'
+    '--driver=podman'
+    'driver podman'
+    '--rootless'
+    'rootless true'
+    'MINIKUBE_ROOTLESS'
+    'podman (build|run|push|port|volume|tag|info|image)'
+    'slirp4netns'
+    'podman-compose'
+    'Podman Desktop'
+    '\bcrun\b'
+    'cri-o'
+    'macOS'
+    'Windows'
+    'WSL'
+    'Ubuntu'
+    'Debian'
+    'Homebrew'
+    'brew install'
+    'Colima'
+    'Rancher Desktop'
+    'Apple Silicon'
+    '\bLima\b'
+    'Docker Desktop'
+    'Hyper-V'
+    'VirtualBox'
+    'apt(-get)? install'
+)
+for pat in "${POLICY_PATTERNS[@]}"; do
+    scan_pattern "$pat" "$pat" policy
+done
+(( ${#counts[@]} == 0 )) && printf '  (none)\n'
+
+hdr "Unpinned versions (check 8b)"
+before=${#counts[@]}
+for pat in ':latest\b' 'releases/latest' '@latest' 'stable\.txt'; do
+    scan_pattern "$pat" "$pat" pin
+done
+[[ ${#counts[@]} -eq $before ]] && printf '  (none)\n'
 
 # Summary
 hdr "Summary"
 total=0
+policy_total=0
 for k in "${!counts[@]}"; do
     n="${counts[$k]}"
-    printf '  %-20s %d\n' "$k" "$n"
     total=$((total + n))
+    case "$k" in policy:*|pin:*) policy_total=$((policy_total + n)) ;; esac
 done
+while IFS= read -r k; do
+    printf '  %-48s %d\n' "$k" "${counts[$k]}"
+done < <(printf '%s\n' "${!counts[@]}" | sort)
 if (( total == 0 )); then
     printf '  No issues found. Editorial pass clean.\n'
 else
     printf '\nTotal findings: %d (advisory — not all are bugs)\n' "$total"
+    printf 'Policy + pin findings: %d\n' "$policy_total"
+fi
+if (( STRICT == 1 && policy_total > 0 )); then
+    printf 'FAIL (--strict): %d policy/pin finding(s)\n' "$policy_total" >&2
+    exit 1
 fi

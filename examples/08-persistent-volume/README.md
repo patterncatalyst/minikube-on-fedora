@@ -3,8 +3,9 @@
 Demonstrates Kubernetes **PersistentVolumes** (PVs) and
 **PersistentVolumeClaims** (PVCs) by deploying nginx with content
 served from a PV instead of baked into the image. The demo
-includes a real persistence test: capture content, delete the
-Pod, capture again — timestamps match → PV did its job.
+includes a real persistence test: capture content from
+`http://127.0.0.1:18080/`, delete the Pod, poll the same URL until the
+replacement Pod answers, capture again — timestamps match → PV did its job.
 
 The example inverts the §6 pattern. §6 baked content into the
 image. §8 uses a generic image; content lives in a PV and outlives
@@ -41,8 +42,10 @@ Expected duration: 30-50 seconds. Most of it is waiting for the
 Pod restart cycle in the persistence test (~15-25 seconds for
 the new Pod to come up after deletion).
 
-If `nginx-custom:v1` isn't cached, add 2-4 minutes for the first
-build (auto-built from §6's Containerfile).
+If `nginx-custom:v1` isn't loaded, add 2-4 minutes for the first
+build (`docker build` from §6's Containerfile, then `minikube image
+load`). The initContainer uses the pinned
+`ubi10/ubi-minimal:10.2-1791444377` image.
 
 ## What you should see
 
@@ -72,9 +75,12 @@ build (auto-built from §6's Containerfile).
 
 ## Cluster scope
 
-Uses the **default minikube cluster**. The `nginx-pv` resources
-(Deployment, Service, PVC) all use distinct names from §6 and §7
-(`nginx`, `nginx-np`) and can coexist. The PV the StorageClass
+Uses the **default minikube cluster** and pins every `kubectl` call to
+that context. The `nginx-pv` resources (Deployment, Service, PVC) all
+use distinct names from §6 and §7 (`nginx`, `nginx-np`). The Service is
+`type: NodePort` on `30080`, published at profile creation as
+`127.0.0.1:18080`. That slot is shared with §6, §9 and §12-http, one at
+a time: the demo calls `require_free_nodeport 30080` first. The PV the StorageClass
 provisions is named like `pvc-<uuid>` and is also distinct from
 anything §6/§7 creates.
 
@@ -82,13 +88,11 @@ anything §6/§7 creates.
 
 `demo.sh` installs a `trap cleanup EXIT` that:
 
-1. Kills the background `kubectl port-forward` process
-2. Sweeps any lingering `kubectl port-forward` children
-3. Deletes the manifests, which cascades to:
+1. Deletes the manifests, which cascades to:
    - Deployment → Pods terminated
-   - Service deleted
+   - Service deleted (frees the shared nodePort 30080)
    - PVC deleted → PV auto-deleted (Delete reclaim policy)
-4. The minikube node's hostpath directory under
+2. The minikube node's hostpath directory under
    `/tmp/hostpath-provisioner/` is cleaned by the provisioner
 
 `nginx-custom:v1` stays in the cluster's image cache.
@@ -96,7 +100,7 @@ anything §6/§7 creates.
 Manual cleanup if needed:
 
 ```bash
-kubectl delete -f manifests/ --ignore-not-found=true
+kubectl --context minikube delete -f manifests/ --ignore-not-found=true
 # the PV is auto-deleted; verify with:
 kubectl get pv
 ```
@@ -117,9 +121,15 @@ kubectl get pv
    demo's cleanup runs on script exit, not between phases — so
    this shouldn't happen in the demo, but might if you've been
    experimenting manually)
-5. **Port-forward never re-attaches to the new Pod** — kubectl
-   port-forward sometimes needs a couple seconds for the new
-   endpoint to register. The demo retries for 15s; longer than
-   that suggests a Service selector mismatch
+5. **The NodePort never answers after the Pod is replaced** — the
+   new endpoint needs a few seconds to register. The demo polls for
+   30s; longer than that suggests a Service selector mismatch
+   (`kubectl --context minikube get endpoints nginx-pv`)
+6. **`nodePort 30080 is held by Service ...`** — §6, §9 or §12-http
+   holds the shared slot. Run the `kubectl delete svc` command the
+   script prints
+7. **`does not publish nodePort 30080`** — the profile was created
+   without the port map. Run the delete-and-recreate command the
+   script prints
 
 For any of these, paste the failing output back.

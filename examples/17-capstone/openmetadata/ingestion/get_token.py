@@ -17,9 +17,10 @@ alternative for unattended pipelines.
 Stdlib only (urllib/json/base64) so it runs in the ingestion image with no
 added dependency.
 
-VERIFY-POINTS (OpenMetadata 1.12.8 basic-auth; confirm at build time):
-  * The default install is basic auth with admin@open-metadata.org / admin
-    (the credential the r27 deploy documented and the smoke uses).
+VERIFY-POINTS (OpenMetadata 2.0.5 basic-auth; confirm at build time):
+  * The default install uses basic auth; the login comes from the
+    OM_ADMIN_EMAIL / OM_ADMIN_PASSWORD environment variables, falling back to the
+    chart's default admin account (see openmetadata/om-app-values.yaml).
   * Basic-auth login is POST /api/v1/users/login with the password
     base64-encoded in the body, returning {"accessToken": "..."}. If the
     install uses a different auth provider, this is the thing to change.

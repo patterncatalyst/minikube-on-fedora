@@ -82,12 +82,21 @@ pattern as Strimzi and KEDA.
 ```bash
 # minikube has an addon for ingress-nginx
 minikube addons enable ingress -p minikube
+```
 
+The ingress controller is reachable from the host only through a
+published port. The `minikube` profile publishes the NodePorts in
+`CORE_PORTS` (§4); to expose the controller, give it a companion
+NodePort Service on one of those ports (or recreate the profile
+with an extra `--ports` entry), the same way §11 does for the
+ingress gateway.
+
+```bash
 # cert-manager comes via helm
 helm repo add jetstack https://charts.jetstack.io
-helm install cert-manager jetstack/cert-manager \
+helm install cert-manager jetstack/cert-manager --version v1.21.2 \
     --namespace cert-manager --create-namespace \
-    --set installCRDs=true
+    --set crds.enabled=true
 ```
 
 Then define an `Ingress` resource pointing at your existing
@@ -123,7 +132,7 @@ and a sensible default set of dashboards and alerts.
 
 ```bash
 helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
-helm install monitoring prometheus-community/kube-prometheus-stack \
+helm install monitoring prometheus-community/kube-prometheus-stack --version 92.2.0 \
     --namespace monitoring --create-namespace
 ```
 
@@ -161,7 +170,7 @@ but each piece is straightforward in isolation.
 
 - **[GitHub Actions docs](https://docs.github.com/en/actions)**
   for the build-and-push pipeline
-- **[ko](https://ko.build/)** as an alternative to `podman
+- **[ko](https://ko.build/)** as an alternative to `docker
   build` for Go services — it handles the image-building step
   with no Containerfile
 - **[ArgoCD auto-sync](https://argo-cd.readthedocs.io/en/stable/user-guide/auto_sync/)**

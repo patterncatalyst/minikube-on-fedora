@@ -1,6 +1,6 @@
 # examples/06-deploy-nginx-kubectl/Containerfile
 #
-# Multi-stage build: UBI 9 builder → UBI 9 Minimal runtime.
+# Multi-stage build: UBI 10 builder → UBI 10 Minimal runtime.
 #
 # Both base images are freely redistributable per Red Hat's UBI EULA;
 # neither requires subscription-manager registration to install
@@ -13,7 +13,7 @@
 #   single-page example, the builder is minimal — but the structure is
 #   familiar from production.
 #
-# Why not just use registry.access.redhat.com/ubi9/nginx-124?
+# Why not just use registry.access.redhat.com/ubi10/nginx-126?
 #   That image is an s2i (source-to-image) builder. Its default CMD is
 #   /usr/libexec/s2i/run, which expects content baked in at build time
 #   via `s2i assemble`. In plain Kubernetes (rather than OpenShift)
@@ -21,7 +21,7 @@
 #   ubi-minimal sidesteps the issue and shows the multi-stage pattern.
 
 # ── Stage 1: Builder ────────────────────────────────────────────────────────
-FROM registry.access.redhat.com/ubi9/ubi AS builder
+FROM registry.access.redhat.com/ubi10/ubi:10.2-1791444044 AS builder
 
 WORKDIR /build
 
@@ -33,7 +33,7 @@ WORKDIR /build
 COPY index.html .
 
 # ── Stage 2: Runtime ────────────────────────────────────────────────────────
-FROM registry.access.redhat.com/ubi9/ubi-minimal
+FROM registry.access.redhat.com/ubi10/ubi-minimal:10.2-1791444377
 
 # microdnf is ubi-minimal's slim package manager. Install nginx and
 # clean caches in the same RUN to keep the layer small.

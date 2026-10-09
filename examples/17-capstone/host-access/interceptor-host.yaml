@@ -1,0 +1,29 @@
+# examples/17-capstone/host-access/interceptor-host.yaml
+#
+# Companion NodePort Service owned by this repo. Reaches the KEDA HTTP add-on interceptor proxy (scale-from-zero path to graphql-gateway).
+# It selects the same Pods as the upstream Service, so helm upgrade,
+# istioctl install or an addon re-apply never reverts it. Published by the
+# mof-capstone profile as 127.0.0.1:8081 (see CAPSTONE_PORTS in
+# scripts/lib/env.sh).
+# Selector: keda-add-ons-http 0.16.0 chart (helm template, release keda-add-ons-http).
+#   verify live: kubectl --context mof-capstone get svc -n keda keda-add-ons-http-interceptor-proxy -o jsonpath='{.spec.selector}'
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: interceptor-host
+  namespace: keda
+  labels:
+    app.kubernetes.io/managed-by: minikube-on-fedora
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/component: interceptor
+    app.kubernetes.io/name: http-add-on
+    app.kubernetes.io/part-of: keda-add-ons-http
+  ports:
+    - name: proxy
+      port: 8080
+      targetPort: proxy
+      nodePort: 30881
+      protocol: TCP

@@ -10,22 +10,20 @@
 #       shows the decoded order — which is only possible if the consumer
 #       fetched the writer schema from the registry by id)
 #
-# Flow: registry guard → Strimzi+Kafka ready → deploy Apicurio → build+push
+# Flow: Strimzi+Kafka ready → deploy Apicurio → build+load
 #       inventory/order/notification → Postgres → deploy → place order →
 #       assert schema registered + event consumed → cleanup on success.
 #
 # Usage:  ./demos/smoke-avro.sh [--purge-db]
 
 set -uo pipefail
-export MINIKUBE_ROOTLESS=true   # CAP-010
-
-PROFILE="capstone"; NS="capstone"
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"; cd "$ROOT"
+source "$ROOT/scripts/lib/env.sh"   # PROFILE, NS, host/node ports; pins kubectl/helm/istioctl to the profile
 PG_RELEASE="capstone-postgres"; PG_CHART="charts/capstone/charts/postgres"
 KAFKA_RELEASE="capstone-kafka"; KAFKA_CHART="charts/capstone/charts/kafka"; KAFKA_CR="capstone-kafka"
 APICURIO_RELEASE="apicurio"; APICURIO_CHART="charts/capstone/charts/apicurio"
 SUBJECT="order-placed-value"
-LOCAL_ORDER=18080; LOCAL_NOTIF=18097; LOCAL_APIC=18085
+LOCAL_ORDER="$HOST_PORT_ORDER"; LOCAL_NOTIF="$HOST_PORT_NOTIFICATION"; LOCAL_APIC="$HOST_PORT_APICURIO"   # published NodePorts on 127.0.0.1
 PURGE_DB=0; [[ "${1:-}" == "--purge-db" ]] && PURGE_DB=1
 
 APP_SERVICES=(inventory-service order-service notification-service)
@@ -43,18 +41,19 @@ fail() {
     exit 1
 }
 
-# ── 1. registry guard ─────────────────────────────────────────────────────────
-step "Sanity: chart image.repository points at the registry"
-for svc in "${APP_SERVICES[@]}"; do
-    repo="$(awk '/^  repository:/{print $2; exit}' "charts/capstone/charts/${svc}/values.yaml")"
-    case "$repo" in
-        localhost:5000/*) printf '    ✓ %s → %s\n' "$svc" "$repo" ;;
-        *) fail "${svc} image.repository is '${repo}' — must start with localhost:5000/" ;;
-    esac
-done
+# Deployed image must be the bare <svc>:v1 with imagePullPolicy Never, and loaded in the node.
+assert_local_image() {  # deployment-name
+    local d="$1" img pol
+    img="$(kubectl get deployment "$d" -n "$NS" -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null)"
+    pol="$(kubectl get deployment "$d" -n "$NS" -o jsonpath='{.spec.template.spec.containers[0].imagePullPolicy}' 2>/dev/null)"
+    [[ "$img" == "${d}:v1" ]] || fail "${d} image is '${img}' — must be the bare '${d}:v1'"
+    [[ "$pol" == "Never" ]] || fail "${d} imagePullPolicy is '${pol}' — must be Never"
+    minikube -p "$PROFILE" image ls 2>/dev/null | grep -qE "(^|/)${d}:v1\$" \
+        || fail "${d}:v1 not in 'minikube -p ${PROFILE} image ls' — ./scripts/build-image.sh services/${d} ${d} v1"
+    printf '    ✓ %s → %s (pullPolicy Never, present in the node)\n' "$d" "$img"
+}
 
 minikube status -p "$PROFILE" >/dev/null 2>&1 || fail "profile '$PROFILE' not running"
-kubectl config use-context "$PROFILE" >/dev/null
 
 # ── 2. Strimzi + Kafka ────────────────────────────────────────────────────────
 step "Ensuring the Strimzi operator + Kafka cluster are up"
@@ -69,10 +68,10 @@ helm upgrade --install "$APICURIO_RELEASE" "$APICURIO_CHART" -n "$NS" || fail "a
 kubectl rollout status deployment/apicurio -n "$NS" --timeout=180s || fail "apicurio rollout failed"
 printf '    ✓ Apicurio ready\n'
 
-# ── 4. build + push ───────────────────────────────────────────────────────────
+# ── 4. build + load ───────────────────────────────────────────────────────────
 for svc in "${APP_SERVICES[@]}"; do
-    step "Building + pushing ${svc}"
-    ./scripts/build-image.sh "services/${svc}" "${svc}" v1 || fail "${svc} build/push failed"
+    step "Building + loading ${svc}"
+    ./scripts/build-image.sh "services/${svc}" "${svc}" v1 || fail "${svc} build/load failed"
 done
 
 # ── 5. Postgres + deploy ──────────────────────────────────────────────────────
@@ -81,7 +80,7 @@ kubectl get crd clusters.postgresql.cnpg.io >/dev/null 2>&1 || fail "CloudNative
 helm upgrade --install "$PG_RELEASE" "$PG_CHART" -n "$NS" --create-namespace || fail "postgres CR install failed"
 pg_ready=0
 for i in $(seq 1 60); do
-    if kubectl get pods -n "$NS" -l "cnpg.io/cluster=${PG_RELEASE},role=primary" \
+    if kubectl get pods -n "$NS" -l "cnpg.io/cluster=${PG_RELEASE},cnpg.io/instanceRole=primary" \
         -o jsonpath='{.items[0].status.conditions[?(@.type=="Ready")].status}' 2>/dev/null | grep -q "True"; then
         printf '    primary Ready after ~%ds\n' "$((i*5))"; pg_ready=1; break
     fi
@@ -93,15 +92,19 @@ for svc in "${APP_SERVICES[@]}"; do
     step "Deploying ${svc}"
     helm upgrade --install "$svc" "charts/capstone/charts/${svc}" -n "$NS" || fail "${svc} install failed"
     kubectl rollout status "deployment/${svc}" -n "$NS" --timeout=120s || fail "${svc} rollout failed"
+    assert_local_image "$svc"
 done
 
 # ── 6. place an order (registers schema on producer startup, emits Avro) ──────
-step "Port-forwards: order(${LOCAL_ORDER}) notification(${LOCAL_NOTIF}) apicurio(${LOCAL_APIC})"
-kubectl port-forward -n "$NS" service/order-service "${LOCAL_ORDER}:80" >/dev/null 2>&1 & PF_O=$!
-kubectl port-forward -n "$NS" service/notification-service "${LOCAL_NOTIF}:80" >/dev/null 2>&1 & PF_N=$!
-kubectl port-forward -n "$NS" service/apicurio "${LOCAL_APIC}:8080" >/dev/null 2>&1 & PF_A=$!
-trap '[[ -n "${PF_O:-}" ]]&&kill "$PF_O" 2>/dev/null;[[ -n "${PF_N:-}" ]]&&kill "$PF_N" 2>/dev/null;[[ -n "${PF_A:-}" ]]&&kill "$PF_A" 2>/dev/null' EXIT
-sleep 3
+step "Waiting for order(${LOCAL_ORDER}) notification(${LOCAL_NOTIF}) apicurio(${LOCAL_APIC}) on their published NodePorts"
+require_published_port "$PROFILE" "$NODE_PORT_ORDER" "$HOST_PORT_ORDER"
+keda_hold_replicas notification-service-scaler 1 notification-service \
+    || fail "notification-service did not come up under the KEDA hold"
+require_published_port "$PROFILE" "$NODE_PORT_NOTIFICATION" "$HOST_PORT_NOTIFICATION"
+require_published_port "$PROFILE" "$NODE_PORT_APICURIO" "$HOST_PORT_APICURIO"
+wait_for_http "http://127.0.0.1:${LOCAL_ORDER}/health" 60 || fail "order-service not answering on 127.0.0.1:${LOCAL_ORDER}"
+wait_for_http "http://127.0.0.1:${LOCAL_NOTIF}/health" 60 || fail "notification-service not answering on 127.0.0.1:${LOCAL_NOTIF}"
+wait_for_http "http://127.0.0.1:${LOCAL_APIC}/apis/registry/v3/system/info" 60 || fail "apicurio not answering on 127.0.0.1:${LOCAL_APIC}"
 
 step "Placing an in-stock order (WIDGET-001 x2) via order-service REST"
 ORDER_JSON="$(curl -fsS -X POST "http://127.0.0.1:${LOCAL_ORDER}/orders" \
@@ -137,7 +140,6 @@ printf '\n✓ SUCCESS — order.placed flows as registered Avro: schema in Apicu
 
 # ── 8. cleanup on success ─────────────────────────────────────────────────────
 step "Cleanup (success)"
-kill "$PF_O" "$PF_N" "$PF_A" 2>/dev/null; PF_O=""; PF_N=""; PF_A=""
 helm uninstall "${APP_SERVICES[@]}" -n "$NS" >/dev/null 2>&1 && echo "service releases uninstalled"
 if (( PURGE_DB )); then
     helm uninstall "$APICURIO_RELEASE" "$KAFKA_RELEASE" "$PG_RELEASE" -n "$NS" >/dev/null 2>&1 && echo "apicurio + kafka + postgres uninstalled"

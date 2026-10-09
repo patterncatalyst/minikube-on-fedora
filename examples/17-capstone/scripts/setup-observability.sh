@@ -18,26 +18,25 @@
 #
 # Usage (from examples/17-capstone/):
 #   ./scripts/setup-observability.sh
-#   kubectl port-forward -n observability svc/grafana 3000:80
+#   kubectl apply -f host-access/{prometheus,grafana,tempo}-host.yaml   # bootstrap-capstone.sh does this
 #   ./demos/smoke-observability.sh   # metrics plumbing
 #   ./demos/smoke-tracing.sh         # trace backend plumbing
 
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/env.sh"
+
 NAMESPACE="observability"
+
+# Pinned chart versions (current stable, verified against the repo index 2026-10-09).
+PROMETHEUS_CHART_VERSION="${PROMETHEUS_CHART_VERSION:-29.36.1}"   # prometheus-community/prometheus
+TEMPO_CHART_VERSION="${TEMPO_CHART_VERSION:-3.1.0}"               # grafana-community/tempo
+GRAFANA_CHART_VERSION="${GRAFANA_CHART_VERSION:-13.4.0}"          # grafana-community/grafana
 OBS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../observability" && pwd)"
 
 command -v kubectl >/dev/null 2>&1 || { printf 'ERROR: kubectl not in PATH.\n' >&2; exit 1; }
 command -v helm    >/dev/null 2>&1 || { printf 'ERROR: helm not in PATH — see §2.\n' >&2; exit 1; }
-
-current_context="$(kubectl config current-context 2>/dev/null || echo "")"
-if [[ "$current_context" != "capstone" ]]; then
-    printf 'WARNING: current kubectl context is "%s", not "capstone".\n' "$current_context" >&2
-    printf 'Switch with: kubectl config use-context capstone\n' >&2
-    printf 'Continue anyway? [y/N] ' >&2
-    read -r answer
-    [[ "$answer" =~ ^[Yy] ]] || exit 1
-fi
 
 # ─── 1. helm repos ───────────────────────────────────────────────────────────
 printf '==> Ensuring the prometheus-community and grafana-community helm repos are registered\n'
@@ -46,10 +45,11 @@ helm repo add grafana-community https://grafana-community.github.io/helm-charts 
 helm repo update prometheus-community grafana-community >/dev/null
 
 # ─── 2. Prometheus (+ kube-state-metrics) ────────────────────────────────────
-# Chart versions intentionally unpinned (latest from the repo) so this keeps
-# working as charts move; pin with --version for a reproducible build.
+# Chart versions are pinned above for a reproducible build; override with
+# PROMETHEUS_CHART_VERSION / TEMPO_CHART_VERSION / GRAFANA_CHART_VERSION.
 printf '==> Installing Prometheus into namespace %s\n' "$NAMESPACE"
 helm upgrade --install prometheus prometheus-community/prometheus \
+    --version "$PROMETHEUS_CHART_VERSION" \
     --namespace "$NAMESPACE" \
     --create-namespace \
     -f "$OBS_DIR/prometheus-values.yaml" \
@@ -60,6 +60,7 @@ helm upgrade --install prometheus prometheus-community/prometheus \
 # grafana/* charts moved there 2026-01-30), so no extra repo beyond Grafana.
 printf '==> Installing Tempo (trace backend) into namespace %s\n' "$NAMESPACE"
 helm upgrade --install tempo grafana-community/tempo \
+    --version "$TEMPO_CHART_VERSION" \
     --namespace "$NAMESPACE" \
     -f "$OBS_DIR/tempo-values.yaml" \
     --wait
@@ -67,21 +68,17 @@ helm upgrade --install tempo grafana-community/tempo \
 # ─── 4. Grafana ──────────────────────────────────────────────────────────────
 printf '==> Installing Grafana into namespace %s\n' "$NAMESPACE"
 helm upgrade --install grafana grafana-community/grafana \
+    --version "$GRAFANA_CHART_VERSION" \
     --namespace "$NAMESPACE" \
     -f "$OBS_DIR/grafana-values.yaml" \
     --wait
 
 # ─── Done ────────────────────────────────────────────────────────────────────
 printf '\n==> Prometheus + Grafana installed in the %s namespace.\n\n' "$NAMESPACE"
-printf 'Open Grafana and find the "Capstone — Scaling & Traffic" dashboard:\n'
-printf '  kubectl port-forward -n %s svc/grafana 3000:80    # http://localhost:3000\n\n' "$NAMESPACE"
-# The grafana chart preserves an existing admin password on upgrade (it looks up
-# the secret), so the password is NOT reliably "capstone" if a grafana secret
-# already existed. Read the truth from the secret rather than assuming.
-printf 'Login (read the real credentials from the secret — the chart keeps an existing\n'
-printf 'password on upgrade, so do not assume it is the values default):\n'
-printf '  user: $(kubectl get secret grafana -n %s -o jsonpath="{.data.admin-user}" | base64 -d)\n' "$NAMESPACE"
-printf '  pass: $(kubectl get secret grafana -n %s -o jsonpath="{.data.admin-password}" | base64 -d)\n\n' "$NAMESPACE"
+printf 'Open Grafana and find the "Capstone — Scaling & Traffic" dashboard (after the\n'
+printf 'host-access companions are applied; bootstrap-capstone.sh does this):\n'
+printf '  http://127.0.0.1:%s     (credentials: see observability/grafana-values.yaml)\n' "$HOST_PORT_GRAFANA"
+printf '  Prometheus: http://127.0.0.1:%s    Tempo: http://127.0.0.1:%s\n\n' "$HOST_PORT_PROMETHEUS" "$HOST_PORT_TEMPO"
 printf 'Then make the graphs move:\n'
 printf '  ./demos/smoke-keda-http.sh    # watch graphql-gateway replicas go 0→1→0\n'
 printf '  ./demos/smoke-canary.sh       # watch order-service request rate by code\n'

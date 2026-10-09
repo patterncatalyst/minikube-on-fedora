@@ -24,9 +24,11 @@ cd examples/NN-name
 ./demo.sh
 ```
 
-`demo.sh` includes pre-flight checks (correct minikube profile,
-required tools in PATH, kernel limits sufficient where applicable)
-and a cleanup trap so re-runs are safe. If anything fails, the
+`demo.sh` includes pre-flight checks (Docker Engine reachable, correct minikube
+profile with its NodePorts published, required tools in PATH, kernel limits sufficient where applicable)
+and a cleanup trap so re-runs are safe. Every `kubectl`, `helm`, and
+`istioctl` call in a demo is pinned to its profile's context, so the
+demos never change your current kubectl context. If anything fails, the
 script exits non-zero with a diagnostic dump of relevant Pod
 state, recent events, and logs.
 
@@ -70,7 +72,9 @@ Fedora 44 is tracked in
 a human on Fedora 44.
 
 As of project close-out (r17), the count of verified rows stood
-at **107**.
+at **107**. Those runs predate the move to Docker Engine and
+published NodePorts, so treat the count as historical until the
+examples are re-verified on the current stack.
 
 ## What's NOT an example
 

@@ -18,16 +18,13 @@
 # Run from examples/17-capstone/:  ./demos/smoke-keda-http.sh
 
 set -uo pipefail
-export MINIKUBE_ROOTLESS=true
+source "$(dirname "${BASH_SOURCE[0]}")/../scripts/lib/env.sh"   # PROFILE, NS, ports; pins kubectl/helm to the profile
 
-NS="capstone"
-PROFILE="capstone"
 KEDA_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../keda" && pwd)"
 SEL="app.kubernetes.io/name=graphql-gateway"
 HOST="graphql-gateway.capstone"
-LOCAL_PORT="8081"
+LOCAL_PORT="$HOST_PORT_INTERCEPTOR"   # KEDA interceptor proxy, published NodePort on 127.0.0.1
 PROXY_SVC="keda-add-ons-http-interceptor-proxy"
-PF_PID=""
 declare -a LOAD_PIDS=()
 
 step() { printf '\n==> %s\n' "$1"; }
@@ -36,7 +33,6 @@ count_pods() {
 }
 cleanup() {
     for p in "${LOAD_PIDS[@]:-}"; do kill "$p" 2>/dev/null; done
-    [[ -n "$PF_PID" ]] && kill "$PF_PID" 2>/dev/null
     true
 }
 trap cleanup EXIT
@@ -61,8 +57,7 @@ is_scaledup() { [[ "$(count_pods)" -gt 0 ]]; }
 
 # ─── Pre-flight ──────────────────────────────────────────────────────────────
 step "Pre-flight checks"
-[[ "$(kubectl config current-context 2>/dev/null)" == "$PROFILE" ]] \
-    || fail "kubectl context is not '$PROFILE'"
+minikube status -p "$PROFILE" >/dev/null 2>&1 || fail "profile '$PROFILE' not running — ./scripts/setup-capstone-profile.sh"
 for t in kubectl curl; do command -v "$t" >/dev/null || fail "$t not in PATH"; done
 kubectl get svc "$PROXY_SVC" -n keda >/dev/null 2>&1 \
     || fail "KEDA HTTP add-on not installed (no $PROXY_SVC in keda ns) — run scripts/setup-keda.sh"
@@ -85,26 +80,27 @@ wait_until "0 replicas" 600 is_zero \
 printf '    ✓ scaled to ZERO (no traffic, costing nothing)\n'
 
 # ─── 2. Wake from zero through the interceptor ───────────────────────────────
-step "Port-forwarding the KEDA HTTP interceptor (proxy :8080)"
-# The proxy listens on 8080 on keda-add-ons-http-interceptor-proxy (matches the
-# proven §12 pattern). Hardcoded — discovering ports[0] risks hitting a non-proxy
-# port, which silently drops the routing and the pending-request metric.
-kubectl port-forward -n keda "svc/$PROXY_SVC" "${LOCAL_PORT}:8080" >/dev/null 2>&1 &
-PF_PID=$!
-# Wait for the port-forward TCP socket to accept connections (not a routing check).
+step "Reaching the KEDA HTTP interceptor on 127.0.0.1:${LOCAL_PORT} (published NodePort -> proxy :8080)"
+# The proxy listens on 8080 on keda-add-ons-http-interceptor-proxy; the companion
+# Service host-access/interceptor-host.yaml publishes it as nodePort $NODE_PORT_INTERCEPTOR.
+# The gateway is reached ONLY through the interceptor in this demo (never directly on
+# 127.0.0.1:${HOST_PORT_GATEWAY}), because at zero replicas that NodePort has no endpoints.
+require_published_port "$PROFILE" "$NODE_PORT_INTERCEPTOR" "$HOST_PORT_INTERCEPTOR"
+# Wait for the interceptor's TCP socket to accept connections (not a routing check).
 for _ in $(seq 1 15); do
     curl -s -o /dev/null --max-time 2 "http://127.0.0.1:${LOCAL_PORT}/" && break
     sleep 1
 done
 
 step "Firing a cold-start request through the interceptor (Host: $HOST)"
-# With interceptor.replicas.waitTimeout raised to 180s (setup-keda.sh), the
+# With interceptor.readinessTimeout set to 180s (setup-keda.sh), the
 # interceptor BUFFERS this request, signals KEDA to scale graphql-gateway from
 # zero, and HOLDS the connection until a replica is Ready — then forwards it and
 # returns the gateway's response. A 200 is the wake-from-zero proof; the elapsed
 # time is the cold-start cost. A single held request also gives KEDA the stable
-# pending-request pressure it needs to activate promptly (the old 20s wait made
-# requests churn-and-502 before a backend existed, starving that signal).
+# pending-request pressure it needs to activate promptly (a short readiness
+# timeout would end the held request with a 504 before a backend existed,
+# starving that signal).
 START=$(date +%s)
 CODE=$(curl -s -o /dev/null -w '%{http_code}' --max-time 200 \
     -H "Host: $HOST" "http://127.0.0.1:${LOCAL_PORT}/health" || echo "000")
@@ -112,7 +108,7 @@ ELAPSED=$(( $(date +%s) - START ))
 if [[ "$CODE" != "200" ]]; then
     printf '    cold-start returned HTTP %s after %ss\n' "$CODE" "$ELAPSED"
     kubectl get deployment,pods -n "$NS" -l app.kubernetes.io/name=graphql-gateway 2>&1 | sed 's/^/      /'
-    fail "interceptor did not serve a 200 from a woken gateway (HTTP $CODE). 502 'context deadline exceeded' = waitTimeout too short; 404 = Host didn't match the HTTPScaledObject."
+    fail "interceptor did not serve a 200 from a woken gateway (HTTP $CODE). 504 (gateway timeout) = readinessTimeout too short; 404 = Host didn't match the HTTPScaledObject."
 fi
 printf '    ✓ woke from ZERO and served 200 in %ss (cold start)\n' "$ELAPSED"
 [[ "$(count_pods)" -gt 0 ]] || fail "served a 200 but no gateway pod present?!"
@@ -131,19 +127,16 @@ LOAD_PIDS=()
 printf '    ✓ stayed up under load (peak %s replica(s))\n' "$MAXSEEN"
 
 # ─── 3. Traffic stops → scale back to zero ───────────────────────────────────
-# Close the port-forward FIRST — this is THE thing that makes scale-to-zero work.
-# The HTTP add-on scales on in-flight `concurrency`, and an open connection (a
-# held port-forward, keep-alive and all) reads as >=1. While anything is
-# connected the metric never reaches 0, so the scaledownPeriod timer never starts
-# and the gateway looks like it refuses to scale down. Drop the connection and it
-# stands down in ~30s (the HTTPScaledObject's scaledownPeriod) — same ballpark as
-# the Kafka ScaledObject's cooldownPeriod: 30.
-[[ -n "$PF_PID" ]] && kill "$PF_PID" 2>/dev/null; PF_PID=""
+# Scale-to-zero needs in-flight `concurrency` to reach 0. The load loops above are
+# finished and killed, and a NodePort holds no keep-alive connection of its own, so
+# nothing is left connected: the scaledownPeriod timer (30s, set on the
+# HTTPScaledObject) starts immediately and the gateway stands down in ~30s, the same
+# ballpark as the Kafka ScaledObject's cooldownPeriod: 30.
 
-step "Stopping traffic (and closing the interceptor connection); waiting for scale back to ZERO (~30s once idle)"
+step "Stopping traffic; waiting for scale back to ZERO (~30s once idle)"
 # We latch on KEDA's decision — the Deployment's desired replicas reaching 0 —
 # rather than waiting for the last pod to finish terminating, so graceful
-# shutdown lag doesn't read as a failure. With the connection closed this is
+# shutdown lag doesn't read as a failure. With traffic stopped this is
 # typically ~30s; the budget stays generous as a ceiling.
 desired() { kubectl get deploy graphql-gateway -n "$NS" -o jsonpath='{.spec.replicas}' 2>/dev/null; }
 START=$(date +%s); SAW_ZERO=""
@@ -157,7 +150,7 @@ if [[ -n "$SAW_ZERO" ]]; then
 else
     printf '    ⚠ still >0 after %ss (desired=%s now) — NOT a failure.\n' "$ELAPSED" "$(desired)"
     printf '      Usually means something still holds a connection to the interceptor\n'
-    printf '      (a browser tab, another port-forward) keeping concurrency >0. Watch it:\n'
+    printf '      (a browser tab, another client) keeping concurrency >0. Watch it:\n'
     printf '        kubectl get deploy graphql-gateway -n %s -w\n' "$NS"
 fi
 

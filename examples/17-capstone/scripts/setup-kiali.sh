@@ -35,10 +35,13 @@
 #
 # Then verify + view:
 #   ./demos/smoke-kiali.sh
-#   kubectl port-forward -n istio-system svc/kiali 20001:20001
-#   open http://localhost:20001   (Graph → namespace: capstone)
+#   kubectl apply -f host-access/kiali-host.yaml     # bootstrap-capstone.sh does this
+#   open http://127.0.0.1:20001/kiali   (Graph → namespace: capstone)
 
 set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/env.sh"
 
 ISTIO_SYSTEM="istio-system"
 OBS_NS="observability"
@@ -47,7 +50,7 @@ ISTIO_DIR="${ISTIO_DIR:-${HOME}/.local/share/istio-current}"
 # capstone observability service endpoints (single-stack wiring targets)
 PROM_URL="http://prometheus-server.${OBS_NS}:80"
 GRAFANA_IN_URL="http://grafana.${OBS_NS}:80"
-GRAFANA_EXT_URL="http://localhost:3000"          # what a browser uses (port-forward)
+GRAFANA_EXT_URL="http://127.0.0.1:${HOST_PORT_GRAFANA}"   # what a browser uses (published NodePort)
 TEMPO_URL="http://tempo.${OBS_NS}:3100"
 
 step() { printf '\n==> %s\n' "$1"; }
@@ -55,15 +58,6 @@ step() { printf '\n==> %s\n' "$1"; }
 # ─── Pre-flight ──────────────────────────────────────────────────────────────
 
 command -v kubectl >/dev/null 2>&1 || { printf 'ERROR: kubectl not in PATH.\n' >&2; exit 1; }
-
-current_context="$(kubectl config current-context 2>/dev/null || echo "")"
-if [[ "$current_context" != "capstone" ]]; then
-    printf 'WARNING: current kubectl context is "%s", not "capstone".\n' "$current_context" >&2
-    printf 'Switch with: kubectl config use-context capstone\n' >&2
-    printf 'Continue anyway? [y/N] ' >&2
-    read -r answer
-    [[ "$answer" =~ ^[Yy] ]] || exit 1
-fi
 
 KIALI_MANIFEST="${ISTIO_DIR}/samples/addons/kiali.yaml"
 if [[ ! -f "$KIALI_MANIFEST" ]]; then
@@ -150,8 +144,8 @@ kubectl rollout status deployment/kiali -n "$ISTIO_SYSTEM" --timeout=5m
 
 step "Kiali is installed and wired to the capstone observability stack."
 printf '\nView the mesh topology:\n'
-printf '  kubectl port-forward -n %s svc/kiali 20001:20001\n' "$ISTIO_SYSTEM"
-printf '  open http://localhost:20001/kiali   (Graph → namespace: capstone)\n'
+printf '  kubectl apply -f host-access/kiali-host.yaml   # companion NodePort 30201 (bootstrap-capstone.sh does this)\n'
+printf '  open http://127.0.0.1:%s/kiali   (Graph → namespace: capstone)\n' "$HOST_PORT_KIALI"
 printf '\nVerify:\n'
 printf '  ./demos/smoke-kiali.sh\n'
 printf '\nNote: the live traffic graph only shows edges while traffic is flowing —\n'

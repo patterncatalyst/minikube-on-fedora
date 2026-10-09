@@ -1,0 +1,32 @@
+# examples/12-keda-http/host-access/interceptor-host.yaml
+#
+# Companion NodePort Service owned by this repo. Reaches the KEDA HTTP
+# add-on interceptor proxy from the host. It selects the same Pods as
+# the chart's keda-add-ons-http-interceptor-proxy Service, so helm upgrade
+# never reverts it. Shares nodePort 30080 with §6, §8 and §9: apply it
+# only while this demo runs (demo.sh does, and removes it on exit).
+# Published by the minikube profile as 127.0.0.1:18080 (CORE_PORTS in
+# scripts/lib/_helpers.sh).
+# Selector: from the keda-add-ons-http 0.16.0 chart (helm template, release
+# name keda-add-ons-http); verify live:
+#   kubectl get svc -n keda keda-add-ons-http-interceptor-proxy -o jsonpath='{.spec.selector}'
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: keda-interceptor-host
+  namespace: keda
+  labels:
+    app.kubernetes.io/managed-by: minikube-on-fedora
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/component: interceptor
+    app.kubernetes.io/name: http-add-on
+    app.kubernetes.io/part-of: keda-add-ons-http
+  ports:
+    - name: proxy
+      port: 8080
+      targetPort: proxy
+      nodePort: 30080
+      protocol: TCP

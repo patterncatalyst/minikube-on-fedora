@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# setup-istio.sh — install the Istio control plane into the capstone cluster and
+# setup-istio.sh — install the Istio control plane into the mof-capstone cluster and
 # enable sidecar injection, in preparation for the order-service v1→v2 canary
 # (r26, CAP-024).
 #
@@ -37,7 +37,9 @@
 
 set -euo pipefail
 
-NS="capstone"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/env.sh"
+
 ISTIO_PROFILE="default"
 
 # ─── Pre-flight ──────────────────────────────────────────────────────────────
@@ -50,18 +52,9 @@ if ! command -v istioctl >/dev/null 2>&1; then
     exit 1
 fi
 
-current_context="$(kubectl config current-context 2>/dev/null || echo "")"
-if [[ "$current_context" != "capstone" ]]; then
-    printf 'WARNING: current kubectl context is "%s", not "capstone".\n' "$current_context" >&2
-    printf 'Switch with: kubectl config use-context capstone\n' >&2
-    printf 'Continue anyway? [y/N] ' >&2
-    read -r answer
-    [[ "$answer" =~ ^[Yy] ]] || exit 1
-fi
-
 # ─── 1. Install Istio (control plane + ingress gateway) ──────────────────────
 
-printf '==> Installing Istio (profile=%s) into the capstone cluster\n' "$ISTIO_PROFILE"
+printf '==> Installing Istio (profile=%s) into the mof-capstone cluster\n' "$ISTIO_PROFILE"
 istioctl install --set profile="$ISTIO_PROFILE" -y
 
 printf '==> Waiting for istiod and the ingress gateway to be ready\n'
