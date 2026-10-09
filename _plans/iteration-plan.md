@@ -4,6 +4,8 @@ description: Six-phase roadmap from PRD to launch, with verification rhythm and 
 render_with_liquid: false
 ---
 
+> **2026-10-09 (r29):** podman, rootless, registry and port-forward content here is historical (podman era); superseded by r29 (Docker Engine, published NodePorts) — see `reconciliation-plan.md` Section D, r29.
+
 This is the roadmap from approved PRD (`_r01`) to public launch.
 Sixteen iterations across six phases; some optional; flexible
 about combining or splitting as real-hardware testing reveals

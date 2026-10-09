@@ -180,6 +180,7 @@ Status values: **accepted**, **superseded by CAP-NNN**,
 - **Date:** r21a (original), revised r21c
 - **Status:** accepted (the r21a/r21b `minikube image load` approach
   is **superseded**)
+- **Superseded by CAP-048 (2026-10-09).**
 - **Context:** Getting a locally-built image to the kubelet under the
   rootless-podman + containerd driver combo proved unexpectedly hard.
   In sequence we hit: (1) `minikube image build` exited 0 but the
@@ -227,6 +228,7 @@ Status values: **accepted**, **superseded by CAP-NNN**,
 
 - **Date:** r21c
 - **Status:** accepted
+- **Superseded by CAP-048 (2026-10-09).**
 - **Context:** minikube's registry is reachable at two *different*
   addresses depending on where you are. With the podman driver, the
   host-side port is NOT 5000 — minikube assigns one (we observed
@@ -246,6 +248,7 @@ Status values: **accepted**, **superseded by CAP-NNN**,
 
 - **Date:** r21c
 - **Status:** accepted
+- **Superseded by CAP-048 (2026-10-09).**
 - **Context:** Several baffling failures (status reporting "unknown
   state", `minikube ssh` aborting, `image load` failing) all traced to
   one cause: when `MINIKUBE_ROOTLESS` is unset in the current shell,
@@ -437,6 +440,7 @@ Status values: **accepted**, **superseded by CAP-NNN**,
 
 - **Date:** r23
 - **Status:** accepted
+- **Superseded by CAP-048 (2026-10-09).**
 - **Context:** Services are pushed to the in-cluster registry under a mutable
   `:v1` tag and rebuilt repeatedly during development. With
   `imagePullPolicy: IfNotPresent`, the node's containerd already has an image
@@ -1626,6 +1630,7 @@ Completed`, unmeshed), and the run proceeds to lineage + the catalog check.
 ## CAP-035 — bootstrap-capstone.sh: one-command full bring-up
 
 **Status:** decided, shipped r35 (offline-grounded; first cluster run pending).
+**Partially superseded by CAP-049 (2026-10-09): its port-forward access path.**
 
 **Context.** A 21-hour-old node degraded past recovery (full crashloop incl. the
 control plane; a containerd-shim panic; `cluster-up.sh`'s stop/start couldn't
@@ -1684,6 +1689,7 @@ constrained the pods. The live root-cgroup write also fails on a rootless node
 is the istio-proxy startup race — see CAP-037. Kept here as an honest record of
 a wrong turn: the lesson is to confirm *which* cgroup bounds the workload before
 treating a number as the limit.
+**Superseded by CAP-048 (2026-10-09).**
 
 **Context.** On the freshly-bootstrapped node, the last service to start
 (order-service — the one meshed app pod) was stuck `RunContainerError`:
@@ -1928,6 +1934,7 @@ even with the istiod ClusterIP unreachable. Another point for that decision.
 ## CAP-041 — Node PID ceiling: raise podman pids_limit at node creation
 
 **Status:** decided, shipped r40 (guard in profile script + host containers.conf).
+**Superseded by CAP-048 (2026-10-09).**
 **Supersedes:** CAP-036 (withdrawn — that tried a live cgroup write, which fails
 on a rootless node). This is the correct, creation-time fix.
 
@@ -2261,6 +2268,7 @@ demo. The upgrade is the right call.
 The upstream fix tracking issue is `kedacore/http-add-on#1668`; this CAP is
 revisited when that issue closes against a tagged release ≥ 0.14.1 (binary,
 not chart).
+**Partially superseded by CAP-049 (2026-10-09): its port-forward access path (the KEDA HTTP 0.12.2 deferral stands).**
 
 **Context.** CAP-046 attempted to migrate the gateway from `HTTPScaledObject`
 (v1alpha1) to `InterceptorRoute` (v1beta1) by upgrading the chart from
@@ -2391,3 +2399,57 @@ valid and is recorded in CAP-046's body for that future revisit.
     workaround is still useful for the cluster: it ensures the gateway
     is always warm during the walkthrough, even though we're not relying
     on the HTTP add-on to scale it from zero in the demo.
+
+
+## CAP-048 — Docker Engine + `minikube image load`; bare names, `imagePullPolicy: Never`, rollout restart
+
+**Status:** decided, shipped r29 (offline-grounded; live run pending).
+**Supersedes:** CAP-007, CAP-009, CAP-010, CAP-015, and the podman parts of CAP-036 and CAP-041.
+
+**Context.** The podman driver needed rootless mode, a PID-ceiling workaround, an
+in-cluster registry with a host/cluster port asymmetry, and `imagePullPolicy:
+Always` against a mutable tag. Each was a workaround for the runtime, not a feature.
+
+**Decision.** Every profile runs `--driver=docker --container-runtime=containerd`
+on Docker Engine (docker-ce). Images are built with `docker build`, loaded with
+`minikube image load`, referenced by bare name with `imagePullPolicy: Never`, and
+picked up by `kubectl rollout restart`. No registry, no `--rootless`, no pids_limit guard.
+
+**Consequences.**
+
+  * (+) One build path for every example; no registry addon, no port asymmetry.
+  * (+) Loaded images survive `minikube stop/start`.
+  * (-) Docker Engine is a prerequisite; a rebuilt image needs an explicit load and rollout restart.
+
+## CAP-049 — NodePorts published to loopback at profile creation; companion NodePort Services for third-party UIs; profile renamed `mof-capstone`
+
+**Status:** decided, shipped r29 (offline-grounded; live run pending).
+**Supersedes:** the port-forward entry path in CAP-035 and CAP-047.
+
+**Context.** Port-forwards, tunnels and `minikube service` disconnect and were the
+flaky part of every walkthrough. The profile name `capstone` also collided with
+another project's minikube profile.
+
+**Decision.** Every host-facing Service is a NodePort published at profile creation
+as `--ports=127.0.0.1:<host>:<nodePort>`; existing host ports are kept. Third-party
+UIs (dashboard on 30900, Kiali, Grafana, Prometheus, Jaeger, KEDA interceptor) get a
+companion NodePort Service. The shared slot nodePort 30080 is guarded by a preflight.
+The capstone profile is renamed `mof-capstone` (namespace stays `capstone`).
+
+**Consequences.**
+
+  * (+) Entry points are stable across the whole session; no background processes.
+  * (-) Ports are fixed at creation; adding one means recreating the profile.
+
+## CAP-050 — Newest UBI with the newest runtime
+
+**Status:** decided, shipped r29 (image build verified 2026-10-09; in-cluster run pending).
+
+**Decision.** Capstone services build on `ubi10/python-314-minimal` (fallback
+`ubi9/python-314`); asyncpg `^0.32.0` for its cp314 wheel; examples on `ubi10/ubi`
+and `ubi10/ubi-minimal`. Base images are pinned by tag.
+
+**Consequences.**
+
+  * (+) Current base and runtime; one local image build confirmed on 2026-10-09.
+  * (-) The fallback tag exists in case the UBI 10 Python image is unavailable.
