@@ -42,5 +42,13 @@ airflow:
 # is exactly what we want; we only shrink the PVC.
 opensearch:
   enabled: true
+  # The 2.0.5 dependencies chart ships OpenSearch 3.5.0, which rejects the
+  # UUID-format X-Request-Id header the OpenMetadata 2.0.5 server sends
+  # ("Invalid X-Request-Id passed. Should be 32 hexadecimal characters"), so
+  # every search-index write (lineage included) fails with HTTP 500. 3.4.0 is
+  # the newest release that works; verified live 2026-10-09. Re-check when
+  # OpenMetadata or the dependencies chart moves.
+  image:
+    tag: "3.4.0"
   persistence:
     size: 10Gi
