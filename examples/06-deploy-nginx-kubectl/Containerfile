@@ -21,7 +21,7 @@
 #   ubi-minimal sidesteps the issue and shows the multi-stage pattern.
 
 # ── Stage 1: Builder ────────────────────────────────────────────────────────
-FROM registry.access.redhat.com/ubi9/ubi AS builder
+FROM registry.access.redhat.com/ubi9/ubi:9.8-1791269371 AS builder
 
 WORKDIR /build
 
@@ -33,7 +33,7 @@ WORKDIR /build
 COPY index.html .
 
 # ── Stage 2: Runtime ────────────────────────────────────────────────────────
-FROM registry.access.redhat.com/ubi9/ubi-minimal
+FROM registry.access.redhat.com/ubi9/ubi-minimal:9.8-1791279563
 
 # microdnf is ubi-minimal's slim package manager. Install nginx and
 # clean caches in the same RUN to keep the layer small.
