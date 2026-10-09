@@ -98,6 +98,8 @@ done
 # ── 6. place an order (registers schema on producer startup, emits Avro) ──────
 step "Waiting for order(${LOCAL_ORDER}) notification(${LOCAL_NOTIF}) apicurio(${LOCAL_APIC}) on their published NodePorts"
 require_published_port "$PROFILE" "$NODE_PORT_ORDER" "$HOST_PORT_ORDER"
+keda_hold_replicas notification-service-scaler 1 notification-service \
+    || fail "notification-service did not come up under the KEDA hold"
 require_published_port "$PROFILE" "$NODE_PORT_NOTIFICATION" "$HOST_PORT_NOTIFICATION"
 require_published_port "$PROFILE" "$NODE_PORT_APICURIO" "$HOST_PORT_APICURIO"
 wait_for_http "http://127.0.0.1:${LOCAL_ORDER}/health" 60 || fail "order-service not answering on 127.0.0.1:${LOCAL_ORDER}"

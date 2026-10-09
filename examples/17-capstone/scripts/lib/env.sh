@@ -56,4 +56,26 @@ NODE_PORT_GRAFANA=30300
 NODE_PORT_TEMPO=30320
 NODE_PORT_TEMPO_OTLP=30418
 
+# KEDA scales the Kafka consumers to zero when there is no lag. A smoke that
+# talks to one over its NodePort holds the ScaledObject at a fixed replica
+# count for the duration (KEDA's paused-replicas annotation) and releases it
+# on exit, so KEDA resumes control.
+keda_hold_replicas() {  # scaledobject replicas deployment
+    local so="$1" n="$2" deploy="$3"
+    kubectl -n "$NS" get scaledobject "$so" >/dev/null 2>&1 || return 0
+    kubectl -n "$NS" annotate scaledobject "$so" \
+        "autoscaling.keda.sh/paused-replicas=$n" --overwrite >/dev/null
+    trap "keda_release '$so'" EXIT
+    local i
+    for i in $(seq 1 60); do
+        [[ "$(kubectl -n "$NS" get deploy "$deploy" -o jsonpath='{.status.readyReplicas}' 2>/dev/null)" == "$n" ]] && return 0
+        sleep 2
+    done
+    echo "  $deploy did not reach $n ready replica(s) under the KEDA hold" >&2
+    return 1
+}
+keda_release() {  # scaledobject
+    kubectl -n "$NS" annotate scaledobject "$1" autoscaling.keda.sh/paused-replicas- >/dev/null 2>&1 || true
+}
+
 pin_context "$PROFILE"

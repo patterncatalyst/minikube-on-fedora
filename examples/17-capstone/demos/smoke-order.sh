@@ -56,7 +56,7 @@ dump_diagnostics() {
     printf '\n--- images in the node ---\n'
     minikube -p "$PROFILE" image ls 2>&1 | grep -E "(^|/)${IMAGE_NAME}:" || echo "(${IMAGE_NAME} not found in the node)"
     printf '\nResources left running. To clean up manually:\n'
-    printf '  helm uninstall %s -n %s\n' "$RELEASE_ORDER" "$NS"
+    printf '  helm uninstall %s inventory-service -n %s\n' "$RELEASE_ORDER" "$NS"
     printf '  helm uninstall %s -n %s   # also removes Postgres\n' "$RELEASE_PG" "$NS"
 }
 
@@ -67,7 +67,7 @@ fail() {
 }
 
 cleanup_on_success() {
-    helm uninstall "$RELEASE_ORDER" -n "$NS" 2>/dev/null || true
+    helm uninstall "$RELEASE_ORDER" inventory-service -n "$NS" 2>/dev/null || true
     if (( PURGE_DB )); then
         helm uninstall "$RELEASE_PG" -n "$NS" 2>/dev/null || true
     fi
@@ -119,6 +119,18 @@ for i in $(seq 1 60); do
 done
 (( pg_ready )) || fail "Postgres primary did not become Ready within 300s"
 
+# ─── Deploy inventory-service ────────────────────────────────────────────────
+# POST /orders checks stock with inventory-service over gRPC (r23), so the
+# order spine needs it running; another smoke's cleanup may have removed it.
+
+step "Building + loading inventory-service"
+./scripts/build-image.sh services/inventory-service inventory-service v1 || fail "inventory build/load failed"
+step "Deploying inventory-service (seeds demo stock)"
+helm upgrade --install inventory-service charts/capstone/charts/inventory-service -n "$NS" \
+    || fail "helm install of inventory-service chart failed"
+kubectl rollout status deployment/inventory-service -n "$NS" --timeout=120s \
+    || fail "inventory-service did not roll out"
+
 # ─── Deploy order-service ────────────────────────────────────────────────────
 
 step "Deploying order-service"
@@ -157,7 +169,7 @@ echo "$healthz" | grep -q '"status":"ready"' || fail "/healthz not ready: $healt
 step "POST a new order"
 created=$(curl -fsS -X POST "$BASE/orders" \
     -H 'Content-Type: application/json' \
-    -d '{"customer_id":"cust-1001","item_sku":"SKU-ABC-42","quantity":3,"amount":"59.97"}') \
+    -d '{"customer_id":"cust-1001","item_sku":"WIDGET-001","quantity":3,"amount":"59.97"}') \
     || fail "POST /orders failed"
 order_id=$(echo "$created" | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])') \
     || fail "could not parse order id from: $created"

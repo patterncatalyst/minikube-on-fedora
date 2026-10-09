@@ -108,6 +108,8 @@ printf '    ✓ table notifications.notifications present\n'
 # ── place an order ────────────────────────────────────────────────────────────
 step "Waiting for order(${LOCAL_ORDER}) and notification(${LOCAL_NOTIF}) on their published NodePorts"
 require_published_port "$PROFILE" "$NODE_PORT_ORDER" "$HOST_PORT_ORDER"
+keda_hold_replicas notification-service-scaler 1 notification-service \
+    || fail "notification-service did not come up under the KEDA hold"
 require_published_port "$PROFILE" "$NODE_PORT_NOTIFICATION" "$HOST_PORT_NOTIFICATION"
 wait_for_http "http://127.0.0.1:${LOCAL_ORDER}/health" 60 || fail "order-service not answering on 127.0.0.1:${LOCAL_ORDER}"
 wait_for_http "http://127.0.0.1:${LOCAL_NOTIF}/health" 60 || fail "notification-service not answering on 127.0.0.1:${LOCAL_NOTIF}"
