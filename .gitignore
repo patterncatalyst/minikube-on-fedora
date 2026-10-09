@@ -3,3 +3,7 @@
 /apply-r*.sh
 /test-r*.sh
 /diagnose-*.sh
+
+# Python bytecode
+__pycache__/
+*.pyc
