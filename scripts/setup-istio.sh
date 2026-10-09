@@ -33,6 +33,11 @@ ISTIO_BASE="${INSTALL_PREFIX}/share"
 ISTIO_DIR="${ISTIO_BASE}/istio-${ISTIO_VERSION}"
 ISTIO_CURRENT="${ISTIO_BASE}/istio-current"
 BIN_DIR="${INSTALL_PREFIX}/bin"
+KUBE_CONTEXT="${KUBE_CONTEXT:-istio}"   # the minikube profile 'istio' creates this context
+
+# Port maps (ISTIO_PORTS) live in one place. The helpers' colour/step
+# functions are redefined below, so source first.
+source "$(dirname "${BASH_SOURCE[0]}")/lib/_helpers.sh"
 
 # ── Color helpers ───────────────────────────────────────────────────────────
 if [[ -t 1 ]]; then
@@ -102,9 +107,10 @@ echo "  Samples:   ${ISTIO_CURRENT}/samples/"
 echo
 echo "  Next: start the istio minikube profile and install Istio into it:"
 echo
-echo "    minikube start -p istio --memory=6g --cpus=4 \\"
-echo "        --container-runtime=containerd --rootless=true"
-echo "    istioctl install --set profile=demo -y"
+echo "    minikube start -p istio --driver=docker --container-runtime=containerd \\"
+echo "        --kubernetes-version=${KUBE_VERSION} --cpus=4 --memory=6144 \\"
+echo "        --ports=${ISTIO_PORTS}"
+echo "    istioctl --context ${KUBE_CONTEXT} install --set profile=demo -y"
 echo
 echo "  Or run the full §11 demo end-to-end:"
 echo
