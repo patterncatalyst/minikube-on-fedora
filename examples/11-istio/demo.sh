@@ -452,6 +452,6 @@ echo "      (Kiali, Prometheus, Grafana, Jaeger; ~5 min to come up)"
 echo "    - Kiali      http://127.0.0.1:20001/kiali"
 echo "      Grafana    http://127.0.0.1:3000/"
 echo "      Prometheus http://127.0.0.1:19090/"
-echo "      Jaeger     http://127.0.0.1:16686/"
+echo "      Jaeger     http://127.0.0.1:16686/jaeger/"
 echo
 exit 0

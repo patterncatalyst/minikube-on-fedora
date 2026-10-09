@@ -142,7 +142,7 @@ does not remove it.
 | `kiali-host` | 20001 | 30201 | `http://127.0.0.1:20001/kiali` |
 | `grafana-host` | 3000 | 30300 | `http://127.0.0.1:3000/` |
 | `prometheus-host` | 19090 | 30990 | `http://127.0.0.1:19090/` |
-| `tracing-host` | 80 -> 16686 | 31686 | `http://127.0.0.1:16686/` |
+| `tracing-host` | 80 -> 16686 | 31686 | `http://127.0.0.1:16686/jaeger/` |
 
 The demo applies `ingressgateway-host` after the Istio install.
 The addon companions are applied together with the addons (see

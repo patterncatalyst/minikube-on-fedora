@@ -574,7 +574,7 @@ The addons take about 5 minutes to come up. Then open:
 | Kiali | `http://127.0.0.1:20001/kiali` |
 | Grafana | `http://127.0.0.1:3000` |
 | Prometheus | `http://127.0.0.1:19090` |
-| Jaeger | `http://127.0.0.1:16686` |
+| Jaeger | `http://127.0.0.1:16686/jaeger/` |
 
 (`host-access/` also holds `ingressgateway-host.yaml`; applying it
 again is harmless.)
@@ -693,7 +693,7 @@ it's open:
 3. **Other dashboards** are one URL each:
    - Grafana at `http://127.0.0.1:3000` — pre-built dashboards
      for mesh metrics
-   - Jaeger at `http://127.0.0.1:16686` — distributed traces of
+   - Jaeger at `http://127.0.0.1:16686/jaeger/` — distributed traces of
      productpage requests through the call graph
    - Prometheus at `http://127.0.0.1:19090` — raw metrics queries,
      for the curious
