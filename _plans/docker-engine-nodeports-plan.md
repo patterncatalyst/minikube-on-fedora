@@ -135,7 +135,7 @@ recreate); `0.0.0.0` publishing (exposes dashboard/Kiali to the LAN).
 | 5a | Chapters §0–§5 (Docker Engine install in §1, pinned installs in §2, §3 rewrite, §4 profiles, §5 dashboard companion) | 2,3 | todo |
 | 5b | Chapters §6–§10 (§7 rewrite around published ports) | 2,3 | todo |
 | 5c | Chapters §11–§17, FAQ, LESSONS-LEARNED (Part 4: why we moved off rootless podman; remove stale merge banners / misplaced PRD block after checking PRD) | 2,3,4a | todo |
-| 6 | README, PRD, CONTRIBUTING, onboarding, examples/README, index.html, Gemfile comment, `03-minikube-topology.svg` labels | — | todo |
+| 6 | README, PRD, CONTRIBUTING, onboarding, examples/README, index.html, Gemfile comment, `03-minikube-topology.svg` labels | — | done |
 | 7 | Historical annotations: reconciliation-plan (banners, new unverified rows, section D entry), capstone-decisions CAP-048/049 + superseded lines, prd-reconciliation addendum, other plan banners | 2–6 | todo |
 | 8 | `sync-example-pages.sh` (skip 17-capstone), run all acceptance checks | 2–7 | todo |
 | 9 | Live verification (below) | 8 | todo |

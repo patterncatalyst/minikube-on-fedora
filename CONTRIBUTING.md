@@ -187,7 +187,7 @@ real vs. what's drafted-but-untested. Keep it honest.
 
 Jekyll's Liquid templating uses `{{ }}` and `{% %}` syntax. Several
 things this tutorial discusses also use `{{ }}` — Go templates in
-helm charts, kustomize templated YAML, `podman info --format`
+helm charts, kustomize templated YAML, `docker info --format`
 strings, future Istio config patterns. When Liquid encounters
 these in markdown, it tries to evaluate them. Best case: noisy
 warnings during build. Worst case: the build crashes because
@@ -202,7 +202,7 @@ different mechanisms because the trade-offs differ.
 
 The section pages mix intentional Liquid (`{{ "/docs/foo/" |
 relative_url }}` in nav links, `{% seo %}` in the layout) with
-content that *describes* templates from other tools (helm, podman
+content that *describes* templates from other tools (helm, docker
 format strings, etc.). The right granularity is per-block.
 
 For any markdown code block containing `{{ }}` syntax that isn't
@@ -284,6 +284,30 @@ What it catches in `_plans/`:
 Run it whenever a section adds template-heavy content. CI also
 catches the same issues via the actual Jekyll build — this is an
 optional pre-flight that gives faster feedback than push-then-wait.
+
+## Cluster and platform conventions
+
+- **Platforms:** Fedora, Fedora VMs, RHEL, and RHEL VMs only. Do not
+  name or add instructions for other operating systems.
+- **Runtime:** minikube runs `--driver=docker --container-runtime=containerd`
+  on Docker Engine (`docker-ce`, context `default`). Do not reintroduce
+  other drivers or runtimes into the tutorial path; the history lives in
+  [`onboarding/LESSONS-LEARNED.md`](onboarding/LESSONS-LEARNED.md) Part 4.
+- **Policy markers:** text that must name a retired approach (history,
+  decision logs, lessons) is wrapped in `<!-- policy-exempt:start -->` and
+  `<!-- policy-exempt:end -->` in Markdown, or carries a trailing
+  `# policy-exempt` in shell and YAML. Keep exempt blocks minimal.
+- **Editorial audit:** `scripts/editorial-audit.sh --strict` must pass
+  before you push.
+- **NodePorts only:** every host-facing Service is a NodePort published at
+  profile creation (`--ports=127.0.0.1:<host>:<nodePort>`) and listed in
+  the port map (`scripts/lib/_helpers.sh` and
+  `examples/17-capstone/scripts/lib/env.sh`). `scripts/check-port-map.sh`
+  cross-checks the maps against the YAML and the docs.
+- **Explicit targets:** every script passes an explicit `--context` or
+  `-p`; never rely on the current kubectl context or default profile.
+- **Unique profile names:** this repo uses `minikube`, `driver-check`,
+  `istio`, and `mof-capstone`. Do not reuse another project's profile name.
 
 ## Branching and PRs
 

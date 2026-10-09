@@ -52,8 +52,7 @@ the README.md with one specific to your project.
 If you don't have Ruby installed:
 
 - **Fedora**: `sudo dnf install -y ruby ruby-devel @development-tools`
-- **macOS**: `brew install ruby` (then add Homebrew Ruby to PATH)
-- **Ubuntu**: `sudo apt install -y ruby-full build-essential`
+- **RHEL**: `sudo dnf install -y ruby ruby-devel gcc make redhat-rpm-config`
 
 Then in the project directory:
 
@@ -181,11 +180,12 @@ work in a project where it has filesystem access.
 >   chat-pasted commands break my zsh autocomplete
 > - When delivering files, use a tarball via the present_files tool;
 >   long inline pastes risk being mangled by the chat client
-> - Default to Podman, not Docker, for any container examples
+> - Use Docker Engine (`docker-ce`) for container examples; minikube runs
+>   on the docker driver with the containerd runtime
 > - Use `127.0.0.1` not `localhost` in test scripts
 > - Use the `-Z` flag (or `:Z` on volumes) for SELinux when on
->   Fedora-family hosts; note in the prose that this is a no-op on
->   non-SELinux platforms but harmless
+>   Fedora-family hosts; note in the prose that this is harmless
+>   where SELinux is permissive
 
 This prompt is calibrated for the patterns that worked on the
 Hummingbird build — feel free to edit it for your project's specifics.

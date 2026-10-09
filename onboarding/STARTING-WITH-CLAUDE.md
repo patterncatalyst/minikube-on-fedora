@@ -165,8 +165,7 @@ message in a fresh Claude conversation.
 > - **Source material I have:** [list, or "none yet"]
 > - **Estimated section count:** [rough number]
 > - **Will there be runnable code examples?** [yes / no / maybe]
-> - **Target platforms:** [Fedora 43 / macOS / Windows-via-WSL /
->   etc.]
+> - **Target platforms:** [Fedora 44 / RHEL 10 / Fedora or RHEL VM]
 > - **Deadline pressure:** [hard deadline / soft target / no
 >   deadline]
 >
@@ -192,7 +191,7 @@ message in a fresh Claude conversation.
 >   in chat-pasted commands break my zsh autocomplete
 > - When delivering files, use a tarball via the present_files
 >   tool; long inline pastes risk being mangled by the chat client
-> - Default to Podman not Docker for any container examples
+> - Use Docker Engine (`docker-ce`) for container examples
 > - Use `127.0.0.1` not `localhost` in test scripts
 > - Remind me to `git add` and commit changes after each
 >   meaningful unit of work — not at the end of the session
