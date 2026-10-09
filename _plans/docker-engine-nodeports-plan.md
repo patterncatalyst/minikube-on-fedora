@@ -130,16 +130,16 @@ recreate); `0.0.0.0` publishing (exposes dashboard/Kiali to the LAN).
 | 2 | Core examples 03, 06, 07, 08, 09 (manifests, chart, demo.sh, READMEs); pin 08 initContainer image | 1 | done (live pending) |
 | 3 | Examples 11-istio (+ `host-access/`), 12-keda-http (+ interceptor companion), 12-keda-kafka | 1 | done (live pending) |
 | 4a | Capstone platform: `scripts/lib/env.sh`, `mof-capstone`, setup/build/cluster/bootstrap/setup-* scripts, subchart values+service templates, `host-access/*.yaml`, pin observability charts, no credential printing | 1 | done (live pending) |
-| 4b | Capstone demos: env.sh, no port-forward, host ports, no `localhost:5000` guard, no credentials | 4a | todo |
+| 4b | Capstone demos: env.sh, no port-forward, host ports, no `localhost:5000` guard, no credentials | 4a | done (live pending) |
 | 4c | Capstone prose: README, order-service README, `_capstone/data-mesh/*`, `capstone/data-mesh.html` | 4a | done |
-| 5a | Chapters §0–§5 (Docker Engine install in §1, pinned installs in §2, §3 rewrite, §4 profiles, §5 dashboard companion) | 2,3 | todo |
-| 5b | Chapters §6–§10 (§7 rewrite around published ports) | 2,3 | todo |
-| 5c | Chapters §11–§17, FAQ, LESSONS-LEARNED (Part 4: why we moved off rootless podman; remove stale merge banners / misplaced PRD block after checking PRD) | 2,3,4a | todo |
+| 5a | Chapters §0–§5 (Docker Engine install in §1, pinned installs in §2, §3 rewrite, §4 profiles, §5 dashboard companion) | 2,3 | done |
+| 5b | Chapters §6–§10 (§7 rewrite around published ports) | 2,3 | done |
+| 5c | Chapters §11–§17, FAQ, LESSONS-LEARNED (Part 4: why we moved off rootless podman; remove stale merge banners / misplaced PRD block after checking PRD) | 2,3,4a | done |
 | 6 | README, PRD, CONTRIBUTING, onboarding, examples/README, index.html, Gemfile comment, `03-minikube-topology.svg` labels | — | done |
-| 7 | Historical annotations: reconciliation-plan (banners, new unverified rows, section D entry), capstone-decisions CAP-048/049 + superseded lines, prd-reconciliation addendum, other plan banners | 2–6 | todo |
-| 8 | `sync-example-pages.sh` (skip 17-capstone), run all acceptance checks | 2–7 | todo |
+| 7 | Historical annotations: reconciliation-plan (banners, new unverified rows, section D entry), capstone-decisions CAP-048/049 + superseded lines, prd-reconciliation addendum, other plan banners | 2–6 | done |
+| 8 | `sync-example-pages.sh` (skip 17-capstone), run all acceptance checks | 2–7 | done |
 | 9 | Live verification (below) | 8 | todo |
-| 10 | `:latest` pin sweep (12-keda-kafka consumer, `services/*/Containerfile`, scaffold template, §1) | — | todo |
+| 10 | `:latest` pin sweep (12-keda-kafka consumer, `services/*/Containerfile`, scaffold template, §1) | — | done (UBI 10 move, 21568b4) |
 
 ## Acceptance criteria
 
