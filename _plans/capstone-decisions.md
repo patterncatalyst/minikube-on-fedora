@@ -2268,7 +2268,7 @@ demo. The upgrade is the right call.
 The upstream fix tracking issue is `kedacore/http-add-on#1668`; this CAP is
 revisited when that issue closes against a tagged release ≥ 0.14.1 (binary,
 not chart).
-**Partially superseded by CAP-049 (2026-10-09): its port-forward access path (the KEDA HTTP 0.12.2 deferral stands).**
+**Partially superseded by CAP-049 (2026-10-09): its port-forward access path. Its KEDA HTTP 0.12.2 deferral is superseded by CAP-051 (2026-10-09).**
 
 **Context.** CAP-046 attempted to migrate the gateway from `HTTPScaledObject`
 (v1alpha1) to `InterceptorRoute` (v1beta1) by upgrading the chart from
@@ -2443,7 +2443,7 @@ The capstone profile is renamed `mof-capstone` (namespace stays `capstone`).
 
 ## CAP-050 — Newest UBI with the newest runtime
 
-**Status:** decided, shipped r29 (image build verified 2026-10-09; in-cluster run pending).
+**Status:** decided, shipped r29; image builds and the in-cluster capstone run verified 2026-10-09.
 
 **Decision.** Capstone services build on `ubi10/python-314-minimal` (fallback
 `ubi9/python-314`); asyncpg `^0.32.0` for its cp314 wheel; examples on `ubi10/ubi`
@@ -2453,3 +2453,54 @@ and `ubi10/ubi-minimal`. Base images are pinned by tag.
 
   * (+) Current base and runtime; one local image build confirmed on 2026-10-09.
   * (-) The fallback tag exists in case the UBI 10 Python image is unavailable.
+
+## CAP-051 — Newest stable platform; KEDA HTTP 0.16 supersedes the CAP-047 deferral
+
+**Status:** decided, shipped r29; verified live 2026-10-09 on `mof-capstone`
+(minikube v1.39.0, Kubernetes v1.36.5, Docker Engine 29.8.2).
+**Decision.** The capstone moves to the newest stable release of every platform component, on Kubernetes v1.36.5.
+
+| Component | From | To |
+|---|---|---|
+| KEDA core (chart) | 2.19.0 | 2.21.0 |
+| KEDA HTTP add-on | 0.12.2 | 0.16.0 |
+| Strimzi operator | 0.51.0 | 1.2.0 (Kafka 4.3.1 set explicitly) |
+| CloudNativePG chart / operator | 0.23.0 | 0.29.1 / 1.30.1 |
+| PostgreSQL image | operator default | `ghcr.io/cloudnative-pg/postgresql:18.6-standard-trixie` |
+| Apicurio Registry | 3.2.4 | 3.3.3 |
+| OpenMetadata chart, server, ingestion | 1.12.8 | 2.0.5 |
+| Kiali (Istio 1.31.1 addon) | v2.8.0 | v2.31.0 |
+
+**KEDA HTTP.** The interceptor POST panic (kedacore/http-add-on#1668) that drove the CAP-047 deferral is fixed in 0.15.0, so 0.16.0 supersedes the deferral. `interceptor.replicas.waitTimeout` is deprecated; setup-keda.sh sets `interceptor.readinessTimeout=180s`. Since 0.14.0 timeouts return 504 (not 502) and the default readiness timeout is disabled. `HTTPScaledObject` stays `http.keda.sh/v1alpha1`; `InterceptorRoute` is its successor and is not adopted. The walkthrough trace act still enters through the gateway NodePort (CAP-046); it now holds the generated ScaledObject at one replica with `autoscaling.keda.sh/paused-replicas` and releases it on exit, because the add-on scales an idle gateway straight back to zero. 0.16 reports a standard `Ready` condition (0.12 used `HTTPScaledObjectIsReady`).
+
+**Strimzi.** From 1.0 only `kafka.strimzi.io/v1` is served. The kafka subchart moves to v1, drops the `strimzi.io/kraft` and `strimzi.io/node-pools` annotations (KRaft and node pools are the only mode), and sets `spec.kafka.version` from the subchart value `version` in `charts/kafka/values.yaml`. The umbrella `strimziCluster.version` was never read by a template and was removed. Rendered CRs validate against the 1.2.0 CRD schema.
+
+**CloudNativePG.** Pod selectors move from the deprecated `role=primary` label to `cnpg.io/instanceRole=primary`, which 1.30 documents.
+
+**OpenMetadata.** The 2.0 chart keeps the override keys used here. The dependencies chart ships OpenSearch 3.5.0, which rejects the server's UUID-format `X-Request-Id` ("Should be 32 hexadecimal characters"), so every search-index write, lineage included, fails with HTTP 500. `om-deps-values.yaml` pins OpenSearch 3.4.0, the newest release that works (3.3.2 and 3.4.0 verified live). Fuseki/RDF is off by default. The `airflow-secrets` placeholder is still required by the server chart.
+
+**Also found by the live run.**
+
+  * gRPC Python's bundled c-ares resolver took about 3 s for the short
+    `inventory-service` name, exactly the 3 s `CheckStock` deadline, so every
+    in-stock order returned 503. order-service and graphql-gateway set
+    `GRPC_DNS_RESOLVER=native`.
+  * KEDA scales the notification consumer to zero when there is no lag. The
+    Kafka smokes hold it at one replica (`keda_hold_replicas` in
+    `scripts/lib/env.sh`) and release it on exit.
+  * smoke-order had been broken since r23: it never deployed inventory-service
+    and ordered a SKU inventory doesn't stock. It now deploys inventory and
+    orders `WIDGET-001`.
+  * The walkthrough checked for OpenMetadata in an `openmetadata` namespace; it
+    runs in `capstone`.
+  * Prometheus publishes on 127.0.0.1:19090: Fedora Server and RHEL enable
+    Cockpit on 9090 by default.
+
+**Consequences.**
+
+  * (+) Every component is on its newest stable release; Istio leaves the 1.29
+    line before its 2026-10-12 EOL.
+  * (-) OpenSearch is held one minor back until OpenMetadata or the
+    dependencies chart moves; re-check then.
+
+**Supersedes:** the deferral in CAP-047.

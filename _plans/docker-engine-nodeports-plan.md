@@ -138,7 +138,7 @@ recreate); `0.0.0.0` publishing (exposes dashboard/Kiali to the LAN).
 | 6 | README, PRD, CONTRIBUTING, onboarding, examples/README, index.html, Gemfile comment, `03-minikube-topology.svg` labels | — | done |
 | 7 | Historical annotations: reconciliation-plan (banners, new unverified rows, section D entry), capstone-decisions CAP-048/049 + superseded lines, prd-reconciliation addendum, other plan banners | 2–6 | done |
 | 8 | `sync-example-pages.sh` (skip 17-capstone), run all acceptance checks | 2–7 | done |
-| 9 | Live verification (below) | 8 | todo |
+| 9 | Live verification (below) | 8 | done (2026-10-09, see below) |
 | 10 | `:latest` pin sweep (12-keda-kafka consumer, `services/*/Containerfile`, scaffold template, §1) | — | done (UBI 10 move, 21568b4) |
 
 ## Acceptance criteria
@@ -193,3 +193,31 @@ Forbidden: `minikube delete --all`, any delete/start of `capstone`,
 - Canary: NodePort to order-service balances v1/v2.
 - First bootstrap loads ~7 images (~0.5 GB each).
 - README's "107 verified" claim becomes partly historical until the live run.
+
+## Live verification result (2026-10-09)
+
+Host: Fedora 44, Docker Engine 29.8.2 (context `default`), minikube v1.39.0,
+kubectl v1.36.5. Mid-run the user asked for the newest stable platform; every
+section was re-run after the bump on Kubernetes v1.36.5.
+
+| Section | Profile | Result |
+|---|---|---|
+| §3 driver check | `driver-check` | pass |
+| §5 dashboard companion (127.0.0.1:18090) | `minikube` | pass |
+| §6, §7, §8, §9 | `minikube` | pass (§9 now polls while old Pods drain) |
+| §11 Istio 1.31.1 + Kiali, Grafana, Prometheus (19090), Jaeger (`/jaeger/`) | `istio` | pass |
+| §12 Strimzi 1.2.0 / Kafka 4.3.1 / KEDA 2.21.0 (0→3→0) | `minikube` | pass |
+| §12 KEDA HTTP 0.16.0 cold start (1 s) and scale-to-zero | `minikube` | pass |
+| §17 bootstrap, cluster-status, 17 smokes, canary and data-product demos up/down, walkthrough 5/5 | `mof-capstone` | pass (not run: `smoke-service.sh`, which needs a scaffolded service, and `debug-ephemeral.sh`) |
+| §17 stop → `cluster-up.sh`: images survive, nothing rebuilt | `mof-capstone` | pass |
+
+Fixed during the run: Prometheus host port 9090 → 19090 (Cockpit), Jaeger
+path, §9 upgrade race, §3 closing hint, OpenSearch 3.4.0 pin, KEDA HTTP
+`Ready` condition, gRPC `GRPC_DNS_RESOLVER=native`, KEDA holds in the Kafka
+smokes and walkthrough, smoke-order (inventory + stocked SKU), walkthrough
+OpenMetadata namespace. See CAP-051.
+
+Other projects' profiles (`capstone`, `datamesh`, `helm4dev`) were never
+started; their `config.json` checksums are unchanged. All profiles stopped at
+the end. Reconciliation rows stay `unverified` until the maintainer promotes
+them.
