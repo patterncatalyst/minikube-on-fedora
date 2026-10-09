@@ -167,7 +167,7 @@ With the Service from this section applied:
 curl http://127.0.0.1:18081/
 ```
 
-You should see the baked-in page ("Test Page for nginx on UBI 9
+You should see the baked-in page ("Test Page for nginx on UBI 10
 Minimal"). The same request works from a script, a browser, or an
 editor's REST client, with no URL to discover and no process to keep
 alive.
