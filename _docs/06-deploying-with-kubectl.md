@@ -17,6 +17,10 @@ the Service from your host, scaled the Deployment up and down, and
 rolled out a new image version. Same vocabulary you'll use for
 every real workload after this.
 
+Commands in this chapter assume the `minikube` kubectl context that
+§4 creates. Run `kubectl config use-context minikube` once if another
+context is current; the demo script pins it for you.
+
 ![Kubernetes workload primitives]({{ "/assets/diagrams/06-k8s-primitives.svg" | relative_url }})
 
 ## The mental model: Pods, ReplicaSets, Deployments
@@ -57,7 +61,7 @@ at zero replicas so you can roll back to it.
 ## A small detour: building our own image
 
 The Red Hat UBI ecosystem ships application images like
-`registry.access.redhat.com/ubi9/nginx-124` — but those are
+`registry.access.redhat.com/ubi10/nginx-126` — but those are
 **s2i (source-to-image) builder images** designed for the OpenShift
 workflow. Their default CMD is `/usr/libexec/s2i/run`, which expects
 content baked in at build time via `s2i assemble`. In plain
@@ -73,12 +77,12 @@ The Containerfile in
 `examples/06-deploy-nginx-kubectl/Containerfile` is a two-stage
 build:
 
-- **Builder stage:** `registry.access.redhat.com/ubi9/ubi` — the full
-  UBI 9 image. In a real project this is where you'd run a static-site
+- **Builder stage:** `registry.access.redhat.com/ubi10/ubi` — the full
+  UBI 10 image. In a real project this is where you'd run a static-site
   generator, compile assets, run package managers — anything that
   needs a full toolchain
-- **Runtime stage:** `registry.access.redhat.com/ubi9/ubi-minimal` —
-  a stripped-down UBI 9 with `microdnf` (the slim package manager).
+- **Runtime stage:** `registry.access.redhat.com/ubi10/ubi-minimal` —
+  a stripped-down UBI 10 with `microdnf` (the slim package manager).
   Just what nginx needs to run, nothing extra
 
 The runtime image inherits nothing from the builder except what we
@@ -98,11 +102,11 @@ Three Red Hat UBI variants are commonly chosen as runtime bases:
 
 | Image                 | When                                                                                      |
 |-----------------------|-------------------------------------------------------------------------------------------|
-| `ubi9/ubi`            | Full UBI 9 — pick when you need many packages or rich shell tooling at runtime           |
-| `ubi9/ubi-minimal`    | UBI 9 with `microdnf` instead of `dnf`. Smaller; great for single-app runtime images     |
-| `ubi9/ubi-micro`      | Strictly distroless — no package manager. Build packages in another stage, then COPY in  |
+| `ubi10/ubi`           | Full UBI 10 — pick when you need many packages or rich shell tooling at runtime           |
+| `ubi10/ubi-minimal`   | UBI 10 with `microdnf` instead of `dnf`. Smaller; great for single-app runtime images     |
+| `ubi10/ubi-micro`     | Strictly distroless — no package manager. Build packages in another stage, then COPY in  |
 
-We use `ubi9/ubi-minimal` for the runtime: small enough to be a
+We use `ubi10/ubi-minimal` for the runtime: small enough to be a
 real "minimal runtime", but with `microdnf` available so the
 Containerfile is simple. All three are **freely redistributable**;
 none require `subscription-manager` registration. (That's the
@@ -113,7 +117,7 @@ registration to install packages.)
 
 ```dockerfile
 # ── Stage 1: Builder ─────────────────────────────────────────────────────
-FROM registry.access.redhat.com/ubi9/ubi AS builder
+FROM registry.access.redhat.com/ubi10/ubi:10.2-1791444044 AS builder
 
 WORKDIR /build
 
@@ -123,7 +127,7 @@ WORKDIR /build
 COPY index.html .
 
 # ── Stage 2: Runtime ─────────────────────────────────────────────────────
-FROM registry.access.redhat.com/ubi9/ubi-minimal
+FROM registry.access.redhat.com/ubi10/ubi-minimal:10.2-1791444377
 
 # Install nginx, clean caches in the same layer
 RUN microdnf install -y nginx && \
@@ -233,50 +237,45 @@ non-root operation and to `kubectl logs`. Worth saving as a starting
 point for your own containerized nginx deployments — the principles
 generalize.
 
-### Loading the image into minikube
+### Building and loading the image
 
-The image lives only on the build host until you load it into the
-cluster. `minikube image build` does both in one command:
+minikube's node is a container with its own containerd, so an image
+built on the host is not visible to the cluster until you load it.
+Build with Docker Engine, then load into the `minikube` profile:
 
 ```bash
 cd examples/06-deploy-nginx-kubectl
-minikube image build -t nginx-custom:v1 -f Containerfile .
+docker build -f Containerfile -t nginx-custom:v1 .
+minikube -p minikube image load nginx-custom:v1
 ```
 
-This runs the build inside minikube's environment (using its
-in-cluster builder, which speaks BuildKit/buildah). The result is
-tagged `nginx-custom:v1` and available immediately to the cluster's
-kubelet — no registry push, no `kubectl cp`, no `docker save`
-shenanigans.
+No registry push, no `docker save` plumbing. `minikube -p minikube
+image build -t nginx-custom:v1 -f Containerfile .` builds inside the
+node instead and skips the load step; the demo uses the host build
+because it reuses Docker's layer cache.
 
 Confirm with:
 
 ```bash
-minikube image ls | grep nginx-custom
+minikube -p minikube image ls | grep nginx-custom
 ```
 
-To remove a stale build:
+To remove a stale copy:
 
 ```bash
-minikube image rm nginx-custom:v1
+minikube -p minikube image rm nginx-custom:v1
 ```
 
 ## A note on SELinux
 
-If you're following along on Fedora (per §1), SELinux is enforcing
-on your host. **`:Z` is the volume-mount flag** that relabels host
-directories so containers can access them — `podman run -v
-/host/path:/in/container:Z`. Without it, a SELinux-protected
-directory bind-mounted into a container is unreadable. On macOS or
-non-SELinux Linux, `:Z` is a harmless no-op.
-
-This example doesn't need `:Z` because nothing bind-mounts from
-the host — the index.html is baked into the image, not mounted in.
-But this is the right time to mention the pattern, because **§8
-persistent volumes will use it everywhere**. The `:Z` syntax also
-appears as `-Z` on the `podman run` command line; both mean "Red
-Hat, please relabel the host directory so my container can read
-it."
+Fedora and RHEL hosts run SELinux in enforcing mode. It matters
+whenever a container bind-mounts a host directory: the directory needs
+a container-readable label (Docker spells that `:z` or `:Z` on the
+`-v` flag). This example does not bind-mount anything from the host
+because index.html is baked into the image, so there is nothing to
+relabel here. The one place later chapters touch host paths is
+minikube's own hostPath storage, which lives inside the node
+container; §8 covers it.
 
 ## Writing a Deployment manifest
 
@@ -303,7 +302,10 @@ spec:
       containers:
       - name: nginx
         image: nginx-custom:v1
-        imagePullPolicy: IfNotPresent
+        # Built with docker and loaded into the cluster by
+        # build_and_load in demo.sh — it's not in any registry, so
+        # never pull.
+        imagePullPolicy: Never
         ports:
         - containerPort: 8080
         readinessProbe:
@@ -344,11 +346,10 @@ Reading it top to bottom:
 - **`template.spec.containers[].image`** — `nginx-custom:v1`, the
   image we just built. Not in any registry; only in the cluster's
   local image cache
-- **`imagePullPolicy: IfNotPresent`** — use the local image if
-  present, don't try to pull. For images with the `:latest` tag
-  the default is `Always`, which would fail for us; pinning to a
-  non-`:latest` tag makes `IfNotPresent` the default, but being
-  explicit is good practice for locally-built images
+- **`imagePullPolicy: Never`** — never contact a registry; use only
+  the image loaded into the node. The image exists nowhere else, so a
+  pull attempt could only fail. If the load step was skipped, the Pod
+  fails fast with `ErrImageNeverPull` instead of hanging on a pull
 - **`containerPort: 8080`** — declares the port the container
   listens on (matching the nginx config we baked in)
 - **`readinessProbe`** — when to consider the Pod ready for
@@ -428,17 +429,17 @@ kubectl logs -l app=nginx --tail=20   # logs from all Pods with that label
 To get a shell inside a Pod:
 
 ```bash
-kubectl exec -it <pod-name> -- /bin/bash
+kubectl exec -it <pod-name> -- /bin/sh
 ```
 
-(UBI nginx ships `/bin/bash`; some smaller base images only have
-`/bin/sh`. `--` separates kubectl's flags from the command to
+(The ubi-minimal runtime image has `/bin/sh`; slimmer images may have
+no shell at all. `--` separates kubectl's flags from the command to
 run in the container.)
 
 ## Exposing it with a Service
 
 Pods are ephemeral — restarts mean new IPs. A **Service** gives
-the Deployment a stable address inside the cluster. Here's
+the Deployment a stable address. Here's
 `examples/06-deploy-nginx-kubectl/manifests/service.yaml`:
 
 ```yaml
@@ -446,26 +447,32 @@ apiVersion: v1
 kind: Service
 metadata:
   name: nginx
+  labels:
+    app: nginx
 spec:
-  type: ClusterIP
+  type: NodePort
   selector:
     app: nginx
   ports:
   - port: 80
     targetPort: 8080
+    # Published to 127.0.0.1:18080 when the minikube profile is created
+    # (--ports=127.0.0.1:18080:30080). Shared slot with §8, §9, §12-http.
+    nodePort: 30080
     protocol: TCP
 ```
 
 The Service:
 
-- Has its own name (`nginx`) and IP, both stable for the Service's
-  lifetime
+- Has its own name (`nginx`) and cluster IP, both stable for the
+  Service's lifetime
 - Has a selector that matches all Pods with `app: nginx` —
   exactly the Pods our Deployment manages
 - Receives traffic on `port: 80` and forwards to `targetPort: 8080`
   on the matching Pods
-- Type `ClusterIP` — reachable from *inside* the cluster only.
-  §7 covers `NodePort` and other external-access types
+- Is type `NodePort`: it also listens on port 30080 of the node. The
+  `minikube` profile publishes that port to `127.0.0.1:18080` on your
+  host, so no helper process is needed. §7 explains the mechanism
 
 Apply:
 
@@ -478,38 +485,26 @@ kubectl get service nginx
 ```
 
 ```
-NAME    TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)   AGE
-nginx   ClusterIP   10.96.123.234   <none>        80/TCP    5s
+NAME    TYPE       CLUSTER-IP      EXTERNAL-IP   PORT(S)        AGE
+nginx   NodePort   10.96.123.234   <none>        80:30080/TCP   5s
 ```
 
-The `<none>` for EXTERNAL-IP is expected for ClusterIP — there's
-no external address by design.
+`EXTERNAL-IP` stays `<none>` for NodePort; the external path is the
+node port, `80:30080` in the PORT(S) column.
 
 ## Reaching the Service from your host
-
-Since the Service is ClusterIP, there's no host-routable IP for
-it directly. The simplest way to reach it from your host is
-`kubectl port-forward`:
-
-```bash
-kubectl port-forward service/nginx 18080:80
-```
-
-This opens a tunnel: traffic to `127.0.0.1:18080` on your host
-goes through the kubectl process to the Service inside the
-cluster, which load-balances to one of the nginx Pods. Open a
-second terminal and:
 
 ```bash
 curl http://127.0.0.1:18080/
 ```
 
-You should see UBI nginx's default landing page — HTML with
-"Test Page for the Nginx HTTP Server" near the top.
+You should see the baked-in page, with "Test Page for nginx on UBI 9
+Minimal" in the title. If the connection is refused, check
+`docker port minikube 30080/tcp`: an empty answer means the profile
+was created without `--ports` and must be recreated (§4, §7).
 
-Ctrl-C the port-forward when done. **Use port-forward for ad-hoc
-access; §7 covers NodePort for an always-on host-reachable
-endpoint.**
+Only one Service can hold nodePort 30080 at a time. §8 and §9 reuse
+the same slot, so delete this Service (see Cleanup) before moving on.
 
 ## Scaling
 
@@ -541,10 +536,14 @@ person to deploy from your manifest gets the same count.
 Change the image:
 
 ```bash
-kubectl set image deployment/nginx nginx=registry.access.redhat.com/ubi9/nginx-122
+kubectl set image deployment/nginx nginx=nginx-custom:v2
 ```
 
-(Pinning to 1.22 instead of 1.24 — different image, same shape.)
+(Build and load a `nginx-custom:v2` first, for example after editing
+index.html: `docker build -t nginx-custom:v2 .` then
+`minikube -p minikube image load nginx-custom:v2`. Always set an
+explicit tag; `imagePullPolicy: Never` plus a fresh tag is what makes
+the rollout pick up the new image.)
 
 Watch the rollout:
 
@@ -562,7 +561,7 @@ deployment "nginx" successfully rolled out
 ```
 
 While it's rolling, `kubectl get pods -l app=nginx` shows a mix
-of old (still pulling the new image) and new (already running).
+of old and new (the new Pods starting up) and new (already running).
 The Deployment manages this by creating a new ReplicaSet,
 scaling it up while scaling the old one down — slowly enough
 that traffic is never dropped.
@@ -614,20 +613,22 @@ Secrets, PVCs, and others need explicit `delete <kind>`.
 `examples/06-deploy-nginx-kubectl/demo.sh` runs the prose above
 as one end-to-end test:
 
-1. Pre-flight: ensures the cluster is up; clears any prior nginx
-   Deployment/Service
-2. Builds the `nginx-custom:v1` image via `minikube image build`
-   (cached on re-runs)
+1. Pre-flight: checks Docker Engine, ensures the `minikube` profile
+   exists with its published ports, pins the kubectl context, clears
+   any prior nginx Deployment/Service, and checks nodePort 30080 is
+   free
+2. Builds the `nginx-custom:v1` image with `docker build`, then
+   loads it with `minikube -p minikube image load`
 3. Applies both manifests
 4. Waits for the Deployment to be `Available` (and dumps pod logs
    from current and previous containers on timeout, so failures
    self-diagnose)
-5. Starts a `kubectl port-forward` in the background
-6. Waits for the port to be listening, curls it, checks for the
+5. Confirms `docker port minikube 30080/tcp` shows 127.0.0.1:18080
+6. Waits for `http://127.0.0.1:18080/`, curls it, checks for the
    sentinel string from our baked-in index.html
 7. Scales to 3 replicas; verifies all three become Ready
-8. Cleans up the port-forward + manifests on exit (`trap`); leaves
-   the built image in the cache for fast re-runs
+8. Deletes the manifests on exit (`trap`), freeing nodePort 30080;
+   leaves the built image in the cache for fast re-runs
 
 Run it:
 
