@@ -82,43 +82,32 @@ only the resolved environment and the application code, runs as a non-root user,
 serves the app. Standard production hygiene — the capstone just applies it from the
 start rather than retrofitting it.
 
-## The one part that fights back: getting images to the kubelet
+## Getting images to the kubelet
 
-This is worth its own section because it's the single part of the capstone that
-reliably trips people up, and it's a direct consequence of a deliberate choice made
-back in §3: the capstone uses the **rootless-podman driver with the containerd
-runtime**, because that's the most realistic local mirror of how Kubernetes runs in
-production. The cost of that realism is that getting a locally-built image to the
-kubelet is not as simple as you'd expect.
+The capstone runs on minikube's Docker driver with the containerd runtime, on Docker
+Engine, so the image path has two steps and no registry. Build on the host with
+`docker build -f Containerfile`, then copy the image into the profile's containerd
+store with `minikube -p mof-capstone image load`. One script does both:
 
-The intuitive approaches are unreliable on this driver. `minikube image build` can
-exit successfully without the image actually landing in the profile's containerd
-store, so the pod then fails to pull. `minikube image load` can report "image not
-found" for an image that's plainly present, because the lookup goes through the
-rootless podman socket in a way that doesn't resolve.
+```bash
+./scripts/build-image.sh services/order-service order-service v1
+```
 
-The reliable answer the capstone standardizes on is **minikube's built-in registry
-addon**: build on the host with podman, push to the registry, and let deployments pull
-from it like any ordinary image. The one detail that catches everyone is that the
-registry has *two addresses*. With the podman driver the host-side port is not 5000 —
-minikube assigns one (something like `127.0.0.1:41685`) and tells you when you enable
-the addon — while *inside* the cluster the kubelet reaches the same registry at
-`localhost:5000`. So you **push** from the host to `127.0.0.1:<assigned-port>` and the
-cluster **pulls** from `localhost:5000`. The build script discovers the host port
-automatically; the charts pull from the in-cluster address.
+Three conventions keep this predictable. Images use bare names with an explicit tag
+(`order-service:v1`), the charts set `imagePullPolicy: Never` so the kubelet only ever
+uses what was loaded, and the script runs `kubectl rollout restart` after a reload,
+because with `Never` a running pod keeps its old image until it restarts. Loaded
+images live in the node's containerd store, so they should survive `minikube stop` and
+`minikube start`; `cluster-up.sh` re-loads any that are missing.
 
-One environment variable makes or breaks all of this: `MINIKUBE_ROOTLESS=true`. If
-it's not set in your shell, minikube routes host operations through `sudo podman`,
-which can't see your rootless container — producing a spread of failures that look
-like a broken cluster but aren't. The capstone scripts both persist it and export it
-at the top of every script; if you run minikube commands by hand, export it first.
+The base image is `ubi10/python-314-minimal` (Python 3.14), with `ubi9/python-314` as
+the documented fallback. Python 3.14 is why asyncpg is pinned at 0.32: that is the
+release that ships a cp314 wheel.
 
-None of this is unique to the capstone — it's inherent to the rootless driver — but
-the capstone is where it bites, because it's the first place you build and deploy your
-*own* images at scale. Get the registry workflow right once here, and every service
-afterward is the same three commands. (The deeper operational sharp edges of running
-all this on a single node are collected as gotchas, separate from this build-level
-friction.)
+An earlier iteration of this build pushed images to the registry addon under a
+different driver and hit a run of driver-specific failures. Those are kept as
+lessons, not repeated here; see Part 4 of
+[LESSONS-LEARNED](https://github.com/patterncatalyst/minikube-on-fedora/blob/main/onboarding/LESSONS-LEARNED.md).
 
 With a service shipped and running, the next question is how products describe
 themselves so others can find and trust them — contracts and the catalog.

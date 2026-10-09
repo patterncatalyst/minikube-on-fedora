@@ -31,14 +31,14 @@ poetry install            # creates the venv, installs deps
 poetry run pytest         # runs the unit tests (SQLite-backed, no Postgres needed)
 ```
 
-To run the service locally against a port-forwarded Postgres:
+To run the service locally against the in-cluster Postgres, use the published
+NodePort. The `capstone-postgres-host` companion Service exposes the primary at
+`127.0.0.1:5432`; the cluster publishes that port when the `mof-capstone`
+profile is created, so there is nothing to start first. The cluster's order-service
+already owns `127.0.0.1:18080`, so run the local copy on another port:
 
 ```bash
-# In one terminal: forward the in-cluster Postgres
-kubectl port-forward -n capstone svc/capstone-postgres-rw 5432:5432
-
-# In another: run with connection env pointing at the forward
-PG_HOST=127.0.0.1 PG_PASSWORD=<from-secret> poetry run uvicorn app.main:app --port 8080
+PG_HOST=127.0.0.1 PG_PASSWORD=<from-secret> poetry run uvicorn app.main:app --port 8000
 ```
 
 (Get the password from the CNPG secret:
@@ -46,12 +46,19 @@ PG_HOST=127.0.0.1 PG_PASSWORD=<from-secret> poetry run uvicorn app.main:app --po
 
 ## Build
 
-The Containerfile is a UBI 9 Python 3.12 multi-stage build
-(CAP-005). Build it into the capstone minikube profile:
+The Containerfile is a UBI 10 Python 3.14 multi-stage build on
+`ubi10/python-314-minimal` (CAP-005, CAP-050), with `ubi9/python-314` as the
+fallback. Build it with Docker Engine and load it into the `mof-capstone`
+minikube profile (from `examples/17-capstone/`):
 
 ```bash
-minikube image build -p capstone -t order-service:v1 services/order-service
+./scripts/build-image.sh services/order-service order-service v1
 ```
+
+The script runs `docker build -f Containerfile`, then `minikube -p mof-capstone
+image load`, then restarts the Deployment if one exists. The chart uses the bare
+name `order-service:v1` with `imagePullPolicy: Never`, so there is no registry.
+Once deployed, order-service is reachable on the host at `http://127.0.0.1:18080`.
 
 **Recommended:** commit `poetry.lock` for reproducible builds.
 Generate it once with `poetry lock` (the Containerfile uses it
@@ -63,7 +70,7 @@ if present via a `poetry.lock*` glob).
 services/order-service/
 ├── pyproject.toml      ← Poetry deps + metadata
 ├── poetry.lock         ← (generate with `poetry lock`, then commit)
-├── Containerfile       ← UBI 9 multi-stage
+├── Containerfile       ← UBI 10 multi-stage
 ├── README.md           ← this file
 ├── app/
 │   ├── __init__.py
@@ -82,7 +89,7 @@ Every other service (inventory, payment, shipping, notification)
 follows this same shape:
 
 - Poetry `pyproject.toml`
-- UBI 9 multi-stage `Containerfile`
+- UBI 10 (`python-314-minimal`) multi-stage `Containerfile`
 - `app/{config,db,models,schemas,main}.py`
 - own schema in the shared Postgres
 - helm subchart under `charts/capstone/charts/<service>/`

@@ -131,7 +131,7 @@ recreate); `0.0.0.0` publishing (exposes dashboard/Kiali to the LAN).
 | 3 | Examples 11-istio (+ `host-access/`), 12-keda-http (+ interceptor companion), 12-keda-kafka | 1 | done (live pending) |
 | 4a | Capstone platform: `scripts/lib/env.sh`, `mof-capstone`, setup/build/cluster/bootstrap/setup-* scripts, subchart values+service templates, `host-access/*.yaml`, pin observability charts, no credential printing | 1 | done (live pending) |
 | 4b | Capstone demos: env.sh, no port-forward, host ports, no `localhost:5000` guard, no credentials | 4a | todo |
-| 4c | Capstone prose: README, order-service README, `_capstone/data-mesh/*`, `capstone/data-mesh.html` | 4a | todo |
+| 4c | Capstone prose: README, order-service README, `_capstone/data-mesh/*`, `capstone/data-mesh.html` | 4a | done |
 | 5a | Chapters §0–§5 (Docker Engine install in §1, pinned installs in §2, §3 rewrite, §4 profiles, §5 dashboard companion) | 2,3 | todo |
 | 5b | Chapters §6–§10 (§7 rewrite around published ports) | 2,3 | todo |
 | 5c | Chapters §11–§17, FAQ, LESSONS-LEARNED (Part 4: why we moved off rootless podman; remove stale merge banners / misplaced PRD block after checking PRD) | 2,3,4a | todo |

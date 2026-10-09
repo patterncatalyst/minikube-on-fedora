@@ -21,5 +21,7 @@ helm upgrade --install review-service charts/capstone/charts/review-service -n c
 kubectl rollout status deployment/review-service -n capstone --timeout=120s
 ```
 
+The image is built with Docker Engine and loaded into the `mof-capstone` profile (bare name, `imagePullPolicy: Never`). Once deployed, the service is reachable on the host at `http://127.0.0.1:18086` through its published NodePort.
+
 Or run the health smoke test, which does all of the above and asserts the
 probes: `./demos/smoke-service.sh review`

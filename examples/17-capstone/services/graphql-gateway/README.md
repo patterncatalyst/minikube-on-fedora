@@ -20,5 +20,7 @@ production-scale pattern — see the §17 prose (CAP-016).
 helm upgrade --install graphql-gateway charts/capstone/charts/graphql-gateway -n capstone
 ```
 
+The image is built with Docker Engine and loaded into the `mof-capstone` profile (bare name, `imagePullPolicy: Never`). Once deployed, the service is reachable on the host at `http://127.0.0.1:18099` through its published NodePort.
+
 Then open `/graphql` in a browser for the GraphiQL UI, or run
 `./demos/smoke-graphql.sh`.
