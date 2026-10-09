@@ -5,7 +5,7 @@
 # End-to-end smoke test for §6:
 #   1. ensure cluster is up; clear any prior nginx Deployment/Service
 #   2. build the nginx image with docker and load it into the cluster
-#      (multi-stage Containerfile, UBI 9 builder → UBI 9 Minimal runtime)
+#      (multi-stage Containerfile, UBI 10 builder → UBI 10 Minimal runtime)
 #   3. apply Deployment + Service manifests
 #   4. wait for the Deployment to be Available; on timeout, dump pod
 #      logs from current and previous containers for diagnosis
@@ -81,7 +81,7 @@ require_free_nodeport "${NODE_PORT}"
 pass "nodePort ${NODE_PORT} free"
 
 # ── Build the image and load it into minikube ──────────────────────────────
-step "building ${IMAGE_TAG} with docker and loading it into ${PROFILE} (multi-stage UBI 9)"
+step "building ${IMAGE_TAG} with docker and loading it into ${PROFILE} (multi-stage UBI 10)"
 # docker build runs on the host's Docker Engine; `minikube image load` copies
 # the result into the profile's containerd so kubelet finds it without a
 # registry. The Deployment uses imagePullPolicy: Never.
@@ -132,7 +132,7 @@ RESP=$(curl -fsS "http://127.0.0.1:${HOST_PORT}/")
 # Sentinel content from index.html that confirms we're serving our
 # baked-in page (not some default upstream nginx welcome).
 case "${RESP}" in
-    *"Test Page for nginx on UBI 9 Minimal"*)
+    *"Test Page for nginx on UBI 10 Minimal"*)
         pass "nginx served the baked-in index.html"
         ;;
     *)

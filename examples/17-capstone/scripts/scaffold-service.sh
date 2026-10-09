@@ -6,7 +6,7 @@
 # What it generates (a "walking skeleton" service — CAP-006):
 #   - services/<name>-service/         FastAPI app with /health + /healthz,
 #                                       async SQLAlchemy wired to its own
-#                                       Postgres schema, UBI 9 Containerfile
+#                                       Postgres schema, UBI 10 Containerfile
 #   - charts/capstone/charts/<name>-service/   helm subchart (Deployment +
 #                                       NodePort Service), bare image name
 #                                       loaded into the node, pullPolicy Never
@@ -95,7 +95,7 @@ EOF
 
 # ─── services/<service>/Containerfile (r21b root-builder; proven) ─────────────
 cat > "${SVC_DIR}/Containerfile" <<'EOF'
-# __SERVICE__ Containerfile — UBI 9 multi-stage build (CAP-005).
+# __SERVICE__ Containerfile — UBI 10 multi-stage build, Python 3.14 (CAP-005, CAP-050).
 #
 # The BUILDER stage runs as root so it can write /opt/venv (the UBI default
 # user 1001 cannot — /opt is root-owned). The builder image is discarded, so

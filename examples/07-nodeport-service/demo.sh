@@ -131,7 +131,7 @@ if [[ -z "${RESP}" ]]; then
     fail "curl never got a response from ${URL}/"
 fi
 case "${RESP}" in
-    *"Test Page for nginx on UBI 9 Minimal"*)
+    *"Test Page for nginx on UBI 10 Minimal"*)
         pass "nginx served the baked-in index.html via the published NodePort"
         ;;
     *)

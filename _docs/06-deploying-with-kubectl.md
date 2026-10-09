@@ -498,7 +498,7 @@ node port, `80:30080` in the PORT(S) column.
 curl http://127.0.0.1:18080/
 ```
 
-You should see the baked-in page, with "Test Page for nginx on UBI 9
+You should see the baked-in page, with "Test Page for nginx on UBI 10
 Minimal" in the title. If the connection is refused, check
 `docker port minikube 30080/tcp`: an empty answer means the profile
 was created without `--ports` and must be recreated (§4, §7).

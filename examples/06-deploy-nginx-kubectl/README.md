@@ -1,8 +1,8 @@
 # 06-deploy-nginx-kubectl
 
 First workload-deployment example in the tutorial. A smoke test that
-builds a small nginx image with a two-stage `Containerfile` (UBI 9
-builder → UBI 9 Minimal runtime) with `docker build`, loads it into the
+builds a small nginx image with a two-stage `Containerfile` (UBI 10
+builder → UBI 10 Minimal runtime) with `docker build`, loads it into the
 cluster with `minikube image load`, deploys it with a Deployment + NodePort
 Service, reaches the Service at `http://127.0.0.1:18080/`, validates the
 response content, then scales.
