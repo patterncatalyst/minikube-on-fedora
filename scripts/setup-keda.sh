@@ -7,8 +7,8 @@
 # `minikube`). Idempotent — safe to re-run.
 #
 # Pinned versions:
-#   KEDA core:        2.19.0    (latest stable, Feb 2026)
-#   KEDA HTTP add-on: 0.12.2    (latest, Feb 2026 — note: BETA)
+#   KEDA core:        2.21.0
+#   KEDA HTTP add-on: 0.16.0    (note: BETA)
 #
 # After this script returns successfully, both `examples/12-keda-kafka`
 # and `examples/12-keda-http` demos can run. The HTTP add-on is only
@@ -18,8 +18,8 @@
 
 set -euo pipefail
 
-KEDA_VERSION="${KEDA_VERSION:-2.19.0}"
-KEDA_HTTP_VERSION="${KEDA_HTTP_VERSION:-0.12.2}"
+KEDA_VERSION="${KEDA_VERSION:-2.21.0}"
+KEDA_HTTP_VERSION="${KEDA_HTTP_VERSION:-0.16.0}"
 NAMESPACE="${NAMESPACE:-keda}"
 KUBE_CONTEXT="${KUBE_CONTEXT:-minikube}"
 

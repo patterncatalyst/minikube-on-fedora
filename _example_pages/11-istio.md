@@ -23,7 +23,7 @@ This demo assumes you've already run:
 ./scripts/setup-istio.sh
 ```
 
-which downloads Istio 1.29.2 to `~/.local/share/istio-1.29.2/`,
+which downloads Istio 1.31.1 to `~/.local/share/istio-1.31.1/`,
 installs `istioctl` to `~/.local/bin/`, and creates the
 `~/.local/share/istio-current` symlink the demo references for
 the Bookinfo manifests.
@@ -34,7 +34,7 @@ doesn't exist, the demo creates it. The recommended sizing:
 
 ```
 minikube start -p istio --driver=docker --container-runtime=containerd \
-    --kubernetes-version=v1.35.1 --cpus=4 --memory=6144 \
+    --kubernetes-version=v1.36.5 --cpus=4 --memory=6144 \
     --ports=127.0.0.1:8080:30880,127.0.0.1:20001:30201,127.0.0.1:3000:30300,127.0.0.1:9090:30990,127.0.0.1:16686:31686
 ```
 
@@ -154,7 +154,7 @@ does not remove it.
 
 The demo applies `ingressgateway-host` after the Istio install.
 The addon companions are applied together with the addons (see
-"Going further"). Selectors were read from the Istio 1.29.2
+"Going further"). Selectors were read from the Istio 1.31.1
 release's addon manifests; confirm any of them on a live cluster
 with `kubectl --context istio get svc -n istio-system <svc> -o
 jsonpath='{.spec.selector}'`.
@@ -205,7 +205,7 @@ minikube delete -p istio     # delete, free disk
        minikube delete -p istio
        minikube start -p istio --driver=docker \
            --container-runtime=containerd \
-           --kubernetes-version=v1.35.1 --cpus=4 --memory=6144 \
+           --kubernetes-version=v1.36.5 --cpus=4 --memory=6144 \
            --ports=127.0.0.1:8080:30880,127.0.0.1:20001:30201,127.0.0.1:3000:30300,127.0.0.1:9090:30990,127.0.0.1:16686:31686
 
 3. **Bookinfo Pods stuck pulling images** — the `docker.io/istio/*`

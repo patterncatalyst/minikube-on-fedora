@@ -414,7 +414,7 @@ functional, not promotional, and worth leaving alone.
 
 ---
 
-## Part 4 — Why this tutorial moved off rootless podman (minikube v1.38.1)
+## Part 4 — Why this tutorial moved off rootless podman (minikube v1.39.0)
 
 <!-- policy-exempt:start -->
 Earlier revisions of this tutorial ran minikube on rootless Podman
@@ -425,7 +425,7 @@ below gives the symptom, the cause, and what the Docker path does
 now. Entries marked "maintainer-reported" were observed by the
 maintainer while building the tutorial; the rest come from the
 project record (`_plans/capstone-decisions.md`, the pre-migration
-chapters). Version context: minikube v1.38.1, Kubernetes v1.35.1,
+chapters). Version context: minikube v1.39.0, Kubernetes v1.36.5,
 Fedora 44.
 
 ### Node iptables FORWARD DROP breaks pod and NodePort traffic (maintainer-reported)
@@ -799,11 +799,12 @@ sidecar"), not a regular container. JSONPath queries against
 count toward readiness totals).
 
 ### Strimzi pins Kafka versions narrowly
-Strimzi 0.51 supports ONLY Kafka 4.1.0, 4.1.1, 4.2.0.
+Strimzi 0.51 supported ONLY Kafka 4.1.0, 4.1.1, 4.2.0 (the repo now
+runs Strimzi 1.2.0 with Kafka 4.3.1, v1 API only).
 Specifying 3.x in the manifest produces a `READY=False` Kafka
 CR with an opaque reason; `kubectl describe kafka` is needed
 to surface the actual error. We caught this in r13's first run
-and pinned 4.1.0 thereafter.
+and pinned an explicit supported version thereafter.
 
 ## Image / packaging
 

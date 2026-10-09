@@ -126,7 +126,7 @@ the safest approach is to delete and recreate:
 ```bash
 minikube delete -p minikube
 minikube start -p minikube --driver=docker --container-runtime=containerd \
-    --kubernetes-version=v1.35.1 --memory=8192 --cpus=6 \
+    --kubernetes-version=v1.36.5 --memory=8192 --cpus=6 \
     --ports=127.0.0.1:18080:30080,127.0.0.1:18081:30808,127.0.0.1:18090:30900
 ```
 
@@ -147,8 +147,8 @@ HTTP add-on in one run:
 What it does:
 
 1. Adds the `kedacore` helm repository
-2. Installs KEDA 2.19.0 into the `keda` namespace
-3. Installs the KEDA HTTP add-on 0.12.2 into the same namespace
+2. Installs KEDA 2.21.0 into the `keda` namespace
+3. Installs the KEDA HTTP add-on 0.16.0 into the same namespace
 4. Waits for both deployments to be Available
 
 After it returns:
@@ -173,13 +173,18 @@ pattern (so you can `helm uninstall keda-add-ons-http -n keda --kube-context min
 without affecting Kafka scaling if you want a leaner install).
 
 > **Beta notice.** The KEDA HTTP add-on is officially in **beta**
-> at v0.12.2. KEDA's upstream README says plainly that
+> at v0.16.0. KEDA's upstream README says plainly that
 > the add-on is not yet recommended for production use while it is
 > still under development and testing. For the tutorial it
 > works fine; for production you'd evaluate alternatives
 > (knative, Kedify HTTP Scaler, or wait for the add-on's GA).
 > KEDA core itself is GA and production-ready; the beta status
 > applies only to the HTTP add-on.
+>
+> **API note.** In 0.16 the `HTTPScaledObject` API
+> (`http.keda.sh/v1alpha1`) is deprecated in favour of
+> `InterceptorRoute`. It still works, and this chapter keeps it for
+> its simpler shape.
 
 ## Pattern A: Kafka consumer-lag scaling with Strimzi
 
@@ -221,7 +226,7 @@ the Istio operator, and dozens of other CNCF projects.
 ./scripts/setup-strimzi.sh
 ```
 
-This installs the Strimzi Cluster Operator 0.51.0 into the
+This installs the Strimzi Cluster Operator 1.2.0 into the
 `kafka` namespace via helm. About 30 seconds. After it returns:
 
 ```bash
@@ -275,7 +280,7 @@ metadata:
     strimzi.io/kraft: enabled
 spec:
   kafka:
-    version: 4.1.0           # Strimzi 0.51 supports ONLY 4.1.0/4.1.1/4.2.0
+    version: 4.3.1           # pinned; Strimzi 1.2.0 supports 4.2.x and 4.3.x
     # metadataVersion omitted: Strimzi defaults to match version
     listeners:
       - name: plain
@@ -296,14 +301,16 @@ spec:
 
 Notable choices:
 
-- **KRaft mode** — no ZooKeeper. Strimzi defaults to KRaft for
-  recent Kafka versions, but the manifest sets the annotation explicitly so
-  the manifest doesn't drift if defaults change
+- **KRaft mode** — no ZooKeeper. Strimzi 1.x is KRaft-only and
+  uses `KafkaNodePool` resources for every cluster. The manifest keeps
+  the `strimzi.io/kraft` and `strimzi.io/node-pools` annotations as
+  documentation of that mode; they are harmless on 1.x
 - **Dual-role node** — combines controller + broker in one Pod.
   Smaller resource footprint than separate controller/broker
   pools. Production deployments split them
-- **Kafka 4.1.0** — pinned. Strimzi 0.51 dropped support for
-  Kafka 3.x entirely; only 4.1.0, 4.1.1, and 4.2.0 are accepted.
+- **Kafka 4.3.1** — pinned. Strimzi 1.x dropped support for
+  Kafka 3.x and ZooKeeper entirely, and accepts only the
+  `kafka.strimzi.io/v1` API (`v1beta2` manifests are rejected).
   The `metadataVersion` field is omitted from the manifest —
   Strimzi defaults it to match the Kafka version on first
   cluster creation. Kafka 4.x removed ZooKeeper completely
@@ -328,13 +335,14 @@ Once the Strimzi operator has reconciled the `Kafka` CR,
 `kubectl --context minikube get kafka,kafkanodepool,pod -n kafka` shows the
 fully-converged state:
 
-![Strimzi Kafka cluster Ready, version 4.1.0, metadata version 4.1-IV1]({{ "/assets/screenshots/strimzi-kafka-cluster-ready.png" | relative_url }})
+![Strimzi Kafka cluster Ready (screenshot from an earlier Kafka release)]({{ "/assets/screenshots/strimzi-kafka-cluster-ready.png" | relative_url }})
 
 Reading top to bottom:
 
-- `kafka/my-kafka  True  4.1.0  4.1-IV1` — the Kafka CR is
-  Ready, running Kafka **4.1.0**, with Strimzi having
-  defaulted the metadata version to **4.1-IV1** (the manifest
+- `kafka/my-kafka  True  <version>  <metadata version>` — the Kafka CR is
+  Ready, running Kafka **4.3.1** here (the screenshot was captured on an
+  earlier release, so its version columns differ), with Strimzi having
+  defaulted the metadata version to the matching 4.3 value (the manifest
   doesn't specify it explicitly, which is why dropping that
   field was safe)
 - `kafkanodepool/dual-role  1  ["controller","broker"]  [0]` —
@@ -357,7 +365,7 @@ Kafka demo will work. If the `kafka/my-kafka` row shows
 `kubectl --context minikube describe kafka/my-kafka -n kafka` will tell you what's
 wrong — most commonly an unsupported version (the error caught
 us during r13's first run before this section was pinned to
-4.1.0).
+a supported version).
 
 ### Define the topic
 
@@ -584,6 +592,14 @@ spec:
 per 5 in-flight requests*. With `hey -c 50` (50 concurrent
 connections), the HPA should ask for 10 replicas (capped at
 max: 5).
+
+Timeouts on the interceptor changed in 0.16. The scale-from-zero wait
+is now `interceptor.readinessTimeout` (the old
+`interceptor.replicas.waitTimeout` value is a deprecated fallback), and
+the interceptor returns **504** rather than 502 when a timeout fires.
+Defaults: `KEDA_HTTP_READINESS_TIMEOUT` is 0 (disabled, so requests wait
+for the backend) and the response header timeout is 300s. The demo
+relies on those defaults.
 
 The interceptor service exposes a single endpoint
 (`keda-add-ons-http-interceptor-proxy.keda:8080` inside the

@@ -368,7 +368,7 @@ guaranteed to make the cut:
 ### Dependencies
 
 - minikube binary (Fedora package if/when available, else upstream
-  install of the pinned v1.38.1 RPM from GitHub releases)
+  install of the pinned v1.39.0 RPM from GitHub releases)
 - UBI image availability at `registry.access.redhat.com`
 - Helm chart sources: `kedacore/keda`, `kedacore/keda-add-ons-http`
   for §12; `istio-base` / `istiod` charts or `istioctl install` for §11

@@ -116,8 +116,18 @@ if ! command -v istioctl >/dev/null 2>&1; then
     info "istioctl not in PATH — run scripts/setup-istio.sh first"
     fail "istioctl missing"
 fi
-info "istioctl: $(istioctl version --remote=false 2>/dev/null | head -1)"
-pass "istioctl available"
+# The istioctl binary and ~/.local/share/istio-current are shared with other
+# repos, so confirm the client matches the version this chapter pins
+# (ISTIO_VERSION in scripts/setup-istio.sh) instead of using whatever is there.
+PINNED_ISTIO_VERSION="${ISTIO_VERSION:-$(sed -n 's/^ISTIO_VERSION="${ISTIO_VERSION:-\([^}]*\)}"$/\1/p' "${REPO_ROOT}/scripts/setup-istio.sh")}"
+[[ -n "${PINNED_ISTIO_VERSION}" ]] || fail "cannot read ISTIO_VERSION from scripts/setup-istio.sh"
+ISTIOCTL_VERSION="$(istioctl version --remote=false 2>/dev/null | head -1 | grep -oE '[0-9]+\.[0-9]+\.[0-9]+[^ ]*' | head -1 || true)"
+info "istioctl: ${ISTIOCTL_VERSION:-unknown} (pinned: ${PINNED_ISTIO_VERSION})"
+if [[ "${ISTIOCTL_VERSION}" != "${PINNED_ISTIO_VERSION}" ]]; then
+    info "istioctl ${ISTIOCTL_VERSION:-unknown} does not match the pinned ${PINNED_ISTIO_VERSION}"
+    fail "run scripts/setup-istio.sh to install Istio ${PINNED_ISTIO_VERSION}"
+fi
+pass "istioctl ${ISTIOCTL_VERSION} matches the pinned version"
 
 # Istio source dir
 if [[ ! -d "${BOOKINFO_DIR}" ]]; then

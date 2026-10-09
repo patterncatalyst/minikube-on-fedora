@@ -34,7 +34,7 @@ Eight §12 Kafka claims:
 
 1. `setup-strimzi.sh` installs Strimzi Cluster Operator
    cleanly on Fedora 44
-2. A single-node KRaft `Kafka` CR with Kafka **3.9.0** reaches
+2. A single-node KRaft `Kafka` CR with Kafka **4.3.1** reaches
    `condition=Ready` within 5 minutes
 3. A `KafkaTopic` CR with 3 partitions reaches `condition=Ready`
 4. The Python `order-processor` consumer image builds cleanly
@@ -101,9 +101,9 @@ Most likely failure modes, in rough order of frequency:
      start)
    - Check the operator logs for `KafkaUpgradeException` —
      this means you're using an unsupported Kafka version
-     (do NOT use 3.9.2 with Strimzi 0.51)
+     (Strimzi 1.2.0 accepts only Kafka 4.2.x and 4.3.x)
 2. **Image pull failures for Kafka itself** — Strimzi pulls
-   `quay.io/strimzi/kafka:0.51.0-kafka-3.9.0` (~600 MB). On
+   `quay.io/strimzi/kafka:1.2.0-kafka-4.3.1` (~600 MB). On
    slow connections this can take 5+ minutes. Check
    `kubectl describe pod -n kafka <kafka-pod>` for image-pull
    progress

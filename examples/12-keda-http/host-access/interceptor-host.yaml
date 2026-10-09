@@ -7,7 +7,7 @@
 # only while this demo runs (demo.sh does, and removes it on exit).
 # Published by the minikube profile as 127.0.0.1:18080 (CORE_PORTS in
 # scripts/lib/_helpers.sh).
-# Selector: from the keda-add-ons-http 0.12.2 chart (helm template, release
+# Selector: from the keda-add-ons-http 0.16.0 chart (helm template, release
 # name keda-add-ons-http); verify live:
 #   kubectl get svc -n keda keda-add-ons-http-interceptor-proxy -o jsonpath='{.spec.selector}'
 ---

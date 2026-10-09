@@ -28,7 +28,7 @@ stress:
 ```bash
 minikube start -p small \
     --driver=docker --container-runtime=containerd \
-    --kubernetes-version=v1.35.1 \
+    --kubernetes-version=v1.36.5 \
     --cpus=2 --memory=2048
 ```
 
@@ -45,7 +45,7 @@ list:
 minikube delete -p small
 minikube start -p small \
     --driver=docker --container-runtime=containerd \
-    --kubernetes-version=v1.35.1 \
+    --kubernetes-version=v1.36.5 \
     --cpus=2 --memory=4096
 ```
 
@@ -75,10 +75,10 @@ The profiles this repo uses by name:
 ### Creating profiles
 
 ```bash
-minikube start -p sandbox-1.34 --driver=docker --container-runtime=containerd \
-    --kubernetes-version=v1.34.0
 minikube start -p sandbox-1.35 --driver=docker --container-runtime=containerd \
-    --kubernetes-version=v1.35.1
+    --kubernetes-version=v1.35.9
+minikube start -p sandbox-1.36 --driver=docker --container-runtime=containerd \
+    --kubernetes-version=v1.36.5
 ```
 
 These create two independent clusters running different Kubernetes
@@ -112,10 +112,10 @@ The "active" profile is what `minikube` commands target when you
 don't pass `-p`. To switch:
 
 ```bash
-minikube profile sandbox-1.34
+minikube profile sandbox-1.35
 ```
 
-After this, `minikube status` reports on `sandbox-1.34`, and
+After this, `minikube status` reports on `sandbox-1.35`, and
 `kubectl`'s active context follows along. To check which profile is
 currently active:
 
@@ -131,9 +131,9 @@ Anything you'd run against the default cluster works against a
 specific profile by adding `-p NAME`:
 
 ```bash
-minikube -p sandbox-1.35 status
-minikube -p sandbox-1.35 stop
-minikube -p sandbox-1.35 addons enable metrics-server
+minikube -p sandbox-1.36 status
+minikube -p sandbox-1.36 stop
+minikube -p sandbox-1.36 addons enable metrics-server
 ```
 
 This is often clearer than switching the active profile and back —
@@ -143,7 +143,7 @@ work.
 ### Deleting profiles
 
 ```bash
-minikube delete -p sandbox-1.34
+minikube delete -p sandbox-1.35
 ```
 
 Removes the cluster, its Docker container(s), its volumes, its
@@ -171,7 +171,7 @@ tolerations, multi-AZ-shaped tests), use `--nodes`:
 
 ```bash
 minikube start -p multi --nodes=3 \
-    --driver=docker --container-runtime=containerd --kubernetes-version=v1.35.1
+    --driver=docker --container-runtime=containerd --kubernetes-version=v1.36.5
 ```
 
 This creates one control-plane node and two worker nodes, each as
@@ -198,7 +198,7 @@ For testing how an app handles a control plane that itself moves:
 
 ```bash
 minikube start -p ha --ha --nodes=3 \
-    --driver=docker --container-runtime=containerd --kubernetes-version=v1.35.1
+    --driver=docker --container-runtime=containerd --kubernetes-version=v1.36.5
 ```
 
 This starts three control-plane nodes with stacked etcd. Resource

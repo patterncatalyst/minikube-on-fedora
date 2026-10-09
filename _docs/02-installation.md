@@ -28,10 +28,10 @@ The cleanest install path is the upstream RPM via `dnf`, so
 future updates pick up like any other dnf-tracked package:
 
 ```bash
-sudo dnf install -y https://github.com/kubernetes/minikube/releases/download/v1.38.1/minikube-1.38.1-0.x86_64.rpm
+sudo dnf install -y https://github.com/kubernetes/minikube/releases/download/v1.39.0/minikube-1.39.0-0.x86_64.rpm
 ```
 
-This installs the pinned release, v1.38.1, as `/usr/bin/minikube`. Confirm:
+This installs the pinned release, v1.39.0, as `/usr/bin/minikube`. Confirm:
 
 ```bash
 minikube version
@@ -39,8 +39,9 @@ minikube version
 
 You should see output mentioning a default Kubernetes version
 that minikube targets — that's the *cluster* version, distinct
-from your `kubectl` client version. minikube v1.38.1 defaults to
-launching Kubernetes 1.35.x clusters; §3 pins v1.35.1 explicitly.
+from your `kubectl` client version. minikube v1.39.0 has its own
+default Kubernetes version; §3 pins v1.36.5 explicitly so the
+cluster doesn't depend on that default.
 
 ### Why not the upstream `curl ... && sudo install` path?
 
@@ -54,29 +55,26 @@ it up alongside everything else.
 ## Install kubectl
 
 If you already have `kubectl` installed at a recent version
-(1.34.x or 1.35.x), skip this step:
+(1.35.x or 1.36.x), skip this step:
 
 ```bash
 kubectl version --client=true
 ```
 
-The Kubernetes version skew policy guarantees a client one minor
-version behind or ahead of the server works — so a kubectl 1.35.x
-client is compatible with minikube's default 1.35.x cluster (and
-with any 1.34.x or 1.36.x cluster you might spin up via
-`--kubernetes-version`).
+The Kubernetes version skew policy supports a client one minor
+version behind or ahead of the server (±1) — so a kubectl 1.36.x
+client works against the v1.36.5 cluster §3 starts, and against any
+1.35.x or 1.37.x cluster you might spin up via
+`--kubernetes-version` (for example the 1.35.9 sandbox in §4).
 
 If kubectl isn't installed, install the upstream binary (kubectl
-is not currently in Fedora 44's standard repos). Pin it to the
-newest v1.35.x patch, which matches the cluster version §3 starts.
-Find that patch (v1.35.9 at the time of writing; `jq` is also used
-by the demo scripts):
+is not currently in Fedora 44's standard repos). Pin it to
+v1.36.5, the same version as the cluster §3 starts. `jq` is used by
+the demo scripts, so install it too:
 
 ```bash
 sudo dnf install -y jq
-KUBECTL_VERSION=$(curl -s "https://api.github.com/repos/kubernetes/kubernetes/releases?per_page=100" \
-  | jq -r '.[].tag_name' | grep -E '^v1\.35\.[0-9]+$' | head -1)
-echo "$KUBECTL_VERSION"
+KUBECTL_VERSION=v1.36.5
 ```
 
 Then download and install it:

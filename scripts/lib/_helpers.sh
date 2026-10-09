@@ -37,7 +37,7 @@ repo_root() {
 # Single source of truth for the Kubernetes version and the host-to-nodePort
 # maps. scripts/check-port-map.sh cross-checks these against the YAML and
 # the docs. Format: 127.0.0.1:<hostPort>:<nodePort>[,...]
-KUBE_VERSION=v1.35.1
+KUBE_VERSION=v1.36.5
 CORE_PORTS="127.0.0.1:18080:30080,127.0.0.1:18081:30808,127.0.0.1:18090:30900"
 ISTIO_PORTS="127.0.0.1:8080:30880,127.0.0.1:20001:30201,127.0.0.1:3000:30300,127.0.0.1:9090:30990,127.0.0.1:16686:31686"
 DRIVER_CHECK_PORTS="127.0.0.1:18079:30079"

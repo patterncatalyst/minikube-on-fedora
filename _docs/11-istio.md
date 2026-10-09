@@ -125,7 +125,7 @@ profile**. Start it once:
 minikube start -p istio \
     --driver=docker \
     --container-runtime=containerd \
-    --kubernetes-version=v1.35.1 \
+    --kubernetes-version=v1.36.5 \
     --cpus=4 \
     --memory=6144 \
     --ports=127.0.0.1:8080:30880,127.0.0.1:20001:30201,127.0.0.1:3000:30300,127.0.0.1:9090:30990,127.0.0.1:16686:31686
@@ -173,8 +173,8 @@ Istio release tarball. The one-time setup script downloads both:
 
 The script:
 
-1. Downloads `istio-1.29.2-linux-amd64.tar.gz` from istio.io
-2. Extracts to `~/.local/share/istio-1.29.2/`
+1. Downloads `istio-1.31.1-linux-amd64.tar.gz` from istio.io
+2. Extracts to `~/.local/share/istio-1.31.1/`
 3. Installs `istioctl` to `~/.local/bin/istioctl`
 4. Sets up a `~/.local/share/istio-current` symlink for
    `examples/11-istio/demo.sh` to find samples
@@ -188,7 +188,7 @@ Verify istioctl is reachable:
 istioctl version --remote=false
 ```
 
-Should print `client version: 1.29.2`.
+Should print `client version: 1.31.1`.
 
 ### Install the control plane
 
@@ -348,12 +348,12 @@ istio-proxy appears:
 ```
 Init Containers:
   istio-init:
-    Image:           docker.io/istio/proxyv2:1.29.2
+    Image:           docker.io/istio/proxyv2:1.31.1
     State:           Terminated (Completed)
     Restart Count:   0
     ...
   istio-proxy:
-    Image:           docker.io/istio/proxyv2:1.29.2
+    Image:           docker.io/istio/proxyv2:1.31.1
     State:           Running
     Restart Policy:  Always              ← this makes it a native sidecar
     ...

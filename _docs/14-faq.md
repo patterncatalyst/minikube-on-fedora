@@ -47,7 +47,7 @@ Two common causes: (1) the cluster is sized too small — check
 `minikube profile list` for current CPU/memory allocation, and
 recreate with bigger numbers if needed (`minikube delete -p
 minikube`, then `minikube start -p minikube --driver=docker
---container-runtime=containerd --kubernetes-version=v1.35.1
+--container-runtime=containerd --kubernetes-version=v1.36.5
 --memory=8192 --cpus=6 --ports=127.0.0.1:18080:30080,127.0.0.1:18081:30808,127.0.0.1:18090:30900`,
 the `CORE_PORTS` map from `scripts/lib/_helpers.sh`); (2) the host
 machine is swapping — `free -h` will tell you. Kubernetes
@@ -165,7 +165,7 @@ profile with `--ports` (the commands are in §3 and §4):
 ```bash
 minikube delete -p minikube
 minikube start -p minikube --driver=docker --container-runtime=containerd \
-    --kubernetes-version=v1.35.1 \
+    --kubernetes-version=v1.36.5 \
     --ports=127.0.0.1:18080:30080,127.0.0.1:18081:30808,127.0.0.1:18090:30900
 ```
 
@@ -313,10 +313,11 @@ For helm-managed deployments, `helm rollback [release] [revision]` is the equiva
 
 ### Q: Strimzi says "Unsupported Kafka.spec.kafka.version"
 
-Strimzi 0.51 supports **only Kafka 4.1.0, 4.1.1, and 4.2.0** —
-the entire 3.x line was dropped. If you have an older manifest
-pinning Kafka 3.9.x, edit `kafka-cluster.yaml` to use
-`version: 4.1.0` and remove any explicit `metadataVersion`
+Strimzi 1.2.0 supports Kafka **4.2.x and 4.3.x** (this repo pins
+4.3.1) — the entire 3.x line was dropped, and only the
+`kafka.strimzi.io/v1` API is accepted. If you have an older manifest
+pinning Kafka 3.9.x or `v1beta2`, edit `kafka-cluster.yaml` to use
+`apiVersion: kafka.strimzi.io/v1`, `version: 4.3.1` and remove any explicit `metadataVersion`
 field (Strimzi defaults it to match the Kafka version when not
 specified). See §12 prose for the full context.
 
@@ -385,14 +386,14 @@ sudo dnf upgrade -y helm
 ```
 
 minikube is pinned on purpose: the chapters, the port maps, and the
-flag set are tested against v1.38.1, installed from the release RPM
+flag set are tested against v1.39.0, installed from the release RPM
 in §2. Upgrading it is a deliberate change, not a routine update.
 To move, install the newer RPM the same way as §2 and re-run the
 demos before relying on it.
 
 After upgrading minikube, existing profiles continue working
 on the old Kubernetes version. The tutorial pins
-`--kubernetes-version=v1.35.1`; a different version means a new
+`--kubernetes-version=v1.36.5`; a different version means a new
 profile.
 
 ### Q: pods or VMs lose network after Docker starts (iptables FORWARD DROP)

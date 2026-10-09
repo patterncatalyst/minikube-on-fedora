@@ -27,7 +27,7 @@ Six claims from §1, §2, and §3:
    system pods
 
 On success, the corresponding reconciliation rows in Section B
-(docker-driver-works-without-KVM, kubectl-1.35.x-against-1.35.x)
+(docker-driver-works-without-KVM, kubectl-1.36.x-against-1.36.x)
 and Section C (this example) flip to `verified (Fedora 44)`.
 
 ## Running
@@ -79,7 +79,7 @@ The most likely failure modes, in order:
 
 1. **`minikube: command not found`** — §2 install of minikube
    didn't take. Fix: rerun `sudo dnf install -y
-   https://github.com/kubernetes/minikube/releases/download/v1.38.1/minikube-1.38.1-0.x86_64.rpm`
+   https://github.com/kubernetes/minikube/releases/download/v1.39.0/minikube-1.39.0-0.x86_64.rpm`
 2. **`require_docker_engine` fails** — the docker context is not
    `default` or the daemon is stopped. Follow the fix line the
    script prints (`docker context use default`,

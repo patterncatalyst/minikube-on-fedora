@@ -31,7 +31,7 @@ this demo (Kafka demo is independent — see
 Six §12 HTTP claims:
 
 1. KEDA HTTP add-on installs cleanly via helm at the pinned
-   version (0.12.2) on the existing `minikube` profile
+   version (0.16.0) on the existing `minikube` profile
 2. An `HTTPScaledObject` CR + a Deployment with `replicas: 0`
    results in **zero replicas at idle**
 3. The HTTP add-on **interceptor buffers the first request**
@@ -93,7 +93,9 @@ Pod startup dominated by readinessProbe `initialDelaySeconds`).
    complains about `keda-add-ons-http-interceptor` not found.
    `./scripts/setup-keda.sh` installs both core + add-on
 3. **Cold-start timeout** — if the interceptor's first request
-   takes >60s, something's wrong with the Pod startup. Check
+   takes >60s, something's wrong with the Pod startup. A configured
+   timeout (`interceptor.readinessTimeout`, default disabled in 0.16)
+   surfaces as HTTP 504, not 502. Check
    `kubectl describe pod -l app=nginx-http` for events
 4. **Scale-up doesn't happen** — the HTTPScaledObject CRD has
    a status block; `kubectl describe httpscaledobject` shows

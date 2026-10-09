@@ -113,7 +113,7 @@ the host, and minikube exposes the mechanism as `--ports` on
 
 ```bash
 minikube start -p minikube --driver=docker --container-runtime=containerd \
-  --kubernetes-version=v1.35.1 \
+  --kubernetes-version=v1.36.5 \
   --ports=127.0.0.1:18080:30080,127.0.0.1:18081:30808,127.0.0.1:18090:30900
 ```
 

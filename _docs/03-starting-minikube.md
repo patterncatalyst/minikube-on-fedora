@@ -31,7 +31,7 @@ another's.
 ```bash
 minikube start \
     --driver=docker --container-runtime=containerd \
-    --kubernetes-version=v1.35.1 \
+    --kubernetes-version=v1.36.5 \
     --cpus=6 --memory=16384 \
     --ports=127.0.0.1:18080:30080,127.0.0.1:18081:30808,127.0.0.1:18090:30900
 ```
@@ -42,20 +42,20 @@ example demos pass when they create the `minikube` profile.
 
 The first run downloads minikube's "kicbase" image (the node image
 with kubeadm preinstalled) and starts a Docker container named
-`minikube`, then bootstraps a single-node Kubernetes v1.35.1
+`minikube`, then bootstraps a single-node Kubernetes v1.36.5
 cluster inside it. Expect 60–90 seconds for the first run; 15–30
 seconds for restarts thereafter.
 
 You'll see output like:
 
 ```
-😄  minikube v1.38.1 on Fedora 44
+😄  minikube v1.39.0 on Fedora 44
 ✨  Using the docker driver based on user configuration
 👍  Starting "minikube" primary control-plane node in "minikube" cluster
 🚜  Pulling base image ...
-💾  Downloading Kubernetes v1.35.1 preload ...
+💾  Downloading Kubernetes v1.36.5 preload ...
 🔥  Creating docker container (CPUs=6, Memory=16384MB) ...
-📦  Preparing Kubernetes v1.35.1 on containerd ...
+📦  Preparing Kubernetes v1.36.5 on containerd ...
 🔗  Configuring CNI (Container Networking Interface) ...
 🔎  Verifying Kubernetes components...
 🌟  Enabled addons: storage-provisioner, default-storageclass
@@ -164,7 +164,7 @@ kubectl --context minikube get nodes
 
 ```
 NAME       STATUS   ROLES           AGE   VERSION
-minikube   Ready    control-plane   30s   v1.35.1
+minikube   Ready    control-plane   30s   v1.36.5
 ```
 
 And the system pods that make the cluster work:

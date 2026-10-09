@@ -5,9 +5,9 @@
 # One-time setup for §11. Idempotent — safe to re-run.
 #
 # What this does:
-#   1. Downloads istio-1.29.2-linux-amd64.tar.gz from istio.io if
+#   1. Downloads istio-1.31.1-linux-amd64.tar.gz from istio.io if
 #      not already cached
-#   2. Extracts to ~/.local/share/istio-1.29.2/
+#   2. Extracts to ~/.local/share/istio-1.31.1/
 #   3. Installs istioctl to ~/.local/bin/istioctl (creates the
 #      directory if needed)
 #   4. Maintains a ~/.local/share/istio-current symlink to the
@@ -26,7 +26,7 @@
 
 set -euo pipefail
 
-ISTIO_VERSION="${ISTIO_VERSION:-1.29.2}"
+ISTIO_VERSION="${ISTIO_VERSION:-1.31.1}"
 TARGET_ARCH="${TARGET_ARCH:-x86_64}"
 INSTALL_PREFIX="${HOME}/.local"
 ISTIO_BASE="${INSTALL_PREFIX}/share"

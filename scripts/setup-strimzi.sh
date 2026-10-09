@@ -7,19 +7,18 @@
 # Idempotent — safe to re-run.
 #
 # Pinned versions:
-#   Strimzi:  0.51.0  (latest, March 2026)
+#   Strimzi:  1.2.0   (kafka.strimzi.io/v1 CRDs only; Kafka 4.3.1 supported)
 #
 # After this script returns, examples/12-keda-kafka/demo.sh can run.
 # The demo creates a Kafka cluster custom resource — the operator
 # reconciles it into actual Pods.
 #
 # Known issues:
-# - DO NOT use Kafka version 3.9.2 in Strimzi 0.51 — the operator fails
-#   with "Unsupported Kafka.spec.kafka.version: 3.9.2". This is a known
-#   bug noted in the 0.51 release notes. examples/12-keda-kafka pins
-#   Kafka 3.9.0 explicitly to avoid this
-# - Strimzi 0.51 requires Kubernetes 1.30+. Current minikube ships
-#   K8s 1.35+, so we're fine
+# - Strimzi 1.x accepts ONLY the kafka.strimzi.io/v1 API; v1beta2
+#   custom resources are rejected. Kafka 3.x and ZooKeeper are gone, so
+#   examples/12-keda-kafka pins Kafka 4.3.1 (KRaft, KafkaNodePool)
+# - Strimzi 1.2 needs a recent Kubernetes; the pinned cluster runs
+#   v1.36.5, so we're fine
 # - The Cluster Operator can occasionally get stuck in a NotReady state
 #   on first install — if `helm install --wait` times out, check
 #   `kubectl logs -n kafka deployment/strimzi-cluster-operator` and
@@ -27,7 +26,7 @@
 
 set -euo pipefail
 
-STRIMZI_VERSION="${STRIMZI_VERSION:-0.51.0}"
+STRIMZI_VERSION="${STRIMZI_VERSION:-1.2.0}"
 NAMESPACE="${NAMESPACE:-kafka}"
 KUBE_CONTEXT="${KUBE_CONTEXT:-minikube}"
 

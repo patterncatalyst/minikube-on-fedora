@@ -4,7 +4,7 @@
 # It selects the same Pods as the upstream Service, so re-applying the
 # addon or running istioctl install never reverts it. Published by the
 # istio profile as 127.0.0.1:8080 (see ISTIO_PORTS in scripts/lib/_helpers.sh).
-# Selector: labels from the gateways/istio-ingress chart values in the Istio 1.29.2 release (istioctl install --set profile=demo); verify live: kubectl get svc -n istio-system istio-ingressgateway -o jsonpath='{.spec.selector}'
+# Selector: labels from the gateways/istio-ingress chart values in the Istio 1.31.1 release (istioctl install --set profile=demo); verify live: kubectl get svc -n istio-system istio-ingressgateway -o jsonpath='{.spec.selector}'
 ---
 apiVersion: v1
 kind: Service

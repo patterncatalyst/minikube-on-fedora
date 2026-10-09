@@ -3,7 +3,7 @@
 # examples/12-keda-http/demo.sh
 #
 # Demonstrates KEDA scale-from-zero on HTTP traffic via the KEDA
-# HTTP add-on (BETA at v0.12.2 — see §12 prose).
+# HTTP add-on (BETA at v0.16.0 — see §12 prose).
 #
 # Phases:
 #   1.  Pre-flight: Docker Engine, minikube up with its published
