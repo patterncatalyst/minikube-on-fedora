@@ -104,15 +104,16 @@ Unlike §11, this section uses the **same minikube profile as
 §3-§10**. No second cluster. Confirm:
 
 ```bash
-kubectl config use-context minikube
-kubectl get nodes
+kubectl --context minikube get nodes
 # minikube  Ready  control-plane  ...
 ```
+
+Every command below names `--context minikube` explicitly.
 
 Resource sizing: KEDA core is small (~150 MB total — operator +
 metrics adapter + admission webhook). The HTTP add-on adds
 another ~200 MB (interceptor + scaler + operator). Strimzi's
-Cluster Operator is ~300 MB; the Kafka cluster we'll deploy is
+Cluster Operator is ~300 MB; the Kafka cluster you deploy is
 sized at ~1 GB request / 1.5 GB limit. The Python consumer
 workload at peak scale (10 replicas × ~50 MB) is another ~500 MB.
 Total worst-case footprint for §12: roughly **2-3 GB** on top of
@@ -124,9 +125,15 @@ the safest approach is to delete and recreate:
 
 ```bash
 minikube delete -p minikube
-minikube start -p minikube --memory=8g --cpus=6 \
-    --container-runtime=containerd --rootless=true
+minikube start -p minikube --driver=docker --container-runtime=containerd \
+    --kubernetes-version=v1.35.1 --memory=8192 --cpus=6 \
+    --ports=127.0.0.1:18080:30080,127.0.0.1:18081:30808,127.0.0.1:18090:30900
 ```
+
+The `--ports` map is `CORE_PORTS` from `scripts/lib/_helpers.sh`. It
+has to be on the command line because published ports are fixed at
+profile creation. Recreating the profile removes the §6-§9 images and
+workloads; rebuild them by re-running those demos.
 
 ## Installing KEDA
 
@@ -147,7 +154,7 @@ What it does:
 After it returns:
 
 ```bash
-kubectl get pods -n keda
+kubectl --context minikube get pods -n keda
 ```
 
 ```
@@ -162,13 +169,13 @@ keda-operator-metrics-apiserver-...                   1/1     Running   ...
 
 Seven Pods total. The four `keda-add-ons-http-*` Pods are
 specifically for HTTP scaling and aren't used by the Kafka
-pattern (so you can `helm uninstall keda-add-ons-http -n keda`
+pattern (so you can `helm uninstall keda-add-ons-http -n keda --kube-context minikube`
 without affecting Kafka scaling if you want a leaner install).
 
 > **Beta notice.** The KEDA HTTP add-on is officially in **beta**
-> at v0.12.2. KEDA's upstream README is explicit about this:
-> *"We can't yet recommend it for production usage because we
-> are still developing and testing it."* For the tutorial it
+> at v0.12.2. KEDA's upstream README says plainly that
+> the add-on is not yet recommended for production use while it is
+> still under development and testing. For the tutorial it
 > works fine; for production you'd evaluate alternatives
 > (knative, Kedify HTTP Scaler, or wait for the add-on's GA).
 > KEDA core itself is GA and production-ready; the beta status
@@ -204,7 +211,7 @@ Two practical notes upfront:
   could replace Strimzi with Bitnami without changing anything
   KEDA-related
 
-For the tutorial we go with Strimzi because the operator pattern
+This tutorial uses Strimzi because the operator pattern
 itself is instructive — it's the same shape as KEDA, cert-manager,
 the Istio operator, and dozens of other CNCF projects.
 
@@ -218,7 +225,7 @@ This installs the Strimzi Cluster Operator 0.51.0 into the
 `kafka` namespace via helm. About 30 seconds. After it returns:
 
 ```bash
-kubectl get pods -n kafka
+kubectl --context minikube get pods -n kafka
 # NAME                                       READY   STATUS    AGE
 # strimzi-cluster-operator-...               1/1     Running   30s
 ```
@@ -290,7 +297,7 @@ spec:
 Notable choices:
 
 - **KRaft mode** — no ZooKeeper. Strimzi defaults to KRaft for
-  recent Kafka versions, but we set the annotation explicitly so
+  recent Kafka versions, but the manifest sets the annotation explicitly so
   the manifest doesn't drift if defaults change
 - **Dual-role node** — combines controller + broker in one Pod.
   Smaller resource footprint than separate controller/broker
@@ -318,7 +325,7 @@ formatting + readiness checks).
 ### What a healthy cluster looks like
 
 Once the Strimzi operator has reconciled the `Kafka` CR,
-`kubectl get kafka,kafkanodepool,pod -n kafka` shows the
+`kubectl --context minikube get kafka,kafkanodepool,pod -n kafka` shows the
 fully-converged state:
 
 ![Strimzi Kafka cluster Ready, version 4.1.0, metadata version 4.1-IV1]({{ "/assets/screenshots/strimzi-kafka-cluster-ready.png" | relative_url }})
@@ -347,7 +354,7 @@ Reading top to bottom:
 If you see this output, everything is wired correctly and the
 Kafka demo will work. If the `kafka/my-kafka` row shows
 `READY=False`, the `WARNINGS` and conditions block in
-`kubectl describe kafka/my-kafka -n kafka` will tell you what's
+`kubectl --context minikube describe kafka/my-kafka -n kafka` will tell you what's
 wrong — most commonly an unsupported version (the error caught
 us during r13's first run before this section was pinned to
 4.1.0).
@@ -583,17 +590,34 @@ The interceptor service exposes a single endpoint
 cluster). All HTTP traffic to scaled workloads flows through it,
 keyed on the Host header.
 
+To reach the interceptor from the host, the demo applies a
+companion NodePort Service, `keda-interceptor-host`
+(`examples/12-keda-http/host-access/interceptor-host.yaml`). It
+selects the interceptor Pods, listens on nodePort 30080, and the
+`minikube` profile publishes that as `127.0.0.1:18080`. The Host
+header carries the routing key, so requests look like
+`curl -H 'Host: nginx.local' http://127.0.0.1:18080/`.
+
+> **Shared slot.** NodePort 30080 is also used by §6, §8, and §9.
+> Only one Service can hold it at a time. Delete the §6, §8, or §9
+> Service first (`kubectl --context minikube delete -f ...` or
+> `helm uninstall`); the demo's preflight stops with a "delete X
+> first" message if another Service holds the slot, and it removes
+> its own companion Service when it exits.
+
 ### The demo run
 
 `examples/12-keda-http/demo.sh`:
 
-1. Pre-flight: KEDA + HTTP add-on installed
-2. Build `nginx-custom:v1` if not present (reuses §6's
-   Containerfile)
+1. Pre-flight: Docker Engine, `minikube` profile publishing
+   nodePort 30080, KEDA + HTTP add-on installed, nodePort 30080 free
+2. `docker build` `nginx-custom:v1` and `minikube image load` it if
+   not present (reuses §6's Containerfile)
 3. Apply the Deployment (replicas: 0)
 4. Apply the HTTPScaledObject
 5. Assert replicas = 0
-6. Port-forward the HTTP interceptor to localhost:18080
+6. Apply the `keda-interceptor-host` companion Service
+   (nodePort 30080 → `127.0.0.1:18080`)
 7. Fire one request with `Host: nginx.local` to wake the
    workload — interceptor should buffer until the pod is ready
 8. Run `hey -n 500 -c 50 -host nginx.local
@@ -629,8 +653,8 @@ Each demo has two layers of cleanup:
 1. **`demo.sh` cleanup trap** — runs automatically on demo exit
    (whether the demo passed, failed, or you Ctrl-C'd it). Removes
    only the per-run workload (consumer / nginx) plus the
-   ScaledObject. Leaves Kafka, Strimzi, KEDA, and any port-forwards
-   intact so re-runs are fast
+   ScaledObject, plus the `keda-interceptor-host` Service. Leaves
+   Kafka, Strimzi, and KEDA intact so re-runs are fast
 2. **`cleanup.sh` script** — explicit, deeper teardown. Run when
    you're done with §12 (or with one of the two patterns) and want
    to free the resources
@@ -657,7 +681,7 @@ share KEDA. If you want to remove only the HTTP add-on (e.g. to
 re-run the Kafka demo without the add-on's Pods running), use:
 
 ```bash
-helm uninstall keda-add-ons-http -n keda
+helm uninstall keda-add-ons-http -n keda --kube-context minikube
 ```
 
 The minikube profile itself remains running for §6-§9 demos or
@@ -683,7 +707,7 @@ cd examples/12-keda-http
 
 Both demos verify the full lifecycle: 0 replicas → traffic
 arrives → scale up → traffic stops → scale back to 0. The
-assertions are timing-based but with generous windows, since
+assertions are timing-based but with generous time limits, since
 both KEDA and Strimzi (especially the latter) can take a few
 extra seconds in development environments.
 

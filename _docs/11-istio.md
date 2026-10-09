@@ -31,7 +31,7 @@ avoid stepping on §6-§9 work. By the end you'll have:
 
 In §6-§9, when one Pod talked to another (e.g., a Deployment of
 nginx serving a request that *would* have made an upstream call
-to a database, if we had one), the networking happened through
+to a database, if there were one), the networking happened through
 kube-proxy and the Service abstraction. The application code knew
 nothing about retries, timeouts, mutual TLS, load-balancing
 strategy, or which version of an upstream it was talking to —
@@ -62,7 +62,7 @@ Pod spec by the cluster, not by you. The application container
 sees a regular network — but every packet in or out goes through
 the sidecar.
 
-Sidecar injection is **opt-in per namespace**. We'll label the
+Sidecar injection is **opt-in per namespace**. You label the
 `default` namespace to enable injection, and any Pod created
 there will get the sidecar automatically.
 
@@ -73,8 +73,8 @@ there will get the sidecar automatically.
 > readers jumping directly to §11; `scripts/audit-fedora-prereqs.sh`
 > reports whether your current limits are sufficient.
 
-minikube containers run systemd as PID 1, which uses inotify watches
-for cgroup management. **Fedora's default settings are sized for one
+minikube nodes are Docker containers that run systemd as PID 1, which
+uses inotify watches for cgroup management. **Fedora's default settings are sized for one
 such container** — and you already have one running (the `minikube`
 profile from §3). Starting a second cluster on the same host pushes
 past the limits and the new container's systemd fails to initialize.
@@ -123,32 +123,44 @@ profile**. Start it once:
 
 ```bash
 minikube start -p istio \
-    --memory=6g \
-    --cpus=4 \
+    --driver=docker \
     --container-runtime=containerd \
-    --rootless=true
+    --kubernetes-version=v1.35.1 \
+    --cpus=4 \
+    --memory=6144 \
+    --ports=127.0.0.1:8080:30880,127.0.0.1:20001:30201,127.0.0.1:3000:30300,127.0.0.1:9090:30990,127.0.0.1:16686:31686
 ```
 
-(The same flags as §3, just on a fresh profile and with more
-resources.)
+The driver, runtime, and Kubernetes version are the same as §3, on a
+fresh profile with more resources. `--ports` publishes five NodePorts
+on `127.0.0.1` (the `ISTIO_PORTS` map in `scripts/lib/_helpers.sh`):
 
-After it starts, your kubectl context points at the `istio`
-cluster. You can confirm:
+| Host | NodePort | Reaches |
+|---|---|---|
+| `127.0.0.1:8080` | 30880 | Istio ingress gateway (Bookinfo) |
+| `127.0.0.1:20001` | 30201 | Kiali |
+| `127.0.0.1:3000` | 30300 | Grafana |
+| `127.0.0.1:9090` | 30990 | Prometheus |
+| `127.0.0.1:16686` | 31686 | Jaeger |
+
+Published ports are fixed when the profile is created. If an `istio`
+profile already exists without them, delete and recreate it:
+`minikube delete -p istio`, then run the command above.
+`examples/11-istio/demo.sh` creates the profile this way and stops with
+the same advice if the ports are missing.
+
+After it starts, minikube creates a kubectl context named `istio`.
+Every command in this chapter names it explicitly with
+`--context istio`, so the §6-§9 `minikube` profile is never touched
+by accident. Confirm the profile and the published ports:
 
 ```bash
-kubectl config current-context  # → istio
 minikube profile list
+docker port istio
 ```
 
-When you're done with §11 and want to go back to the §6-§9
-profile:
-
-```bash
-kubectl config use-context minikube
-```
-
-(Or use `kubectx` from §10.) `minikube stop -p istio` stops the
-istio cluster; `minikube delete -p istio` removes it entirely.
+`minikube stop -p istio` stops the istio cluster; `minikube delete -p
+istio` removes it entirely.
 
 ## Installing Istio
 
@@ -181,7 +193,7 @@ Should print `client version: 1.29.2`.
 ### Install the control plane
 
 ```bash
-istioctl install --set profile=demo -y
+istioctl --context istio install --set profile=demo -y
 ```
 
 The `demo` profile is what Istio's own tutorials use — it
@@ -192,7 +204,7 @@ slimmer profile (e.g., `default` or a custom IstioOperator).
 After ~30-60 seconds:
 
 ```bash
-kubectl get pods -n istio-system
+kubectl --context istio get pods -n istio-system
 ```
 
 ```
@@ -212,12 +224,12 @@ Two ways to opt a Pod into the mesh:
 ### Namespace label (the usual way)
 
 ```bash
-kubectl label namespace default istio-injection=enabled
+kubectl --context istio label namespace default istio-injection=enabled
 ```
 
 Every Pod created in `default` from now on gets the
 `istio-proxy` sidecar automatically. Existing Pods don't — you'd
-need to recreate them (e.g., `kubectl rollout restart deployment/nginx`).
+need to recreate them (e.g., `kubectl --context istio rollout restart deployment/nginx`).
 
 ### Per-Pod annotation (override)
 
@@ -282,8 +294,9 @@ spec:
     targetPort: 8080
 ```
 
-Same image as §6 (we'll need to rebuild it on this profile —
-images don't cross profiles), same Deployment shape with the
+Same image as §6 (the demo rebuilds it and loads it into this
+profile with `docker build` and `minikube image load`; images don't
+cross profiles), same Deployment shape with the
 mesh-injection annotation added. The Service is plain ClusterIP
 — Istio's sidecars provide mTLS between meshed Pods regardless
 of Service type.
@@ -291,13 +304,13 @@ of Service type.
 Apply:
 
 ```bash
-kubectl apply -f examples/11-istio/manifests/nginx-with-sidecar.yaml
+kubectl --context istio apply -f examples/11-istio/manifests/nginx-with-sidecar.yaml
 ```
 
 Watch:
 
 ```bash
-kubectl get pods -l app=nginx-istio
+kubectl --context istio get pods -l app=nginx-istio
 ```
 
 ```
@@ -362,17 +375,19 @@ runs init-first, but with `restartPolicy: Always` so it never
 Useful istioctl commands:
 
 ```bash
+POD=$(kubectl --context istio get pod -l app=nginx-istio -o jsonpath='{.items[0].metadata.name}')
+
 # What Envoy clusters does this Pod know about?
-istioctl proxy-config clusters $(kubectl get pod -l app=nginx-istio -o jsonpath='{.items[0].metadata.name}')
+istioctl --context istio proxy-config clusters "$POD"
 
 # What listeners?
-istioctl proxy-config listeners $(kubectl get pod -l app=nginx-istio -o jsonpath='{.items[0].metadata.name}')
+istioctl --context istio proxy-config listeners "$POD"
 
 # What route rules?
-istioctl proxy-config routes $(kubectl get pod -l app=nginx-istio -o jsonpath='{.items[0].metadata.name}')
+istioctl --context istio proxy-config routes "$POD"
 
 # Cluster-wide sanity check
-istioctl analyze
+istioctl --context istio analyze
 ```
 
 These get more interesting once Bookinfo's routing rules are in
@@ -413,13 +428,13 @@ between:
 - **v2** — black ratings stars (calls `ratings`)
 - **v3** — red ratings stars (calls `ratings`)
 
-By default, traffic round-robins across all three; we'll add
+By default, traffic round-robins across all three; later steps add
 rules that pin or split.
 
 ### Deploy
 
 ```bash
-kubectl apply -f ~/.local/share/istio-current/samples/bookinfo/platform/kube/bookinfo.yaml
+kubectl --context istio apply -f ~/.local/share/istio-current/samples/bookinfo/platform/kube/bookinfo.yaml
 ```
 
 (`istio-current` is the symlink the setup script created.)
@@ -429,8 +444,8 @@ three reviews versions, each with 2 containers (app + sidecar).
 Give it 1-2 minutes.
 
 ```bash
-kubectl get pods
-kubectl get svc
+kubectl --context istio get pods
+kubectl --context istio get svc
 ```
 
 ### Expose via the ingress gateway
@@ -441,46 +456,39 @@ the ingress gateway to listen on a host/port) and a
 productpage Service):
 
 ```bash
-kubectl apply -f ~/.local/share/istio-current/samples/bookinfo/networking/bookinfo-gateway.yaml
+kubectl --context istio apply -f ~/.local/share/istio-current/samples/bookinfo/networking/bookinfo-gateway.yaml
 ```
 
 Verify config is clean:
 
 ```bash
-istioctl analyze
+istioctl --context istio analyze
 ```
 
 ### Reaching Bookinfo
 
-Under rootless podman (same situation as §7), the ingress
-gateway's IP isn't host-routable. Two ways to reach it:
-
-**Option A: kubectl port-forward** (consistent with §6/§9):
+The `istio` profile publishes NodePort 30880 on `127.0.0.1:8080`, but
+the upstream `istio-ingressgateway` Service is a LoadBalancer with
+its own ports. A companion NodePort Service owned by this repo
+selects the same gateway Pods and listens on 30880, so
+`istioctl install` never reverts it:
 
 ```bash
-kubectl port-forward -n istio-system service/istio-ingressgateway 8080:80
+kubectl --context istio apply -f examples/11-istio/host-access/ingressgateway-host.yaml
 ```
 
-Then in another terminal:
+Then:
 
 ```bash
 curl http://127.0.0.1:8080/productpage
 ```
 
-**Option B: minikube tunnel** (Istio's documented approach):
+Open the same URL in a browser for the rendered page. If the curl
+gets no answer, check `docker port istio 30880/tcp`: an empty result
+means the profile was created without `--ports`, and the fix is to
+recreate it (see Profile setup).
 
-```bash
-minikube tunnel -p istio   # leave running in another terminal
-# Then look up the ingress gateway's external IP
-INGRESS_HOST=$(kubectl get svc -n istio-system istio-ingressgateway -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
-curl http://${INGRESS_HOST}/productpage
-```
-
-The demo uses Option A — simpler, doesn't need a second
-terminal. For interactive exploration, Option B + a browser
-gives the cleaner experience.
-
-Either way, refresh the page a few times. The reviews section
+Refresh the page a few times. The reviews section
 cycles through three versions (no ratings, black stars, red
 stars) because the default routing is round-robin.
 
@@ -495,14 +503,14 @@ First, define `DestinationRule`s that name the three subsets of
 the reviews Service:
 
 ```bash
-kubectl apply -f ~/.local/share/istio-current/samples/bookinfo/networking/destination-rule-all.yaml
+kubectl --context istio apply -f ~/.local/share/istio-current/samples/bookinfo/networking/destination-rule-all.yaml
 ```
 
 Then a `VirtualService` that sends 100% of reviews traffic to
 v1:
 
 ```bash
-kubectl apply -f ~/.local/share/istio-current/samples/bookinfo/networking/virtual-service-all-v1.yaml
+kubectl --context istio apply -f ~/.local/share/istio-current/samples/bookinfo/networking/virtual-service-all-v1.yaml
 ```
 
 Refresh the productpage a few times. The reviews section is now
@@ -512,7 +520,7 @@ Refresh the productpage a few times. The reviews section is now
 ### 50/50 between v1 and v3
 
 ```bash
-kubectl apply -f ~/.local/share/istio-current/samples/bookinfo/networking/virtual-service-reviews-50-v3.yaml
+kubectl --context istio apply -f ~/.local/share/istio-current/samples/bookinfo/networking/virtual-service-reviews-50-v3.yaml
 ```
 
 Refresh a dozen times. Roughly half show no ratings (v1), half
@@ -528,7 +536,7 @@ that your app handles upstream failures gracefully.
 Add a 7-second delay to all calls hitting ratings:
 
 ```bash
-kubectl apply -f ~/.local/share/istio-current/samples/bookinfo/networking/virtual-service-ratings-test-delay.yaml
+kubectl --context istio apply -f ~/.local/share/istio-current/samples/bookinfo/networking/virtual-service-ratings-test-delay.yaml
 ```
 
 Refresh the productpage. The ratings panel takes 7 seconds to
@@ -547,35 +555,42 @@ exploring on your own):
 ## Observability: the addons
 
 Istio doesn't include Kiali / Prometheus / Grafana / Jaeger
-by default, but ships sample manifests for them:
+by default, but ships sample manifests for them. Apply the addons,
+then the companion NodePort Services that put each UI on a published
+host port:
 
 ```bash
-kubectl apply -f ~/.local/share/istio-current/samples/addons/
+kubectl --context istio apply -f ~/.local/share/istio-current/samples/addons/
+kubectl --context istio apply -f examples/11-istio/host-access/
 ```
 
-~5 minutes to come up. Then:
+The addons take about 5 minutes to come up. Then open:
 
-```bash
-istioctl dashboard kiali
-```
+| UI | URL |
+|---|---|
+| Kiali | `http://127.0.0.1:20001/kiali` |
+| Grafana | `http://127.0.0.1:3000` |
+| Prometheus | `http://127.0.0.1:9090` |
+| Jaeger | `http://127.0.0.1:16686` |
 
-Opens Kiali in your browser. The most useful view is the
+(`host-access/` also holds `ingressgateway-host.yaml`; applying it
+again is harmless.)
+
+The most useful Kiali view is the
 **service graph** — visualize the entire mesh as a directed
 graph of Services, with live traffic rates and golden signals on
 each edge. The current routing rules show up as colored edges
 (green for healthy, red for errors). Apply the 50/50 split rule
 and you'll see the traffic visibly diverge in real time.
 
-Other dashboards:
-
-- `istioctl dashboard prometheus` — raw metrics
-- `istioctl dashboard grafana` — pre-built Istio dashboards
-- `istioctl dashboard jaeger` — distributed traces
+Grafana carries pre-built Istio dashboards, Prometheus answers raw
+metric queries, and Jaeger shows distributed traces.
 
 The addons are **not part of the §11 demo** because they take 5+
 minutes to come up and aren't critical for the routing exercises.
 Install them when you want the visual feedback; uninstall with
-`kubectl delete -f ~/.local/share/istio-current/samples/addons/`.
+`kubectl --context istio delete -f ~/.local/share/istio-current/samples/addons/`
+and `kubectl --context istio delete -f examples/11-istio/host-access/`.
 
 ## Exploring with Kiali after the demo
 
@@ -589,8 +604,7 @@ the `istio` profile, and any subsequent run starts fresh.
 the moment the demo finishes.** If you open Kiali immediately
 after a `✓ SUCCESS` run, you'll see the mesh control plane
 (istio-ingressgateway, istiod, the gateways) but no application
-traffic to graph, and a `kubectl port-forward` to the
-ingressgateway will fail with "connection refused" because no
+traffic to graph, and a request to `127.0.0.1:8080` will fail with "connection refused" because no
 Gateway resource is configured to make Envoy bind to port 8080.
 
 To explore Kiali with a live mesh, redeploy Bookinfo manually
@@ -598,15 +612,13 @@ after the demo runs:
 
 ```bash
 ISTIO_DIR=~/.local/share/istio-current
-kubectl config use-context istio
-
 # Redeploy the workload + Gateway + DestinationRules
-kubectl apply -f $ISTIO_DIR/samples/bookinfo/platform/kube/bookinfo.yaml
-kubectl wait --for=condition=Available --timeout=180s \
+kubectl --context istio apply -f $ISTIO_DIR/samples/bookinfo/platform/kube/bookinfo.yaml
+kubectl --context istio wait --for=condition=Available --timeout=180s \
     deployment/productpage-v1 deployment/details-v1 deployment/ratings-v1 \
     deployment/reviews-v1 deployment/reviews-v2 deployment/reviews-v3
-kubectl apply -f $ISTIO_DIR/samples/bookinfo/networking/bookinfo-gateway.yaml
-kubectl apply -f $ISTIO_DIR/samples/bookinfo/networking/destination-rule-all.yaml
+kubectl --context istio apply -f $ISTIO_DIR/samples/bookinfo/networking/bookinfo-gateway.yaml
+kubectl --context istio apply -f $ISTIO_DIR/samples/bookinfo/networking/destination-rule-all.yaml
 ```
 
 Now Bookinfo is running independently of the demo. Install the
@@ -616,8 +628,9 @@ Loki) which the demo deliberately doesn't install — they take
 assertions:
 
 ```bash
-kubectl apply -f $ISTIO_DIR/samples/addons/
-kubectl wait --for=condition=Available --timeout=300s \
+kubectl --context istio apply -f $ISTIO_DIR/samples/addons/
+kubectl --context istio apply -f examples/11-istio/host-access/
+kubectl --context istio wait --for=condition=Available --timeout=300s \
     deployment/kiali deployment/prometheus deployment/grafana deployment/jaeger \
     -n istio-system
 ```
@@ -625,17 +638,10 @@ kubectl wait --for=condition=Available --timeout=300s \
 Generate some traffic so Kiali has data to graph:
 
 ```bash
-kubectl port-forward -n istio-system service/istio-ingressgateway 8080:80 &
 for i in {1..200}; do curl -s http://127.0.0.1:8080/productpage >/dev/null; sleep 0.15; done
 ```
 
-Open Kiali:
-
-```bash
-istioctl dashboard kiali
-```
-
-The Kiali UI opens at `http://localhost:20001/kiali/`. The
+Open `http://127.0.0.1:20001/kiali/` in a browser. The
 **Overview** page shows namespace cards with live inbound
 traffic rates per namespace. The default namespace card should
 show `4 application` (productpage, details, ratings, reviews)
@@ -665,7 +671,7 @@ it's open:
 
 1. **Apply v1 pinning** in another terminal:
    ```bash
-   kubectl apply -f $ISTIO_DIR/samples/bookinfo/networking/virtual-service-all-v1.yaml
+   kubectl --context istio apply -f $ISTIO_DIR/samples/bookinfo/networking/virtual-service-all-v1.yaml
    for i in {1..100}; do curl -s http://127.0.0.1:8080/productpage >/dev/null; sleep 0.1; done
    ```
    Kiali's graph redraws within 10-15 seconds. Traffic now
@@ -674,20 +680,20 @@ it's open:
 
 2. **Apply fault injection** to see what unhealthy looks like:
    ```bash
-   kubectl apply -f $ISTIO_DIR/samples/bookinfo/networking/virtual-service-ratings-test-delay.yaml
+   kubectl --context istio apply -f $ISTIO_DIR/samples/bookinfo/networking/virtual-service-ratings-test-delay.yaml
    for i in {1..50}; do curl -s -o /dev/null http://127.0.0.1:8080/productpage; done
    ```
    The ratings edge goes yellow or red as Kiali notices the 7s
    artificial delay. Refresh productpage in a browser — the
    ratings panel takes seven seconds to render
 
-3. **Other dashboards** are one command each:
-   - `istioctl dashboard grafana` — pre-built dashboards for
-     mesh metrics
-   - `istioctl dashboard jaeger` — distributed traces of
+3. **Other dashboards** are one URL each:
+   - Grafana at `http://127.0.0.1:3000` — pre-built dashboards
+     for mesh metrics
+   - Jaeger at `http://127.0.0.1:16686` — distributed traces of
      productpage requests through the call graph
-   - `istioctl dashboard prometheus` — raw metrics queries, for
-     the curious
+   - Prometheus at `http://127.0.0.1:9090` — raw metrics queries,
+     for the curious
 
 This is the moment §11 stops being abstract: every Service-to-
 Service call you've configured through DestinationRule and
@@ -699,7 +705,8 @@ When you're done exploring, remove the addons (they're heavy
 and not needed for §12 or anything later in the tutorial):
 
 ```bash
-kubectl delete -f $ISTIO_DIR/samples/addons/
+kubectl --context istio delete -f examples/11-istio/host-access/
+kubectl --context istio delete -f $ISTIO_DIR/samples/addons/
 ```
 
 This keeps Istio itself installed; just removes the four
@@ -707,26 +714,23 @@ observability tools. To also clean up the manually-redeployed
 Bookinfo:
 
 ```bash
-kubectl delete -f $ISTIO_DIR/samples/bookinfo/networking/
-kubectl delete -f $ISTIO_DIR/samples/bookinfo/platform/kube/bookinfo.yaml
+kubectl --context istio delete -f $ISTIO_DIR/samples/bookinfo/networking/
+kubectl --context istio delete -f $ISTIO_DIR/samples/bookinfo/platform/kube/bookinfo.yaml
 ```
 
-Then switch back to the `minikube` profile for the rest of the
-tutorial:
-
-```bash
-kubectl config use-context minikube
-```
+The rest of the tutorial uses the `minikube` profile; nothing in
+this chapter changed your current kubectl context, so there is
+nothing to switch back.
 
 ## Cleanup
 
-The §11 demo's trap cleans up Bookinfo, our nginx, and the
+The §11 demo's trap cleans up Bookinfo, the nginx Deployment, and the
 routing rules. To uninstall Istio itself:
 
 ```bash
-istioctl uninstall --purge -y
-kubectl delete namespace istio-system
-kubectl label namespace default istio-injection-
+istioctl --context istio uninstall --purge -y
+kubectl --context istio delete namespace istio-system
+kubectl --context istio label namespace default istio-injection-
 ```
 
 To stop the istio profile:
@@ -745,16 +749,18 @@ minikube delete -p istio
 
 `examples/11-istio/demo.sh` runs the §11 happy path:
 
-1. Pre-flight: istio profile up; kubectl context is `istio`;
+1. Pre-flight: Docker Engine reachable; istio profile up with its
+   published NodePorts; every call pinned to the `istio` context;
    istioctl in PATH; ISTIO_DIR symlink exists
-2. Build `nginx-custom:v1` in the istio profile (image cache
-   doesn't carry across profiles)
-3. Install Istio if not already installed (`istioctl install`)
+2. `docker build` `nginx-custom:v1` and `minikube image load` it into
+   the istio profile (image cache doesn't carry across profiles)
+3. Install Istio if not already installed (`istioctl install`) and
+   apply the `ingressgateway-host` companion Service
 4. Label `default` namespace for injection
 5. Deploy our nginx-with-sidecar; verify 2/2 containers
 6. Deploy Bookinfo; wait for all Pods to be Ready
 7. Apply the Gateway + VirtualService
-8. Port-forward the ingress gateway; curl `/productpage`;
+8. Curl `http://127.0.0.1:8080/productpage` (NodePort 30880);
    verify the response contains expected markers (e.g. the
    "Bookinfo Sample" heading)
 9. Apply destination rules + all-v1 routing; curl productpage
@@ -764,8 +770,8 @@ minikube delete -p istio
     roughly 8-12 of 20 if split is working
 11. Cleanup all bookinfo and nginx resources on exit (trap)
 
-Restoring kubectl context to `minikube` (the §6-§9 profile)
-happens in the trap too.
+The demo pins `--context istio` on every call, so your current kubectl
+context is never changed.
 
 ```bash
 cd examples/11-istio
@@ -775,7 +781,7 @@ cd examples/11-istio
 Expected duration: **5-10 minutes** for the full run. Most of it
 is Bookinfo Pod startup and waiting for sidecars to be ready.
 First run after `setup-istio.sh` adds 2-4 minutes for the
-nginx-custom image build on the new profile.
+nginx-custom image build and load on the new profile.
 
 This is the longest single demo in the tutorial. The phases are
 idempotent — re-running picks up where the cluster state left
