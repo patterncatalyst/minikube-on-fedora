@@ -12,6 +12,10 @@ image:
   pullPolicy: IfNotPresent
 
 service:
+  # NodePort published by the mof-capstone profile (CAPSTONE_PORTS in
+  # scripts/lib/env.sh).
+  type: NodePort
+  nodePort: 30185
   port: 8080
   targetPort: 8080
 

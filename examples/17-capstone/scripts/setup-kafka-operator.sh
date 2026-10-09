@@ -11,9 +11,10 @@
 # Idempotent: re-running upgrades the operator in place.
 
 set -euo pipefail
-export MINIKUBE_ROOTLESS=true   # CAP-010
 
-NS="capstone"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/env.sh"
+
 STRIMZI_VERSION="0.51.0"
 
 step() { printf '\n==> %s\n' "$1"; }

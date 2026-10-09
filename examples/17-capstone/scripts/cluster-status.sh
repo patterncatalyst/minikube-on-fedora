@@ -6,9 +6,9 @@
 # answer during the r29c debugging marathon:
 #   - Is the profile running and is the control plane actually healthy?
 #     (etcd can crashloop in place after a long uptime — see §17 troubleshooting.)
-#   - Which locally-built images are MISSING from the in-cluster registry?
-#     (The registry does not persist across `minikube stop/start`; missing
-#     images surface as ImagePullBackOff "not found".)
+#   - Which locally-built images are MISSING from the node?
+#     (`minikube -p mof-capstone image ls`; a missing image surfaces as
+#     ErrImageNeverPull because the Deployments use pullPolicy: Never.)
 #   - Are the core services, KEDA, and the observability stack up?
 #
 # Read-only: it changes nothing. Use it any time something looks off, and as the
@@ -17,11 +17,12 @@
 # Run from examples/17-capstone/:  ./scripts/cluster-status.sh
 
 set -uo pipefail
-export MINIKUBE_ROOTLESS=true   # CAP-010
 
-PROFILE="capstone"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/env.sh"
+
 TAG="v1"
-# Services whose images live in the in-cluster registry (one per services/ dir).
+# Services whose images are loaded into the node (one per services/ dir).
 SERVICES=(graphql-gateway inventory-service notification-service order-service payment-service shipping-service)
 
 step() { printf '\n==> %s\n' "$1"; }
@@ -65,26 +66,25 @@ else
     ok "etcd / scheduler / controller-manager all Running"
 fi
 
-# ─── In-cluster registry: which images are missing? ──────────────────────────
-step "In-cluster registry images"
-HOST_PORT="$(podman port "$PROFILE" 2>/dev/null | awk -F'[:]' '/5000\/tcp/ {print $NF; exit}')"
-if [[ -z "$HOST_PORT" ]]; then
-    warn "could not find the registry host port (is the registry addon enabled?)"
+# ─── Node images: which are missing? ─────────────────────────────────────────
+step "Node images (minikube -p $PROFILE image ls)"
+node_images="$(minikube -p "$PROFILE" image ls 2>/dev/null || true)"
+if [[ -z "$node_images" ]]; then
+    warn "could not list images in profile $PROFILE"
     note_problem
 else
-    HOST_REG="127.0.0.1:${HOST_PORT}"
     missing=()
     for svc in "${SERVICES[@]}"; do
-        if curl -fsS --max-time 4 "http://${HOST_REG}/v2/${svc}/tags/list" 2>/dev/null | grep -q "\"${TAG}\""; then
+        if grep -qE "(^|/)${svc}:${TAG}\$" <<<"$node_images"; then
             :
         else
             missing+=("$svc")
         fi
     done
     if [[ ${#missing[@]} -eq 0 ]]; then
-        ok "all ${#SERVICES[@]} service images present (:${TAG}) in registry at ${HOST_REG}"
+        ok "all ${#SERVICES[@]} service images present (:${TAG}) in the node"
     else
-        bad "missing from registry (will cause ImagePullBackOff): ${missing[*]}"
+        bad "missing from the node (will cause ErrImageNeverPull): ${missing[*]}"
         warn "rebuild them with: ./scripts/cluster-up.sh   (or per-image: ./scripts/build-image.sh services/<svc> <svc> ${TAG})"
         note_problem
     fi

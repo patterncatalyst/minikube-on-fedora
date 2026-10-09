@@ -21,7 +21,8 @@
 #   * apiVersion http.keda.sh/v1alpha1 (matches the §12 add-on version, 0.12.x).
 #   * scaleTargetRef.service/port reference the gateway's ClusterIP Service.
 #   * Traffic must arrive via the interceptor with a matching Host header
-#     (the smoke port-forwards keda-add-ons-http-interceptor-proxy and sets it).
+#     (the smoke posts to the interceptor's published NodePort, 127.0.0.1:8081
+#     -> 30881 via host-access/interceptor-host.yaml, and sets it).
 apiVersion: http.keda.sh/v1alpha1
 kind: HTTPScaledObject
 metadata:

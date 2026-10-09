@@ -16,7 +16,7 @@ temporary demo product: `up` adds the edge, `down` removes it, leaving the
 permanent spine untouched.
 
 Mirrors lineage.py exactly (stdlib only; OM_HOST/OM_JWT from env), so it runs
-either in the ingestion image or host-side against a port-forwarded server.
+either in the ingestion image or host-side against the published server (127.0.0.1:8585).
 
 Usage:  OM_HOST=... OM_JWT=... ./reviews_lineage.py up|down
 

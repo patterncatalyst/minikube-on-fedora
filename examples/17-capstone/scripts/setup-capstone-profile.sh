@@ -1,26 +1,30 @@
 #!/usr/bin/env bash
 #
-# setup-capstone-profile.sh — create (or replace) the capstone minikube
+# setup-capstone-profile.sh — create (or replace) the mof-capstone minikube
 # profile sized for the full §17 stack.
 #
-# The capstone profile is intentionally separate from §3's `minikube`
-# profile and §11's `istio` profile so the larger resource footprint
-# doesn't disturb earlier sections' state. Idempotent: safe to re-run.
+# The profile is intentionally separate from §3's `minikube` profile and §11's
+# `istio` profile so the larger resource footprint doesn't disturb earlier
+# sections' state. It is named `mof-capstone` (not `capstone`) because the name
+# `capstone` belongs to another repository's cluster on the same host; the
+# Kubernetes namespace stays `capstone`. Idempotent: safe to re-run.
+#
+# Runs on Docker Engine (docker driver, containerd runtime) and publishes every
+# host-facing NodePort at creation (CAPSTONE_PORTS in scripts/lib/env.sh).
+# Published ports are fixed when the profile is created, which is why a
+# profile created without them has to be deleted and recreated.
 #
 # Usage:
 #   ./setup-capstone-profile.sh             # start (or do nothing if running)
-#   ./setup-capstone-profile.sh --replace   # delete first, then start fresh
+#   ./setup-capstone-profile.sh --replace   # delete mof-capstone first, then start fresh
 
 set -euo pipefail
-export MINIKUBE_ROOTLESS=true   # CAP-010: required so minikube uses rootless podman
-                                # for host ops (status/ssh/registry), not sudo podman
 
-PROFILE_NAME="capstone"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/env.sh"
+
 MEMORY="24g"
 CPUS="16"
-DISK="80g"
-RUNTIME="containerd"
-DRIVER="podman"
 
 REPLACE=0
 if [[ "${1:-}" == "--replace" ]]; then
@@ -29,15 +33,11 @@ fi
 
 # ─── Pre-flight ──────────────────────────────────────────────────────────────
 
-if ! command -v minikube >/dev/null 2>&1; then
-    printf 'ERROR: minikube not in PATH. See §2 for installation.\n' >&2
-    exit 1
-fi
+for tool in minikube kubectl jq; do
+    command -v "$tool" >/dev/null 2>&1 || fail "$tool not in PATH. See §1/§2 for installation."
+done
 
-if ! command -v podman >/dev/null 2>&1; then
-    printf 'ERROR: podman not in PATH. See §1 for installation.\n' >&2
-    exit 1
-fi
+require_docker_engine
 
 # Confirm inotify limits (§1's tweak). Capstone runs many controllers; the
 # Fedora default fs.inotify.max_user_instances=128 is insufficient.
@@ -53,64 +53,10 @@ if (( inotify_instances < 256 )); then
     exit 1
 fi
 
-# Confirm podman's default pids_limit is raised (CAP-040). The podman driver
-# creates the minikube node as a container whose ROOT cgroup pids.max is
-# podman's default (--pids-limit=2048) — a cap on TOTAL processes across ALL
-# pods on the node. The full meshed capstone (CNPG, Kafka, KEDA, OpenMetadata +
-# OpenSearch JVMs, observability, six services, and six Envoy sidecars under
-# namespace-wide injection) runs ~2000+ tasks and saturates 2048 — so the
-# kubelet can't fork the last pod's init (order-service: EAGAIN, runc exit 128,
-# "fork/exec ...: resource temporarily unavailable", CrashLoopBackOff/StartError).
-# The node-container cgroup pids.max is NOT writable live on a rootless node
-# (Operation not permitted), so the only durable fix is at CREATION time: raise
-# podman's default via containers.conf before the node is built.
-# Parse the effective podman default pids_limit from containers.conf (user first,
-# then system). The trailing `|| true` is ESSENTIAL: under `set -e` + `pipefail`,
-# a `var=$(...)` assignment aborts the whole script if the inner pipeline returns
-# non-zero — and this grep chain legitimately returns non-zero when a file is
-# absent or contains no match. That abort (not the arithmetic) was the real bug.
-pids_limit=$(
-    grep -hsE '^[[:space:]]*pids_limit[[:space:]]*=' \
-        "${HOME}/.config/containers/containers.conf" \
-        /etc/containers/containers.conf 2>/dev/null \
-        | tail -1 | grep -oE '[0-9]+' | tail -1 || true
-)
-pids_limit="${pids_limit:-2048}"
-pids_too_low=0
-# Use `(( ))` only as an if-condition (set-e-exempt position) and only on a
-# verified-numeric value.
-if [[ "$pids_limit" != "0" ]] && [[ "$pids_limit" =~ ^[0-9]+$ ]]; then
-    if (( pids_limit < 8192 )); then pids_too_low=1; fi
-fi
-if [[ "$pids_too_low" == "1" ]]; then
-    printf 'ERROR: podman default pids_limit is %s (need 0=unlimited or ≥ 8192).\n' "$pids_limit" >&2
-    printf 'The capstone node would be capped at %s total PIDs and the last pod\n' "$pids_limit" >&2
-    printf 'would fail to fork (EAGAIN / runc exit 128). Raise it before creating the node:\n' >&2
-    printf '  mkdir -p ~/.config/containers\n' >&2
-    printf '  printf '\''[containers]\\npids_limit = 0\\n'\'' >> ~/.config/containers/containers.conf\n' >&2
-    printf 'Then re-run this script (a node recreate is needed to pick it up).\n' >&2
-    exit 1
-fi
-if [[ "$pids_limit" == "0" ]]; then
-    pids_display="unlimited"
-else
-    pids_display="$pids_limit"
-fi
-printf '==> podman pids_limit OK (%s) — node will have PID headroom (CAP-040)\n' "$pids_display"
-
 # Warn (don't fail) if other minikube profiles are running. Capstone wants
 # the headroom.
 running_profiles=$(minikube profile list -o json 2>/dev/null \
-    | python3 -c '
-import json, sys
-try:
-    data = json.load(sys.stdin)
-    for p in data.get("valid", []):
-        if p["Name"] != "'"$PROFILE_NAME"'" and p.get("Status") == "Running":
-            print(p["Name"])
-except Exception:
-    pass
-' 2>/dev/null || true)
+    | jq -r --arg p "$PROFILE" '.valid[]? | select(.Name != $p and .Status == "Running") | .Name' 2>/dev/null || true)
 
 if [[ -n "$running_profiles" ]]; then
     printf 'WARNING: other minikube profiles are running and will compete for RAM:\n' >&2
@@ -123,57 +69,55 @@ fi
 
 # ─── Profile setup ───────────────────────────────────────────────────────────
 
-if minikube status -p "$PROFILE_NAME" >/dev/null 2>&1; then
-    if (( REPLACE )); then
-        printf '==> Deleting existing %s profile (--replace specified)\n' "$PROFILE_NAME"
-        minikube delete -p "$PROFILE_NAME"
-    else
-        printf '==> Profile %s already exists and is running. Pass --replace to recreate.\n' "$PROFILE_NAME"
-        printf '==> Switching kubectl context to %s\n' "$PROFILE_NAME"
-        kubectl config use-context "$PROFILE_NAME"
-        printf '==> Done. Current nodes:\n'
-        kubectl get nodes
-        exit 0
+if (( REPLACE )); then
+    if minikube profile list -o json 2>/dev/null \
+        | jq -e --arg n "$PROFILE" '[.valid[]?, .invalid[]?] | any(.Name == $n)' >/dev/null 2>&1; then
+        printf '==> Deleting existing %s profile (--replace specified)\n' "$PROFILE"
+        minikube delete -p "$PROFILE"
     fi
 fi
 
-printf '==> Starting %s profile (%s RAM, %s CPUs, %s disk, %s runtime)\n' \
-    "$PROFILE_NAME" "$MEMORY" "$CPUS" "$DISK" "$RUNTIME"
+printf '==> Ensuring the %s profile (%s RAM, %s CPUs, containerd runtime, docker driver)\n' \
+    "$PROFILE" "$MEMORY" "$CPUS"
+ensure_profile "$PROFILE" "$CAPSTONE_PORTS" "$CPUS" "$MEMORY"
 
-minikube start -p "$PROFILE_NAME" \
-    --memory="$MEMORY" \
-    --cpus="$CPUS" \
-    --disk-size="$DISK" \
-    --container-runtime="$RUNTIME" \
-    --driver="$DRIVER" \
-    --rootless=true \
-    --addons=metrics-server
-
-printf '==> Switching kubectl context to %s\n' "$PROFILE_NAME"
-kubectl config use-context "$PROFILE_NAME"
+printf '==> Enabling metrics-server\n'
+minikube addons enable metrics-server -p "$PROFILE" >/dev/null
 
 printf '==> Creating capstone namespace\n'
-kubectl create namespace capstone --dry-run=client -o yaml | kubectl apply -f -
+kubectl create namespace "$NS" --dry-run=client -o yaml | kubectl apply -f -
 
 printf '==> Verifying cluster health\n'
 kubectl get nodes
 kubectl get pods -n kube-system
 
-printf '==> Persisting rootless mode in minikube config (CAP-010)\n'
-minikube config set rootless true >/dev/null 2>&1 || true
-
-printf '==> Enabling the in-cluster registry addon (CAP-009)\n'
-minikube addons enable registry -p "$PROFILE_NAME"
-printf '    Host pushes to 127.0.0.1:<port> (see: podman port %s | grep 5000)\n' "$PROFILE_NAME"
-printf '    Cluster pulls from localhost:5000 — build-image.sh handles both.\n'
+# The node is a container; its PID limit caps TOTAL processes across all pods.
+# The full meshed capstone (CNPG, Kafka, KEDA, OpenMetadata + OpenSearch JVMs,
+# observability, services and their Envoy sidecars) runs ~2000+ tasks (CAP-040).
+# Docker Engine's default is unlimited (0 / -1); report the value, and fail only
+# when a daemon-level default clearly caps it.
+pids_limit=$(docker inspect -f '{{.HostConfig.PidsLimit}}' "$PROFILE" 2>/dev/null || echo unknown)
+case "$pids_limit" in
+    0|-1|"<nil>"|"") pids_display="unlimited" ;;
+    unknown)         pids_display="unknown" ;;
+    *)               pids_display="$pids_limit" ;;
+esac
+printf '==> Node PidsLimit: %s\n' "$pids_display"
+if [[ "$pids_limit" =~ ^[0-9]+$ ]] && (( pids_limit > 0 && pids_limit < 4096 )); then
+    printf 'ERROR: the node container is capped at %s PIDs; the full stack needs more.\n' "$pids_limit" >&2
+    printf 'The Docker daemon applies a default pids limit. Remove "default-pids-limit" from\n' >&2
+    printf '/etc/docker/daemon.json (or raise it), restart docker, then recreate the profile:\n' >&2
+    printf '  ./scripts/setup-capstone-profile.sh --replace\n' >&2
+    exit 1
+fi
 
 printf '\n'
 printf '==> Capstone profile is ready.\n'
 printf '\n'
-printf 'Next steps (per r20):\n'
+printf 'Next steps:\n'
 printf '  1. The platform stack (Strimzi, KEDA, Istio, Apicurio, OpenMetadata,\n'
-printf '     observability, Prefect, Postgres) installs in iterations r21-r27.\n'
+printf '     observability, Postgres) installs with ./scripts/bootstrap-capstone.sh.\n'
 printf '  2. To free the profile when done with §17:\n'
 printf '       ./scripts/teardown.sh\n'
-printf '  3. To switch back to a different profile:\n'
-printf '       kubectl config use-context minikube  # (or istio, etc.)\n'
+printf '  3. kubectl and helm in this repo always target the %s context;\n' "$PROFILE"
+printf '     your current-context is never changed by these scripts.\n'

@@ -6,28 +6,30 @@
 # was scattered across setup-* scripts, smokes, and helm installs) — which is why
 # every recovery had been manual archaeology.
 #
-# Use it after `minikube delete -p capstone` (a clean rebuild), or any time you
+# Use it after `minikube delete -p mof-capstone` (a clean rebuild), or any time you
 # want the full stack from nothing. Idempotent: helm upgrade --install, kubectl
 # apply, kubectl wait, and build-only-if-missing, so re-running resumes safely.
 #
 # Tiers (each gated on health before the next):
-#   1. profile + registry        5. Kafka operator + cluster CR
+#   1. profile (published ports)  5. Kafka operator + cluster CR
 #   2. Istio                      6. KEDA
 #   3. CloudNativePG operator     7. OpenMetadata (needs Postgres) + observability
 #   4. Postgres cluster CR        8. images → apicurio → services → scalers → seed
 #
-# Catalog population (discovery contracts + OpenMetadata ingestion) is printed as
-# the final follow-on rather than run inline — those need warm-server port-forwards
-# and are better as explicit steps (and the ingestion Jobs opt out of the mesh, r34).
+# Every host-facing Service is a NodePort published when the profile is created
+# (CAPSTONE_PORTS in scripts/lib/env.sh). Charts own the NodePorts of our own
+# services; third-party Services (ingress gateway, KEDA interceptor, Kiali,
+# Prometheus, Grafana, Tempo, OpenMetadata, Postgres) get a companion NodePort
+# Service from host-access/*.yaml, applied right after the component is installed.
+# The ingestion Jobs opt out of the mesh (r34).
 #
 # Run from examples/17-capstone/:  ./scripts/bootstrap-capstone.sh
 
 set -uo pipefail
-export MINIKUBE_ROOTLESS=true
 
-NS="capstone"
-PROFILE="capstone"
-ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"; cd "$ROOT"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+source "$SCRIPT_DIR/lib/env.sh"
+ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"; cd "$ROOT"
 
 PG_RELEASE="capstone-postgres";  PG_CHART="charts/capstone/charts/postgres"
 KAFKA_RELEASE="capstone-kafka";  KAFKA_CHART="charts/capstone/charts/kafka"; KAFKA_CR="capstone-kafka"
@@ -38,13 +40,14 @@ step() { printf '\n\033[1m==> %s\033[0m\n' "$1"; }
 ok()   { printf '    \xe2\x9c\x93 %s\n' "$1"; }
 fail() { printf '\n\xe2\x9c\x97 %s\n' "$1" >&2; exit 1; }
 
+apply_host_access() { kubectl apply -f "host-access/$1" >/dev/null || fail "host-access/$1 apply failed"; ok "host-access/$1 applied"; }
+
 wait_rollout() { kubectl rollout status "$1" -n "$NS" --timeout="${2:-300s}"; }
 
 # ── Tier 1: profile + registry ───────────────────────────────────────────────
-step "1/10 Profile + in-cluster registry"
+step "1/10 Profile (docker driver, containerd, published NodePorts)"
 ./scripts/setup-capstone-profile.sh || fail "profile setup failed"
-[[ "$(kubectl config current-context 2>/dev/null)" == "$PROFILE" ]] || kubectl config use-context "$PROFILE"
-ok "profile up, context set"
+ok "profile $PROFILE up (kubectl/helm pinned to context $PROFILE)"
 
 # ── Tier 2: Istio ────────────────────────────────────────────────────────────
 step "2/10 Istio control plane"
@@ -53,6 +56,8 @@ kubectl get ns istio-system >/dev/null 2>&1 && kubectl get deploy istiod -n isti
     || { ./scripts/setup-istio.sh || fail "istio setup failed"; }
 kubectl wait -n istio-system --for=condition=Available deploy/istiod --timeout=180s || fail "istiod not Available"
 ok "istiod Available"
+kubectl rollout status deployment/istio-ingressgateway -n istio-system --timeout=180s || fail "istio-ingressgateway not rolled out"
+apply_host_access ingressgateway-host.yaml
 
 # ── Tier 3: CloudNativePG operator ───────────────────────────────────────────
 step "3/10 CloudNativePG operator"
@@ -63,6 +68,7 @@ kubectl get crd clusters.postgresql.cnpg.io >/dev/null 2>&1 \
 # ── Tier 4: Postgres cluster CR (OpenMetadata depends on this) ───────────────
 step "4/10 Postgres cluster"
 helm upgrade --install "$PG_RELEASE" "$PG_CHART" -n "$NS" --create-namespace || fail "postgres CR install failed"
+apply_host_access postgres-host.yaml
 pg_ready=0
 for i in $(seq 1 72); do
     kubectl get pods -n "$NS" -l "cnpg.io/cluster=$PG_RELEASE,role=primary" \
@@ -87,6 +93,7 @@ step "6/10 KEDA (core + HTTP add-on)"
 kubectl get crd scaledobjects.keda.sh >/dev/null 2>&1 \
     && ok "KEDA CRDs present" \
     || { ./scripts/setup-keda.sh || fail "keda setup failed"; }
+apply_host_access interceptor-host.yaml
 
 # ── Tier 7: OpenMetadata (needs Postgres) + observability ────────────────────
 step "7/10 OpenMetadata + observability"
@@ -97,20 +104,21 @@ kubectl get deploy openmetadata -n "$NS" >/dev/null 2>&1 \
 kubectl scale deploy openmetadata -n "$NS" --replicas=1 >/dev/null 2>&1 || true
 wait_rollout deploy/openmetadata 420s || fail "openmetadata did not roll out"
 ok "OpenMetadata rolled out"
+apply_host_access openmetadata-host.yaml
 ./scripts/setup-observability.sh || fail "observability setup failed"
+for f in prometheus-host.yaml grafana-host.yaml tempo-host.yaml; do apply_host_access "$f"; done
 ok "observability (Prometheus/Grafana/Tempo) installed"
 
 # ── Tier 8: images → apicurio → services → scalers → seed ────────────────────
 step "8/10 Workloads: images, apicurio, services, scalers"
-HOST_PORT="$(podman port "$PROFILE" 2>/dev/null | awk -F'[:]' '/5000\/tcp/ {print $NF; exit}')"
-[[ -n "$HOST_PORT" ]] || fail "registry host port not found"
+node_images="$(minikube -p "$PROFILE" image ls 2>/dev/null || true)"
 for svc in "${SERVICES[@]}"; do
-    if curl -fsS --max-time 4 "http://127.0.0.1:${HOST_PORT}/v2/${svc}/tags/list" 2>/dev/null | grep -q '"v1"'; then
-        ok "image ${svc}:v1 present"
+    if grep -qE "(^|/)${svc}:v1\$" <<<"$node_images"; then
+        ok "image ${svc}:v1 present in the node"
     else
         printf '    building %s...\n' "$svc"
         ./scripts/build-image.sh "services/${svc}" "$svc" v1 >/dev/null || fail "build of $svc failed"
-        ok "built ${svc}:v1"
+        ok "built and loaded ${svc}:v1"
     fi
 done
 
@@ -132,19 +140,17 @@ ok "core services Ready"
 
 # Seed one order so the Kafka topic + Postgres have data for the catalog/ingestion.
 step "Seeding one order (gives the catalog data to ingest)"
-kubectl port-forward -n "$NS" svc/order-service 18080:80 >/dev/null 2>&1 &
-SEED_PF=$!; sleep 3
-curl -s -o /dev/null --max-time 8 -X POST "http://127.0.0.1:18080/orders" \
+curl -s -o /dev/null --max-time 8 -X POST "http://127.0.0.1:${HOST_PORT_ORDER}/orders" \
     -H 'Content-Type: application/json' \
     --data '{"customer_id":"cust-1001","item_sku":"SKU-ABC-42","quantity":1,"amount":19.99}' \
     && ok "seed order placed" || printf '    (seed skipped — place one later via smoke-order.sh)\n'
-kill "$SEED_PF" 2>/dev/null || true
 
 # ── Tier 9: Kiali (mesh topology console for the walkthrough's act 5) ───────
 # Kiali is additive and lives in istio-system; depends on Istio + observability
 # (it points at the existing Prometheus/Grafana/Tempo, single-stack — CAP-042).
 step "9/10 Kiali (mesh-topology console for the walkthrough)"
 ./scripts/setup-kiali.sh || fail "kiali setup failed"
+apply_host_access kiali-host.yaml
 ok "kiali installed (wired to the capstone observability stack)"
 
 # ── Tier 10: catalog ingestion (populate OpenMetadata + declare lineage) ────

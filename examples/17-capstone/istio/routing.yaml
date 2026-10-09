@@ -15,7 +15,8 @@
 # matches §11's 1.29.x — these are not renderable offline):
 #   * apiVersion networking.istio.io/v1 (v1beta1 also accepted on 1.29.x).
 #   * The Gateway selector `istio: ingressgateway` matches the default
-#     ingress-gateway install; the smoke port-forwards that Service.
+#     ingress-gateway install; the smoke reaches it on the published NodePort
+#     (127.0.0.1:8080 -> 30880 via host-access/ingressgateway-host.yaml).
 #   * Subset matching is by the `version` label set on the v1/v2 pods.
 ---
 apiVersion: networking.istio.io/v1

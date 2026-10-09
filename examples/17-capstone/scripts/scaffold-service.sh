@@ -8,8 +8,8 @@
 #                                       async SQLAlchemy wired to its own
 #                                       Postgres schema, UBI 9 Containerfile
 #   - charts/capstone/charts/<name>-service/   helm subchart (Deployment +
-#                                       Service), image pulled from the
-#                                       in-cluster registry (CAP-009)
+#                                       NodePort Service), bare image name
+#                                       loaded into the node, pullPolicy Never
 #
 # What it deliberately does NOT generate (added in later iterations):
 #   - domain tables / REST CRUD (r23+), gRPC (r23), GraphQL (r24),
@@ -22,7 +22,10 @@
 # useful for testing regardless (user decision, r22).
 #
 # Usage:
-#   ./scripts/scaffold-service.sh <name> <schema>
+#   ./scripts/scaffold-service.sh <name> <schema> [nodePort]
+# nodePort defaults to 30189 (host 18089). The service is published as a
+# NodePort; the script prints the CAPSTONE_PORTS entry to add (and the
+# profile has to be recreated for a new entry to take effect).
 # Examples:
 #   ./scripts/scaffold-service.sh inventory inventory
 #   ./scripts/scaffold-service.sh payment payments
@@ -35,7 +38,9 @@
 set -euo pipefail
 
 BASE="${1:?usage: scaffold-service.sh <name> <schema>   e.g. inventory inventory}"
-SCHEMA="${2:?usage: scaffold-service.sh <name> <schema>   (schema is often the plural, e.g. payment payments)}"
+SCHEMA="${2:?usage: scaffold-service.sh <name> <schema> [nodePort]   (schema is often the plural, e.g. payment payments)}"
+NODEPORT="${3:-30189}"
+HOSTPORT=$(( NODEPORT - 12100 ))   # table convention: 30180 -> 18080
 SERVICE="${BASE}-service"
 
 # Resolve repo-relative paths from the example root (parent of scripts/).
@@ -48,6 +53,7 @@ fail() { printf 'ERROR: %s\n' "$1" >&2; exit 1; }
 
 # Validate the name: lowercase letters, digits, hyphens (DNS-1123-ish).
 [[ "$BASE"   =~ ^[a-z][a-z0-9-]*$ ]] || fail "name '$BASE' must be lowercase alphanumeric/hyphen, starting with a letter"
+[[ "$NODEPORT" =~ ^3[0-2][0-9]{3}$ ]] || fail "nodePort '$NODEPORT' must be in 30000-32767"
 [[ "$SCHEMA" =~ ^[a-z][a-z0-9_]*$ ]] || fail "schema '$SCHEMA' must be lowercase alphanumeric/underscore, starting with a letter"
 [[ -d "$SVC_DIR" ]]   && fail "service dir already exists: $SVC_DIR (refusing to overwrite)"
 [[ -d "$CHART_DIR" ]] && fail "chart dir already exists: $CHART_DIR (refusing to overwrite)"
@@ -99,7 +105,7 @@ cat > "${SVC_DIR}/Containerfile" <<'EOF'
 # Per CONTRIBUTING.md: UBI 9 base, runtime as USER 1001:0.
 
 # ─── Builder (runs as root; image discarded) ─────────────────────────────────
-FROM registry.access.redhat.com/ubi9/python-312:latest AS builder
+FROM registry.access.redhat.com/ubi9/python-312:9.8-1791407922 AS builder
 
 USER 0
 WORKDIR /build
@@ -113,7 +119,7 @@ RUN poetry export --without-hashes --only main -f requirements.txt -o requiremen
     && /opt/venv/bin/pip install --no-cache-dir -r requirements.txt
 
 # ─── Runtime (non-root) ──────────────────────────────────────────────────────
-FROM registry.access.redhat.com/ubi9/python-312:latest AS runtime
+FROM registry.access.redhat.com/ubi9/python-312:9.8-1791407922 AS runtime
 
 WORKDIR /opt/app-root/src
 
@@ -169,7 +175,7 @@ cat > "${SVC_DIR}/app/config.py" <<'EOF'
 
 In-cluster, the Postgres connection comes from the CloudNativePG-generated
 Secret (`capstone-postgres-app`), surfaced as env vars by the helm subchart.
-Locally, the defaults allow running against a port-forwarded Postgres.
+Locally, the defaults allow running against the published Postgres NodePort (127.0.0.1:5432).
 """
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -386,17 +392,19 @@ cat > "${CHART_DIR}/values.yaml" <<'EOF'
 replicas: 1
 
 image:
-  # In-cluster registry address (CAP-009). build-image.sh pushes to
-  # 127.0.0.1:<port>; the kubelet pulls from localhost:5000.
-  repository: localhost:5000/__SERVICE__
+  # Bare name: build-image.sh builds with Docker and loads the image into the
+  # mof-capstone profile (minikube image load); nothing is pulled.
+  repository: __SERVICE__
   tag: v1
-  # Always: the :v1 tag is mutable during the dev loop, and the node caches
-  # images by tag — IfNotPresent would serve a stale cached :v1 after a
-  # rebuild. Local-registry pulls are cheap, so Always guarantees the pod
-  # runs what was just pushed (CAP-015).
-  pullPolicy: Always
+  # Never: the image only exists in the node via image load. build-image.sh
+  # runs kubectl rollout restart after each load so pods pick up a rebuild.
+  pullPolicy: Never
 
 service:
+  # NodePort published by the mof-capstone profile (CAPSTONE_PORTS in
+  # scripts/lib/env.sh).
+  type: NodePort
+  nodePort: __NODEPORT__
   port: 80
   targetPort: 8080
 
@@ -510,13 +518,16 @@ metadata:
     app.kubernetes.io/name: __SERVICE__
     app.kubernetes.io/part-of: capstone
 spec:
-  type: ClusterIP
+  type: {{ .Values.service.type | default "ClusterIP" }}
   selector:
     app.kubernetes.io/name: __SERVICE__
   ports:
     - name: http
       port: {{ .Values.service.port }}
       targetPort: {{ .Values.service.targetPort }}
+      {{- if and (eq (.Values.service.type | default "ClusterIP") "NodePort") .Values.service.nodePort }}
+      nodePort: {{ .Values.service.nodePort }}
+      {{- end }}
 EOF
 
 # ─── Substitute placeholders across everything just generated ─────────────────
@@ -524,7 +535,7 @@ EOF
 # {{ }} templating, which we left literal in quoted heredocs above).
 step "Substituting placeholders (__SERVICE__=${SERVICE}, __SCHEMA__=${SCHEMA})"
 find "$SVC_DIR" "$CHART_DIR" -type f -print0 | while IFS= read -r -d '' f; do
-    sed -i "s/__SERVICE__/${SERVICE}/g; s/__SCHEMA__/${SCHEMA}/g; s/__BASE__/${BASE}/g" "$f"
+    sed -i "s/__SERVICE__/${SERVICE}/g; s/__SCHEMA__/${SCHEMA}/g; s/__BASE__/${BASE}/g; s/__NODEPORT__/${NODEPORT}/g" "$f"
 done
 
 step "Done — scaffolded ${SERVICE}"
@@ -547,8 +558,14 @@ cat <<EOF
   charts/capstone/charts/${SERVICE}/   helm subchart
 
 Next:
-  1. Build + deploy + assert the probes:
+  1. Add the NodePort to the profile's port map (scripts/lib/env.sh), as both
+     a HOST_PORT_/NODE_PORT_ pair and a CAPSTONE_PORTS entry:
+       127.0.0.1:${HOSTPORT}:${NODEPORT}
+     Published ports are fixed when the profile is created, so recreate it:
+       ./scripts/teardown.sh --remove-profile && ./scripts/setup-capstone-profile.sh
+     (scripts/check-port-map.sh also checks the new entry against the chart.)
+  2. Build + deploy + assert the probes:
        ./demos/smoke-service.sh ${BASE}
-  2. When green, commit, then scaffold the next service.
+  3. When green, commit, then scaffold the next service.
 
 EOF

@@ -3,17 +3,19 @@
 replicas: 1
 
 image:
-  # In-cluster registry address (CAP-009). build-image.sh pushes to
-  # 127.0.0.1:<port>; the kubelet pulls from localhost:5000.
-  repository: localhost:5000/review-service
+  # Bare name: build-image.sh builds with Docker and loads it into the
+  # mof-capstone profile (minikube image load); nothing is pulled.
+  repository: review-service
   tag: v1
-  # Always: the :v1 tag is mutable during the dev loop, and the node caches
-  # images by tag — IfNotPresent would serve a stale cached :v1 after a
-  # rebuild. Local-registry pulls are cheap, so Always guarantees the pod
-  # runs what was just pushed (CAP-015).
-  pullPolicy: Always
+  # Never: the image only exists in the node via image load. build-image.sh
+  # runs kubectl rollout restart after each load so pods pick up a rebuild.
+  pullPolicy: Never
 
 service:
+  # NodePort published by the mof-capstone profile (CAPSTONE_PORTS in
+  # scripts/lib/env.sh).
+  type: NodePort
+  nodePort: 30186
   port: 80
   targetPort: 8080
 
