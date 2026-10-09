@@ -120,7 +120,10 @@ pass "all kube-system pods Ready"
 step "SUCCESS — minikube + kubectl + docker driver + containerd + published port all working"
 echo
 echo "  The driver-check profile will be torn down momentarily."
-echo "  To work with minikube interactively, start a separate cluster:"
-echo "    minikube start            # uses your default profile and config"
+echo "  To work with minikube interactively, create the default profile with"
+echo "  its published ports (§3):"
+echo "    minikube start -p minikube --driver=docker --container-runtime=containerd \\"
+echo "      --kubernetes-version=$KUBE_VERSION --cpus=6 --memory=16384 \\"
+echo "      --ports=$CORE_PORTS"
 echo
 exit 0
