@@ -6,11 +6,14 @@
 # HTTP add-on (BETA at v0.12.2 — see §12 prose).
 #
 # Phases:
-#   1.  Pre-flight: minikube up, KEDA + HTTP add-on installed
-#   2.  Build nginx-custom:v1 if not cached (reuses §6's Containerfile)
+#   1.  Pre-flight: Docker Engine, minikube up with its published
+#       NodePorts, KEDA + HTTP add-on installed, nodePort 30080 free
+#   2.  Build nginx-custom:v1 and load it if not cached (reuses §6's
+#       Containerfile)
 #   3.  Apply nginx Deployment (replicas: 0) + Service + HTTPScaledObject
 #   4.  Assert nginx is at 0 replicas
-#   5.  Port-forward the HTTP add-on interceptor to 127.0.0.1:18080
+#   5.  Apply the keda-interceptor-host companion NodePort Service
+#       (nodePort 30080 -> 127.0.0.1:18080)
 #   6.  Fire one request (Host: nginx.local) — interceptor buffers
 #       until the Pod is up. First request takes a few seconds
 #       (cold-start)
@@ -34,6 +37,8 @@ PROFILE_NAME="minikube"
 IMAGE_TAG="nginx-custom:v1"
 SECTION6_DIR="${REPO_ROOT}/examples/06-deploy-nginx-kubectl"
 MANIFESTS_DIR="${SCRIPT_DIR}/manifests"
+HOST_ACCESS_DIR="${SCRIPT_DIR}/host-access"
+INTERCEPTOR_NODEPORT=30080
 INTERCEPTOR_PORT=18080
 HOST_HEADER="nginx.local"
 LOAD_REQUESTS=500
@@ -41,16 +46,10 @@ LOAD_CONCURRENCY=50
 SCALEUP_TIMEOUT=120
 SCALEDOWN_TIMEOUT=120
 
-# ── State for cleanup ───────────────────────────────────────────────────────
-PF_PID=""
-
 cleanup() {
-    info "cleanup: stopping port-forward + removing nginx + HTTPScaledObject"
-    if [[ -n "${PF_PID}" ]] && kill -0 "${PF_PID}" 2>/dev/null; then
-        kill "${PF_PID}" 2>/dev/null || true
-        wait "${PF_PID}" 2>/dev/null || true
-    fi
-    pkill -f "kubectl port-forward.*keda-add-ons-http-interceptor" 2>/dev/null || true
+    info "cleanup: removing interceptor-host Service + nginx + HTTPScaledObject (frees nodePort 30080)"
+    kubectl delete -f "${HOST_ACCESS_DIR}/interceptor-host.yaml" \
+        --ignore-not-found=true >/dev/null 2>&1 || true
     kubectl delete -f "${MANIFESTS_DIR}/http-scaled-object.yaml" \
         --ignore-not-found=true >/dev/null 2>&1 || true
     kubectl delete -f "${MANIFESTS_DIR}/nginx-deployment.yaml" \
@@ -60,8 +59,9 @@ trap cleanup EXIT
 
 # ── Phase 1: Pre-flight ─────────────────────────────────────────────────────
 step "pre-flight: minikube up, KEDA + HTTP add-on installed"
-kubectl config use-context "${PROFILE_NAME}" >/dev/null 2>&1 || \
-    fail "kubectl context '${PROFILE_NAME}' not configured"
+require_docker_engine
+# Every kubectl / helm call below targets the minikube context explicitly
+pin_context "${PROFILE_NAME}"
 kubectl get nodes >/dev/null 2>&1 || fail "kubectl cannot reach the cluster"
 pass "minikube cluster reachable"
 
@@ -73,6 +73,12 @@ if ! kubectl get deployment keda-add-ons-http-interceptor -n keda >/dev/null 2>&
 fi
 pass "KEDA + HTTP add-on present in 'keda' namespace"
 
+# nodePort 30080 is shared by §6, §8, §9 and this demo; only one holds it.
+# Fails with "delete <ns>/<svc> first" if another Service has it.
+require_free_nodeport "${INTERCEPTOR_NODEPORT}"
+require_published_port "${PROFILE_NAME}" "${INTERCEPTOR_NODEPORT}" "${INTERCEPTOR_PORT}"
+pass "nodePort ${INTERCEPTOR_NODEPORT} free and published on 127.0.0.1:${INTERCEPTOR_PORT}"
+
 command -v hey >/dev/null 2>&1 || fail "hey not in PATH — see §2 (go install)"
 
 # ── Phase 2: Ensure nginx-custom image is cached ────────────────────────────
@@ -82,8 +88,8 @@ if ! minikube image ls -p "${PROFILE_NAME}" 2>/dev/null | grep -q "${IMAGE_TAG}"
     if [[ ! -f "${SECTION6_DIR}/Containerfile" ]]; then
         fail "${SECTION6_DIR}/Containerfile not found — examples/06 missing?"
     fi
-    minikube -p "${PROFILE_NAME}" image build -t "${IMAGE_TAG}" \
-        -f Containerfile "${SECTION6_DIR}"
+    build_and_load "${IMAGE_TAG}" "${SECTION6_DIR}" "${PROFILE_NAME}" \
+        || fail "build_and_load ${IMAGE_TAG} failed"
 fi
 pass "${IMAGE_TAG} available"
 
@@ -103,29 +109,31 @@ if [[ "${INITIAL_REPLICAS}" != "0" ]]; then
 fi
 pass "nginx at 0 replicas"
 
-# ── Phase 5: Port-forward the HTTP interceptor ──────────────────────────────
-step "port-forwarding HTTP add-on interceptor to 127.0.0.1:${INTERCEPTOR_PORT}"
-kubectl port-forward -n keda service/keda-add-ons-http-interceptor-proxy \
-    "${INTERCEPTOR_PORT}:8080" >/dev/null 2>&1 &
-PF_PID=$!
-# Wait for the port-forward TCP socket to accept connections. This is NOT
-# a check that routing works — just that the port-forward is up. The
-# cold-start phase below validates actual routing.
-PF_READY=""
+# ── Phase 5: Companion NodePort for the HTTP interceptor ────────────────────
+step "applying keda-interceptor-host (nodePort ${INTERCEPTOR_NODEPORT} -> 127.0.0.1:${INTERCEPTOR_PORT})"
+# The chart's own interceptor-proxy Service stays untouched; this repo-owned
+# Service selects the same Pods so helm upgrade never reverts it.
+kubectl apply -f "${HOST_ACCESS_DIR}/interceptor-host.yaml"
+# Wait for the TCP socket to accept connections. This is NOT a check that
+# routing works. The cold-start phase below validates actual routing.
+NP_READY=""
 for _ in {1..30}; do
     if curl -s -o /dev/null --max-time 2 "http://127.0.0.1:${INTERCEPTOR_PORT}/"; then
-        PF_READY="yes"
+        NP_READY="yes"
         break
     fi
     sleep 1
 done
-if [[ -z "${PF_READY}" ]]; then
-    fail "port-forward to interceptor did not accept TCP connections within 30s"
+if [[ -z "${NP_READY}" ]]; then
+    info "keda-interceptor-host endpoints (empty means the selector matches no Pod):"
+    kubectl get endpoints -n keda keda-interceptor-host 2>&1 | sed 's/^/    /' || true
+    info "chart Service selector:"
+    kubectl get svc -n keda keda-add-ons-http-interceptor-proxy \
+        -o jsonpath='{.spec.selector}' 2>&1 | sed 's/^/    /' || true
+    echo
+    fail "interceptor did not accept connections on 127.0.0.1:${INTERCEPTOR_PORT} within 30s"
 fi
-if ! kill -0 "${PF_PID}" 2>/dev/null; then
-    fail "port-forward died before becoming reachable"
-fi
-pass "interceptor port-forward is up (note: this does NOT validate routing — see cold-start phase)"
+pass "interceptor reachable on 127.0.0.1:${INTERCEPTOR_PORT} (note: this does NOT validate routing — see cold-start phase)"
 
 # ── Phase 6: Cold-start request ─────────────────────────────────────────────
 step "firing single cold-start request — interceptor will buffer until Pod is ready"
@@ -323,6 +331,7 @@ echo "  Lifecycle:       0 → ${PEAK_REPLICAS} → 0 replicas"
 echo "  Load test:       ${LOAD_REQUESTS} requests at concurrency ${LOAD_CONCURRENCY}"
 echo
 echo "  Cleanup on exit removes nginx Deployment + Service +"
-echo "  HTTPScaledObject. KEDA + HTTP add-on stay installed."
+echo "  HTTPScaledObject + keda-interceptor-host (frees nodePort 30080)."
+echo "  KEDA + HTTP add-on stay installed."
 echo
 exit 0

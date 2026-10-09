@@ -1,0 +1,25 @@
+# examples/11-istio/host-access/tracing-host.yaml
+#
+# Companion NodePort Service owned by this repo. Reaches the Jaeger UI (apply samples/addons/jaeger.yaml first).
+# It selects the same Pods as the upstream Service, so re-applying the
+# addon or running istioctl install never reverts it. Published by the
+# istio profile as 127.0.0.1:16686 (see ISTIO_PORTS in scripts/lib/_helpers.sh).
+# Selector: verified against samples/addons/jaeger.yaml in the Istio release
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: tracing-host
+  namespace: istio-system
+  labels:
+    app.kubernetes.io/managed-by: minikube-on-fedora
+spec:
+  type: NodePort
+  selector:
+    app: jaeger
+  ports:
+    - name: http
+      port: 80
+      targetPort: 16686
+      nodePort: 31686
+      protocol: TCP

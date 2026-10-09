@@ -1,0 +1,27 @@
+# examples/11-istio/host-access/prometheus-host.yaml
+#
+# Companion NodePort Service owned by this repo. Reaches Prometheus (apply samples/addons/prometheus.yaml first).
+# It selects the same Pods as the upstream Service, so re-applying the
+# addon or running istioctl install never reverts it. Published by the
+# istio profile as 127.0.0.1:9090 (see ISTIO_PORTS in scripts/lib/_helpers.sh).
+# Selector: verified against samples/addons/prometheus.yaml in the Istio release
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus-host
+  namespace: istio-system
+  labels:
+    app.kubernetes.io/managed-by: minikube-on-fedora
+spec:
+  type: NodePort
+  selector:
+    app.kubernetes.io/name: prometheus
+    app.kubernetes.io/component: server
+    app.kubernetes.io/instance: prometheus
+  ports:
+    - name: http
+      port: 9090
+      targetPort: 9090
+      nodePort: 30990
+      protocol: TCP

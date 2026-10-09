@@ -23,7 +23,7 @@ spec:
       containers:
         - name: nginx
           image: nginx-custom:v1
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Never
           ports:
             - containerPort: 8080
           readinessProbe:

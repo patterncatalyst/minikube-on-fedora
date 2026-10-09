@@ -8,6 +8,8 @@
 # Removes:
 #   - Demo workload (nginx-with-sidecar Deployment + Service + VS/DR)
 #   - Bookinfo sample app + its networking (gateway, vs, drs)
+#   - host-access companion NodePort Services (ingressgateway-host,
+#     kiali-host, grafana-host, prometheus-host, tracing-host)
 #   - Optional addons (Kiali, Prometheus, Grafana, Jaeger, Loki) if
 #     installed
 #   - With --remove-istio: istiod, ingress/egress gateways, the
@@ -55,8 +57,10 @@ if ! minikube profile list 2>/dev/null | grep -q "${PROFILE_NAME}"; then
     exit 0
 fi
 
-kubectl config use-context "${PROFILE_NAME}" >/dev/null 2>&1 || \
+kubectl config get-contexts -o name 2>/dev/null | grep -qx "${PROFILE_NAME}" || \
     fail "kubectl context '${PROFILE_NAME}' not configured"
+# Every kubectl / istioctl call below targets the istio context explicitly
+pin_context "${PROFILE_NAME}"
 
 # ── Tier 1: demo workload ───────────────────────────────────────────────────
 step "removing §11 demo workload (nginx with sidecar)"
@@ -75,6 +79,12 @@ if [[ -d "${ISTIO_DIR}/samples/bookinfo" ]]; then
 else
     info "Istio dir not found at ${ISTIO_DIR}; skipping Bookinfo (likely already gone)"
 fi
+
+# ── Tier 2b: host-access companion Services ─────────────────────────────────
+step "removing host-access companion NodePort Services"
+kubectl delete -f "${SCRIPT_DIR}/host-access/" \
+    --ignore-not-found=true >/dev/null 2>&1 || true
+pass "host-access Services removed (nodePorts 30880/30201/30300/30990/31686 free)"
 
 # ── Tier 3: Addons (Kiali, Prometheus, Grafana, Jaeger, Loki) ──────────────
 if [[ -d "${ISTIO_DIR}/samples/addons" ]]; then
@@ -134,19 +144,13 @@ step "deleting the entire istio minikube profile (--remove-profile)"
 minikube delete -p "${PROFILE_NAME}" || true
 pass "istio profile deleted"
 
-# Switch context back to minikube so the user isn't left on a dangling
-# context that no longer exists
-if kubectl config get-contexts -o name 2>/dev/null | grep -q '^minikube$'; then
-    kubectl config use-context minikube >/dev/null 2>&1 || true
-    info "kubectl context switched back to 'minikube'"
-fi
-
 echo
 step "DONE (full teardown)"
 echo
 echo "  The istio profile and everything in it are gone."
 echo "  To rebuild from scratch:"
-echo "    minikube start -p istio --memory=6g --cpus=4 \\"
-echo "        --container-runtime=containerd --rootless=true"
+echo "    minikube start -p istio --driver=docker --container-runtime=containerd \\"
+echo "        --kubernetes-version=${KUBE_VERSION} --cpus=4 --memory=6144 \\"
+echo "        --ports=${ISTIO_PORTS}"
 echo "    ./scripts/setup-istio.sh"
 echo

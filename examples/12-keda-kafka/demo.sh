@@ -7,7 +7,7 @@
 # Phases:
 #   1.  Pre-flight: minikube up, Strimzi installed, KEDA installed
 #   2.  Apply Kafka cluster + topic CRs, wait for Ready
-#   3.  Build order-processor:v1 image on the minikube profile
+#   3.  Build order-processor:v1 with Docker Engine and load it into the profile
 #   4.  Apply consumer Deployment (replicas: 0) + KEDA ScaledObject
 #   5.  Assert consumer is at 0 replicas
 #   6.  Produce 200 messages to the orders topic
@@ -55,8 +55,9 @@ trap cleanup EXIT
 
 # ── Phase 1: Pre-flight ─────────────────────────────────────────────────────
 step "pre-flight: minikube up, Strimzi + KEDA installed"
-kubectl config use-context "${PROFILE_NAME}" >/dev/null 2>&1 || \
-    fail "kubectl context '${PROFILE_NAME}' not configured — run minikube start -p ${PROFILE_NAME}"
+require_docker_engine
+# Every kubectl call below targets the minikube context explicitly
+pin_context "${PROFILE_NAME}"
 kubectl get nodes >/dev/null 2>&1 || fail "kubectl cannot reach the cluster"
 pass "minikube cluster reachable"
 
@@ -122,8 +123,8 @@ kubectl get pods -n "${KAFKA_NS}" -l strimzi.io/cluster=${KAFKA_CLUSTER} | sed '
 step "ensuring ${IMAGE_TAG} is in the minikube profile's image cache"
 if ! minikube image ls -p "${PROFILE_NAME}" 2>/dev/null | grep -q "${IMAGE_TAG}"; then
     info "building consumer image from ${CONSUMER_DIR}/Containerfile (~30s first time)"
-    minikube -p "${PROFILE_NAME}" image build -t "${IMAGE_TAG}" \
-        -f Containerfile "${CONSUMER_DIR}"
+    build_and_load "${IMAGE_TAG}" "${CONSUMER_DIR}" "${PROFILE_NAME}" \
+        || fail "build_and_load ${IMAGE_TAG} failed"
 fi
 pass "${IMAGE_TAG} available"
 

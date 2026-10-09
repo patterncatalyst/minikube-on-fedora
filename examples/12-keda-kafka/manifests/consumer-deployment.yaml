@@ -22,7 +22,7 @@ spec:
       containers:
         - name: order-processor
           image: order-processor:v1
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Never
           env:
             - name: KAFKA_BROKER
               value: "my-kafka-kafka-bootstrap.kafka:9092"
