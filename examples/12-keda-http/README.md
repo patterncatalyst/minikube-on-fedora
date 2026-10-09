@@ -80,7 +80,7 @@ Pod startup dominated by readinessProbe `initialDelaySeconds`).
    curl handles `-H 'Host:'` correctly because curl treats Host as
    a special case
 2. **`hey` not installed** — `go install
-   github.com/rakyll/hey@v0.1.4` per §2
+   github.com/rakyll/hey@v0.1.5` per §2
 2. **HTTP add-on not installed** — symptom: pre-flight
    complains about `keda-add-ons-http-interceptor` not found.
    `./scripts/setup-keda.sh` installs both core + add-on
