@@ -38,7 +38,9 @@ Eight §12 Kafka claims:
    `condition=Ready` within 5 minutes
 3. A `KafkaTopic` CR with 3 partitions reaches `condition=Ready`
 4. The Python `order-processor` consumer image builds cleanly
-   from `consumer/Containerfile` (multi-stage UBI)
+   with `docker build` from `consumer/Containerfile` (multi-stage
+   UBI) and loads into the `minikube` profile with
+   `minikube image load`
 5. A `Deployment` with `replicas: 0` plus a KEDA `ScaledObject`
    results in **zero replicas at idle** (proves scale-to-zero)
 6. Producing N messages to the topic causes KEDA to scale the
@@ -55,7 +57,7 @@ Eight §12 Kafka claims:
 
 Expected timing:
 
-- **First run** (Kafka cluster bring-up + image build):
+- **First run** (Kafka cluster bring-up + image build and load):
   ~5-8 minutes
 - **Subsequent runs** (everything cached): ~2-4 minutes
 

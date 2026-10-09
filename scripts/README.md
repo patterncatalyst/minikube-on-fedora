@@ -111,7 +111,7 @@ version pins in the reconciliation plan need resolving.
 tracked files. Checks 1-7 are advisory. Check 8 covers runtime,
 access and OS policy (no tunnels or forwarded ports, no podman
 driver or rootless flags, Fedora/RHEL only) plus a version-pin check
-for unpinned `latest` references and `stable.txt` lookups. It prints
+for unpinned `latest` references and `stable.txt` lookups. It prints <!-- policy-exempt -->
 `file:line` for every finding.
 
 ```bash

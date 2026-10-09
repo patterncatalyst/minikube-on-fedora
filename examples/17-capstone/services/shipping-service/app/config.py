@@ -2,7 +2,7 @@
 
 In-cluster, the Postgres connection comes from the CloudNativePG-generated
 Secret (`capstone-postgres-app`), surfaced as env vars by the helm subchart.
-Locally, the defaults allow running against a port-forwarded Postgres.
+Locally, the defaults reach Postgres on its published port (127.0.0.1:5432).
 """
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
