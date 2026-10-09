@@ -290,6 +290,20 @@ manifests, which only the action's maintainer can update.
 
 ---
 
+### gRPC's c-ares resolver can eat a 3-second deadline
+
+On the docker-driver `mof-capstone` profile, every in-stock `POST /orders`
+returned `503 inventory-service unreachable ... DEADLINE_EXCEEDED`, while a
+plain TCP connection from the order pod to `inventory-service:50051` worked
+at once. gRPC Python resolves names with its bundled c-ares resolver, which
+walks the pod's DNS search list itself and can take about 3 s for a short
+Service name: exactly the order client's 3 s `CheckStock` deadline.
+`GRPC_DNS_RESOLVER=native`, set in the order-service and graphql-gateway
+Containerfiles, makes gRPC use the system resolver like every other library
+in the pod. The same fix was found earlier in the Python data mesh project.
+The lesson: when a gRPC deadline fails but the server is fast, time name
+resolution separately from the call.
+
 ## Part 3 — Working with AI assistants on long technical projects
 
 ### The reconciliation plan is the most important file
@@ -414,7 +428,7 @@ functional, not promotional, and worth leaving alone.
 
 ---
 
-## Part 4 — Why this tutorial moved off rootless podman (minikube v1.39.0)
+## Part 4 — Why this tutorial moved off rootless podman (minikube v1.38.1)
 
 <!-- policy-exempt:start -->
 Earlier revisions of this tutorial ran minikube on rootless Podman
@@ -425,8 +439,8 @@ below gives the symptom, the cause, and what the Docker path does
 now. Entries marked "maintainer-reported" were observed by the
 maintainer while building the tutorial; the rest come from the
 project record (`_plans/capstone-decisions.md`, the pre-migration
-chapters). Version context: minikube v1.39.0, Kubernetes v1.36.5,
-Fedora 44.
+chapters). Version context of these problems: minikube v1.38.1,
+Kubernetes v1.35, Fedora 44.
 
 ### Node iptables FORWARD DROP breaks pod and NodePort traffic (maintainer-reported)
 
