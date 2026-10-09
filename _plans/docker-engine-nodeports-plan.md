@@ -127,7 +127,7 @@ recreate); `0.0.0.0` publishing (exposes dashboard/Kiali to the LAN).
 |---|---|---|---|
 | 0 | Hygiene: delete stale copies, untrack `__pycache__`, `.gitignore` | — | done |
 | 1 | Shared tooling: `_helpers.sh` (`require_docker_engine`, port maps, `ensure_profile`, `require_published_port`, `build_and_load`, `pin_context`, `require_free_nodeport`, docker `cleanup_container`), `audit-fedora-prereqs.sh` Docker Engine section, `test-template.sh`, `scripts/README.md`, root `setup-{keda,strimzi,istio}.sh` context pins, new `check-port-map.sh`, `editorial-audit.sh` policy check + `--strict` (+ optional CI step) | 0 | done |
-| 2 | Core examples 03, 06, 07, 08, 09 (manifests, chart, demo.sh, READMEs); pin 08 initContainer image | 1 | todo |
+| 2 | Core examples 03, 06, 07, 08, 09 (manifests, chart, demo.sh, READMEs); pin 08 initContainer image | 1 | done (live pending) |
 | 3 | Examples 11-istio (+ `host-access/`), 12-keda-http (+ interceptor companion), 12-keda-kafka | 1 | todo |
 | 4a | Capstone platform: `scripts/lib/env.sh`, `mof-capstone`, setup/build/cluster/bootstrap/setup-* scripts, subchart values+service templates, `host-access/*.yaml`, pin observability charts, no credential printing | 1 | todo |
 | 4b | Capstone demos: env.sh, no port-forward, host ports, no `localhost:5000` guard, no credentials | 4a | todo |

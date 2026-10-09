@@ -21,7 +21,7 @@ spec:
       # The timestamp lets the demo prove persistence by matching
       # it across Pod restarts.
       - name: seed-content
-        image: registry.access.redhat.com/ubi9/ubi-minimal
+        image: registry.access.redhat.com/ubi9/ubi-minimal:9.8-1791279563
         command:
           - "/bin/sh"
           - "-c"
@@ -47,7 +47,7 @@ spec:
         image: nginx-custom:v1
         # Same image as §6/§7 — generic nginx; content comes from
         # the volume mount below, not the image
-        imagePullPolicy: IfNotPresent
+        imagePullPolicy: Never
         ports:
         - containerPort: 8080
         readinessProbe:

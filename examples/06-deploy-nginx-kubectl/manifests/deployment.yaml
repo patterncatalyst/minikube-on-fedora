@@ -17,9 +17,10 @@ spec:
       containers:
       - name: nginx
         image: nginx-custom:v1
-        # The image was built locally by `minikube image build` in
-        # demo.sh — it's not in any registry, so don't try to pull.
-        imagePullPolicy: IfNotPresent
+        # Built with docker and loaded into the cluster by
+        # build_and_load in demo.sh — it's not in any registry, so
+        # never pull.
+        imagePullPolicy: Never
         ports:
         - containerPort: 8080
         readinessProbe:

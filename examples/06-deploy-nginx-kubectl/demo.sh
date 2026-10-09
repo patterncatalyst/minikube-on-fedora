@@ -4,22 +4,22 @@
 #
 # End-to-end smoke test for §6:
 #   1. ensure cluster is up; clear any prior nginx Deployment/Service
-#   2. build the nginx image with `minikube image build` (multi-stage
-#      Containerfile, UBI 9 builder → UBI 9 Minimal runtime)
+#   2. build the nginx image with docker and load it into the cluster
+#      (multi-stage Containerfile, UBI 9 builder → UBI 9 Minimal runtime)
 #   3. apply Deployment + Service manifests
 #   4. wait for the Deployment to be Available; on timeout, dump pod
 #      logs from current and previous containers for diagnosis
-#   5. port-forward the Service to a host port in the 1808x range
+#   5. confirm the profile publishes NodePort 30080 on 127.0.0.1:18080
 #   6. curl the host port; check for the sentinel content baked
 #      into the image
 #   7. scale the Deployment to 3 replicas; verify all Ready
-#   8. clean up port-forward + manifests on exit (success or failure)
+#   8. clean up manifests on exit (success or failure)
 #
-# Uses the default minikube cluster (NOT a separate profile, unlike
+# Uses the default minikube profile (NOT a separate profile, unlike
 # examples/03-driver-check/) — leaves the cluster running for the
 # next demo. The built image stays in the cluster's local image cache
 # across runs (cached for fast re-runs); to force a rebuild from
-# scratch, run `minikube image rm nginx-custom:v1` before re-running.
+# scratch, run `minikube -p minikube image rm nginx-custom:v1` first.
 #
 # Exit codes: 0 on full pass, non-zero on any step failure.
 
@@ -38,29 +38,30 @@ MANIFESTS_DIR="${SCRIPT_DIR}/manifests"
 HOST_PORT=18080
 WAIT_DEPLOY_SECONDS=180
 WAIT_SCALE_SECONDS=120
-PORT_FORWARD_TIMEOUT=30
-PORT_FORWARD_PID=""
+NODE_PORT=30080
+HTTP_WAIT_SECONDS=30
+PROFILE="minikube"
+CPUS=6
+MEMORY_MB=16384
 
 # ── Cleanup trap ────────────────────────────────────────────────────────────
 cleanup() {
-    info "cleanup: stopping port-forward and removing nginx resources"
-    if [[ -n "${PORT_FORWARD_PID}" ]]; then
-        kill "${PORT_FORWARD_PID}" 2>/dev/null || true
-        wait "${PORT_FORWARD_PID}" 2>/dev/null || true
-    fi
+    info "cleanup: removing nginx resources (frees nodePort ${NODE_PORT})"
+    # Skip until pin_context has run, so an early failure never touches
+    # whatever cluster happens to be current.
+    [[ -n "${PINNED_CONTEXT}" ]] || return 0
     kubectl delete -f "${MANIFESTS_DIR}/" --ignore-not-found=true \
         >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
 # ── Pre-flight: cluster up ──────────────────────────────────────────────────
-step "pre-flight: cluster is up and kubectl can reach it"
-if ! minikube status >/dev/null 2>&1; then
-    info "no cluster running; starting default profile"
-    minikube start
-fi
+step "pre-flight: Docker Engine, profile and kubectl context"
+require_docker_engine
+ensure_profile "${PROFILE}" "${CORE_PORTS}" "${CPUS}" "${MEMORY_MB}"
+pin_context "${PROFILE}"
 kubectl get nodes >/dev/null
-pass "cluster reachable"
+pass "cluster reachable (context ${PROFILE})"
 
 # ── Pre-flight: clear any leftover state from previous runs ─────────────────
 step "pre-flight: remove any prior ${APP_NAME} Deployment/Service"
@@ -75,15 +76,19 @@ for _ in {1..15}; do
 done
 pass "no stale ${APP_NAME} resources"
 
-# ── Build the image inside minikube ─────────────────────────────────────────
-step "building ${IMAGE_TAG} via minikube image build (multi-stage UBI 9)"
-# `minikube image build` runs the build inside the cluster's runtime so the
-# resulting image is immediately available to kubelet without needing a
-# registry push. -f specifies the Containerfile (default lookup is Dockerfile).
-if ! minikube image build -t "${IMAGE_TAG}" -f Containerfile "${SCRIPT_DIR}"; then
-    fail "minikube image build failed (see output above)"
+step "pre-flight: nodePort ${NODE_PORT} is free"
+require_free_nodeport "${NODE_PORT}"
+pass "nodePort ${NODE_PORT} free"
+
+# ── Build the image and load it into minikube ──────────────────────────────
+step "building ${IMAGE_TAG} with docker and loading it into ${PROFILE} (multi-stage UBI 9)"
+# docker build runs on the host's Docker Engine; `minikube image load` copies
+# the result into the profile's containerd so kubelet finds it without a
+# registry. The Deployment uses imagePullPolicy: Never.
+if ! build_and_load "${IMAGE_TAG}" "${SCRIPT_DIR}" "${PROFILE}"; then
+    fail "image build/load failed (see output above)"
 fi
-pass "${IMAGE_TAG} built and available in cluster"
+pass "${IMAGE_TAG} built and loaded into cluster"
 
 # ── Apply manifests ─────────────────────────────────────────────────────────
 step "applying nginx Deployment and Service"
@@ -111,27 +116,15 @@ fi
 kubectl get deployment,pods -l "app=${APP_NAME}" | sed 's/^/    /'
 pass "Deployment Available"
 
-# ── Port-forward to the Service ─────────────────────────────────────────────
-step "port-forwarding service/${APP_NAME} to 127.0.0.1:${HOST_PORT}"
-kubectl port-forward "service/${APP_NAME}" "${HOST_PORT}:80" >/dev/null 2>&1 &
-PORT_FORWARD_PID=$!
-
-# Wait for the port to actually be listening before we curl it.
-listening=0
-for ((i = 0; i < PORT_FORWARD_TIMEOUT; i++)); do
-    if curl -fsS "http://127.0.0.1:${HOST_PORT}/" >/dev/null 2>&1; then
-        listening=1
-        break
-    fi
-    sleep 1
-done
-if [[ "${listening}" -ne 1 ]]; then
-    if ! kill -0 "${PORT_FORWARD_PID}" 2>/dev/null; then
-        info "(port-forward process is no longer running)"
-    fi
-    fail "port-forward never started listening within ${PORT_FORWARD_TIMEOUT}s"
+# ── Published NodePort ──────────────────────────────────────────────────────
+step "checking nodePort ${NODE_PORT} is published on 127.0.0.1:${HOST_PORT}"
+require_published_port "${PROFILE}" "${NODE_PORT}" "${HOST_PORT}"
+if ! wait_for_http "http://127.0.0.1:${HOST_PORT}/" "${HTTP_WAIT_SECONDS}"; then
+    info "Service and endpoints:"
+    kubectl get svc,endpoints "${APP_NAME}" | sed 's/^/    /'
+    fail "http://127.0.0.1:${HOST_PORT}/ did not respond within ${HTTP_WAIT_SECONDS}s"
 fi
-pass "port-forward listening on :${HOST_PORT}"
+pass "nginx reachable on 127.0.0.1:${HOST_PORT} (nodePort ${NODE_PORT})"
 
 # ── Validate response ───────────────────────────────────────────────────────
 step "validating nginx HTTP response (looking for sentinel string)"
@@ -169,14 +162,13 @@ kubectl get pods -l "app=${APP_NAME}" | sed 's/^/    /'
 pass "scaled to 3 replicas, all Running"
 
 # ── Done ────────────────────────────────────────────────────────────────────
-step "SUCCESS — image built + Deployment + Service + port-forward + scaling all working"
+step "SUCCESS — image built + Deployment + NodePort Service + scaling all working"
 echo
 echo "  Cleanup will run automatically on script exit:"
-echo "    - kubectl port-forward backgrounded process killed"
-echo "    - nginx Deployment and Service deleted"
+echo "    - nginx Deployment and Service deleted (nodePort 30080 freed)"
 echo "  Persists across runs:"
 echo "    - ${IMAGE_TAG} image stays in the cluster's image cache"
-echo "      (force rebuild: minikube image rm ${IMAGE_TAG})"
+echo "      (force rebuild: minikube -p minikube image rm ${IMAGE_TAG})"
 echo "    - the minikube cluster itself stays up for the next demo"
 echo
 exit 0

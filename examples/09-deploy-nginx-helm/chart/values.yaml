@@ -4,14 +4,18 @@
 replicaCount: 1
 
 image:
-  # Built in §6's example, cached in minikube's image store.
+  # Built in §6's example and loaded into minikube's containerd.
   repository: nginx-custom
   tag: v1
-  pullPolicy: IfNotPresent
+  pullPolicy: Never
 
 service:
-  type: ClusterIP
+  type: NodePort
   port: 80
+  # Published to 127.0.0.1:18080 at profile creation
+  # (--ports=127.0.0.1:18080:30080). Shared slot with §6, §8, §12-http.
+  # Set to null for a Kubernetes-assigned port.
+  nodePort: 30080
 
 # Content rendered into the index.html ConfigMap.
 # These are the values you'd typically override per environment.

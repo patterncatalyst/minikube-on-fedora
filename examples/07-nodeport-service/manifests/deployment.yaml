@@ -18,8 +18,8 @@ spec:
       - name: nginx
         image: nginx-custom:v1
         # Same image as §6 — built once, used everywhere. The demo.sh
-        # builds it from §6's Containerfile if not already cached.
-        imagePullPolicy: IfNotPresent
+        # builds and loads it from §6's Containerfile if not already cached.
+        imagePullPolicy: Never
         ports:
         - containerPort: 8080
         readinessProbe:

@@ -6,12 +6,12 @@
 #   1. helm lint (chart sanity check)
 #   2. helm template (dry-run render)
 #   3. helm install with --set overrides
-#   4. wait for rollout; port-forward; curl; verify the installed
-#      title appears in the response
+#   4. wait for rollout; confirm the NodePort is published; curl
+#      127.0.0.1:18080; verify the installed title appears
 #   5. helm upgrade with different --set overrides
 #   6. wait for rollout (the ConfigMap checksum annotation makes
 #      the upgrade actually roll the Pods)
-#   7. re-establish port-forward (Pods got recreated)
+#   7. poll 127.0.0.1:18080 (the NodePort follows the recreated Pods)
 #   8. curl; verify the upgraded title appears
 #   9. helm history (show both revisions)
 #  10. helm uninstall; verify no leftover resources
@@ -29,36 +29,34 @@ RELEASE_NAME="nginx-helm"
 CHART_DIR="${SCRIPT_DIR}/chart"
 IMAGE_TAG="nginx-custom:v1"
 SECTION6_DIR="${REPO_ROOT}/examples/06-deploy-nginx-kubectl"
+NODE_PORT=30080
 LOCAL_PORT=18080
+PROFILE="minikube"
+CPUS=6
+MEMORY_MB=16384
 WAIT_DEPLOY_SECONDS=180
 
 # Install/upgrade titles — used for the curl assertions
 TITLE_INSTALL="First install via helm"
 TITLE_UPGRADE="Upgraded title via helm"
 
-# ── State for cleanup ───────────────────────────────────────────────────────
-PF_PID=""
-
 cleanup() {
-    info "cleanup: stopping port-forward and uninstalling helm release"
-    if [[ -n "${PF_PID}" ]] && kill -0 "${PF_PID}" 2>/dev/null; then
-        kill "${PF_PID}" 2>/dev/null || true
-        wait "${PF_PID}" 2>/dev/null || true
-    fi
-    pkill -f "kubectl port-forward.*${RELEASE_NAME}" 2>/dev/null || true
+    info "cleanup: uninstalling helm release (frees nodePort ${NODE_PORT})"
+    # Skip until pin_context has run, so an early failure never touches
+    # whatever cluster happens to be current.
+    [[ -n "${PINNED_CONTEXT}" ]] || return 0
     # Uninstall whether or not we got past install — idempotent
     helm uninstall "${RELEASE_NAME}" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
 
 # ── Pre-flight: cluster up ──────────────────────────────────────────────────
-step "pre-flight: cluster is up and kubectl can reach it"
-if ! minikube status >/dev/null 2>&1; then
-    info "no cluster; starting"
-    minikube start
-fi
+step "pre-flight: Docker Engine, profile and kubectl context"
+require_docker_engine
+ensure_profile "${PROFILE}" "${CORE_PORTS}" "${CPUS}" "${MEMORY_MB}"
+pin_context "${PROFILE}"
 kubectl get nodes >/dev/null
-pass "cluster reachable"
+pass "cluster reachable (context ${PROFILE})"
 
 # ── Pre-flight: helm available ──────────────────────────────────────────────
 step "pre-flight: helm binary present"
@@ -71,13 +69,13 @@ pass "helm available"
 
 # ── Pre-flight: image cached ────────────────────────────────────────────────
 step "pre-flight: ${IMAGE_TAG} image in cluster cache"
-if ! minikube image ls 2>/dev/null | grep -q "${IMAGE_TAG}"; then
+if ! minikube -p "${PROFILE}" image ls 2>/dev/null | grep -q "${IMAGE_TAG}"; then
     info "image not present; building from §6's Containerfile"
     if [[ ! -f "${SECTION6_DIR}/Containerfile" ]]; then
         fail "${SECTION6_DIR}/Containerfile not found — examples/06 missing?"
     fi
-    if ! minikube image build -t "${IMAGE_TAG}" -f Containerfile "${SECTION6_DIR}"; then
-        fail "minikube image build failed (see output above)"
+    if ! build_and_load "${IMAGE_TAG}" "${SECTION6_DIR}" "${PROFILE}"; then
+        fail "image build/load failed (see output above)"
     fi
 fi
 pass "${IMAGE_TAG} available"
@@ -86,6 +84,10 @@ pass "${IMAGE_TAG} available"
 step "pre-flight: remove any prior ${RELEASE_NAME} release"
 helm uninstall "${RELEASE_NAME}" >/dev/null 2>&1 || true
 pass "no stale ${RELEASE_NAME} release"
+
+step "pre-flight: nodePort ${NODE_PORT} is free"
+require_free_nodeport "${NODE_PORT}"
+pass "nodePort ${NODE_PORT} free"
 
 # ── helm lint ───────────────────────────────────────────────────────────────
 step "running 'helm lint ${CHART_DIR}'"
@@ -124,20 +126,15 @@ if ! kubectl wait --for=condition=Available "deployment/${DEPLOY_NAME}" \
 fi
 pass "Deployment Available"
 
-# ── Port-forward and curl ───────────────────────────────────────────────────
-step "port-forwarding service/${RELEASE_NAME} to 127.0.0.1:${LOCAL_PORT}"
-kubectl port-forward "service/${RELEASE_NAME}" "${LOCAL_PORT}:80" >/dev/null 2>&1 &
-PF_PID=$!
-for _ in {1..15}; do
-    if curl -fsS --max-time 2 "http://127.0.0.1:${LOCAL_PORT}/" >/dev/null 2>&1; then
-        break
-    fi
-    sleep 1
-done
-if ! kill -0 "${PF_PID}" 2>/dev/null; then
-    fail "port-forward died before becoming reachable"
+# ── Published NodePort and curl ────────────────────────────────────────────
+step "checking nodePort ${NODE_PORT} is published on 127.0.0.1:${LOCAL_PORT}"
+require_published_port "${PROFILE}" "${NODE_PORT}" "${LOCAL_PORT}"
+if ! wait_for_http "http://127.0.0.1:${LOCAL_PORT}/" 30; then
+    info "Service and endpoints:"
+    kubectl get svc,endpoints "${RELEASE_NAME}" | sed 's/^/    /'
+    fail "http://127.0.0.1:${LOCAL_PORT}/ did not respond within 30s"
 fi
-pass "port-forward listening"
+pass "nginx reachable on 127.0.0.1:${LOCAL_PORT} (nodePort ${NODE_PORT})"
 
 # ── Verify install content ──────────────────────────────────────────────────
 step "verifying installed title appears in served HTML"
@@ -173,22 +170,14 @@ if ! kubectl rollout status "deployment/${DEPLOY_NAME}" --timeout=60s >/dev/null
 fi
 pass "Pods rolled out to new revision"
 
-# ── Re-establish port-forward (old one died with old Pod) ──────────────────
-step "re-establishing port-forward to upgraded Pods"
-if [[ -n "${PF_PID}" ]] && kill -0 "${PF_PID}" 2>/dev/null; then
-    kill "${PF_PID}" 2>/dev/null || true
-    wait "${PF_PID}" 2>/dev/null || true
+# ── Poll the NodePort (Pods were recreated; nothing to reconnect) ───────────
+step "polling 127.0.0.1:${LOCAL_PORT} until the upgraded Pods answer"
+if ! wait_for_http "http://127.0.0.1:${LOCAL_PORT}/" 30; then
+    info "Service and endpoints:"
+    kubectl get svc,endpoints "${RELEASE_NAME}" | sed 's/^/    /'
+    fail "NodePort did not answer after the upgrade within 30s"
 fi
-PF_PID=""
-kubectl port-forward "service/${RELEASE_NAME}" "${LOCAL_PORT}:80" >/dev/null 2>&1 &
-PF_PID=$!
-for _ in {1..15}; do
-    if curl -fsS --max-time 2 "http://127.0.0.1:${LOCAL_PORT}/" >/dev/null 2>&1; then
-        break
-    fi
-    sleep 1
-done
-pass "port-forward reconnected"
+pass "NodePort answering after upgrade"
 
 # ── Verify upgrade content ──────────────────────────────────────────────────
 step "verifying upgraded title appears in served HTML"
@@ -215,13 +204,6 @@ pass "history shows ${HISTORY_LINES} revisions"
 
 # ── helm uninstall ──────────────────────────────────────────────────────────
 step "running 'helm uninstall ${RELEASE_NAME}'"
-# Kill port-forward before uninstall (so it doesn't error out trying
-# to talk to a vanishing service)
-if [[ -n "${PF_PID}" ]] && kill -0 "${PF_PID}" 2>/dev/null; then
-    kill "${PF_PID}" 2>/dev/null || true
-    wait "${PF_PID}" 2>/dev/null || true
-fi
-PF_PID=""
 helm uninstall "${RELEASE_NAME}" | sed 's/^/    /'
 pass "release uninstalled"
 
