@@ -11,4 +11,22 @@ The system built here is a **data mesh**: a domain of services modeling order-pl
 
 Because the capstone is so much larger than the other sections, it's organized as its own set of pages with its own reading order, rather than one long section here.
 
+## Where the capstone continues
+
+This capstone grew into two standalone reference architectures that
+take the same data mesh further:
+
+- [**Data mesh reference architecture — Python**](https://patterncatalyst.github.io/datamesh-reference-arch-python/)
+  ([repo](https://github.com/patterncatalyst/datamesh-reference-arch-python))
+  is a fork of this capstone, broken out for its own audience. It
+  carries the same services and domain, with its own workshop
+  chapters, demos and an OpenShift Local appendix.
+- [**Data mesh reference architecture — Quarkus**](https://patterncatalyst.github.io/datamesh-reference-arch-quarkus/)
+  ([repo](https://github.com/patterncatalyst/datamesh-reference-arch-quarkus))
+  builds the same mesh with Quarkus and Camel.
+
+Use this capstone to see how §1–§12 fit together on one minikube
+profile; use the reference architectures when the data mesh itself
+is the subject.
+
 <p><a class="btn btn--primary" href="{{ '/capstone/data-mesh/' | relative_url }}">Start the capstone: a data mesh on minikube →</a></p>

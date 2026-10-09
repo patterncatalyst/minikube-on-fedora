@@ -1,6 +1,6 @@
 # §17 Capstone — Data mesh on minikube
 
-The full implementation of the §17 capstone: five Python/FastAPI
+The full implementation of the §17 capstone: seven Python/FastAPI
 services exposing REST, gRPC, GraphQL, and Kafka interfaces,
 deployed via helm to a dedicated `mof-capstone` minikube profile, with full
 observability, metadata cataloging, and orchestration.
@@ -10,6 +10,12 @@ This is the **runnable counterpart** to
 Read the section page for the data-mesh conceptual background;
 this README is the operational entry point for actually running
 the system.
+
+The capstone continues as two standalone projects:
+[datamesh-reference-arch-python](https://github.com/patterncatalyst/datamesh-reference-arch-python)
+(a fork of this capstone) and
+[datamesh-reference-arch-quarkus](https://github.com/patterncatalyst/datamesh-reference-arch-quarkus)
+(the same mesh on Quarkus and Camel).
 
 ## Status
 
