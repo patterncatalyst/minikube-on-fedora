@@ -180,8 +180,16 @@ fi
 pass "NodePort answering after upgrade"
 
 # ── Verify upgrade content ──────────────────────────────────────────────────
-step "verifying upgraded title appears in served HTML"
-RESP=$(curl -fsS "http://127.0.0.1:${LOCAL_PORT}/" 2>/dev/null || true)
+# The NodePort balances across every ready endpoint, and for a few seconds
+# after the rollout kube-proxy can still route to a terminating old Pod, so
+# poll until the new title is served rather than checking once.
+step "verifying upgraded title appears in served HTML (up to 60s)"
+RESP=""
+for _ in $(seq 1 30); do
+    RESP=$(curl -fsS --max-time 3 "http://127.0.0.1:${LOCAL_PORT}/" 2>/dev/null || true)
+    [[ "${RESP}" == *"${TITLE_UPGRADE}"* ]] && break
+    sleep 2
+done
 case "${RESP}" in
     *"${TITLE_UPGRADE}"*)
         pass "served HTML contains '${TITLE_UPGRADE}'"
