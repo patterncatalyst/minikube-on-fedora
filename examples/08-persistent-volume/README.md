@@ -45,7 +45,7 @@ the new Pod to come up after deletion).
 If `nginx-custom:v1` isn't loaded, add 2-4 minutes for the first
 build (`docker build` from §6's Containerfile, then `minikube image
 load`). The initContainer uses the pinned
-`ubi9/ubi-minimal:9.8-1791279563` image.
+`ubi10/ubi-minimal:10.2-1791444377` image.
 
 ## What you should see
 

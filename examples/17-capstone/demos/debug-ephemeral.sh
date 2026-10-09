@@ -28,7 +28,7 @@ export MINIKUBE_ROOTLESS=true   # CAP-010
 
 NS="capstone"
 APP="notification-service"
-DEBUG_IMAGE="registry.access.redhat.com/ubi9/ubi"   # has curl + ps; any tool image works
+DEBUG_IMAGE="registry.access.redhat.com/ubi10/ubi:10.2-1791444044"   # has curl + ps; any tool image works
 STAMP="$(date +%s)"
 
 step() { printf '\n==> %s\n' "$1"; }

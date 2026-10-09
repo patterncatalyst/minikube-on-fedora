@@ -92,8 +92,10 @@ ambiguity for readers.
 
 ### Preferred image sources (in priority order)
 
-1. `registry.access.redhat.com/ubi9/...` — UBI 9 images. Stable,
-   supported, publicly pullable
+1. `registry.access.redhat.com/ubi10/...` — UBI 10 images first,
+   then `ubi9/...` only when UBI 10 doesn't publish the runtime.
+   Stable, supported, publicly pullable (see "Choosing a UBI image"
+   below)
 2. `quay.io/...` — when the project ships only to Quay
 3. `ghcr.io/...` — when the project ships only to GHCR
 4. `docker.io/...` — last resort. Document inline why no UBI,
@@ -113,12 +115,35 @@ require updating this table:
 
 For the application workloads the tutorial deploys (the actual
 demo apps, not the platform images),
-`registry.access.redhat.com/ubi9/nginx-124` is the default.
+the examples build their own image on `ubi10/ubi` and
+`ubi10/ubi-minimal` (see §6's Containerfile).
+
+### Choosing a UBI image
+
+Pick the newest UBI major that publishes the newest runtime, and
+fall back to an older UBI major with the **same** runtime, never an
+older runtime to stay on a newer UBI:
+
+| Runtime | First choice | Fallback |
+|---|---|---|
+| Python 3.14 | `ubi10/python-314-minimal` | `ubi9/python-314` |
+| JDK 25 | `ubi10/openjdk-25` / `ubi10/openjdk-25-runtime` | `ubi9/openjdk-25` |
+| none (compiled or static) | `ubi10/ubi`, `ubi10/ubi-minimal` | — |
+
+UBI 10 publishes Python only as `-minimal` images, which have no
+compiler: a builder stage that compiles a wheel needs `microdnf
+install -y gcc python3.14-devel`. Prefer a dependency version that
+ships a wheel for the runtime (the capstone moved asyncpg to 0.32
+for this).
+
+Pin the exact tag (`10.2-<build>`, `1.24-<build>`). Find tags with
+`skopeo list-tags docker://registry.access.redhat.com/<repo>` and
+confirm one with `skopeo inspect`.
 
 ### UBI without a Red Hat subscription
 
 If a future iteration adds a custom `Containerfile` using `FROM
-registry.access.redhat.com/ubi9/ubi:9.x` (the "full" UBI base,
+registry.access.redhat.com/ubi10/ubi:10.x` (the "full" UBI base,
 which uses `dnf` rather than `microdnf`), include this fragment
 right after the `FROM` line to silence subscription-manager:
 
@@ -146,7 +171,7 @@ subscription is a documented, supported Red Hat configuration;
 this is just the one-line opt-out of the entitlement plumbing
 that's installed by default.
 
-This applies only to **`ubi9/ubi`** stages. **`ubi9/ubi-minimal`**
+This applies only to full **`ubi10/ubi`** stages. **`ubi-minimal`**
 uses `microdnf`, which has no subscription-manager plugin and no
 `redhat.repo`; runtime stages on `ubi-minimal` need no fix.
 

@@ -76,7 +76,7 @@ python = "^3.12"
 fastapi = "^0.115.0"
 uvicorn = { extras = ["standard"], version = "^0.32.0" }
 sqlalchemy = { extras = ["asyncio"], version = "^2.0.36" }
-asyncpg = "^0.30.0"
+asyncpg = "^0.32.0"
 pydantic = "^2.9.0"
 pydantic-settings = "^2.6.0"
 
@@ -102,10 +102,10 @@ cat > "${SVC_DIR}/Containerfile" <<'EOF'
 # there's no security cost. The RUNTIME stage enforces the non-root user
 # (1001:0) and only reads/executes the copied venv. (CAP-005 r21b amendment.)
 #
-# Per CONTRIBUTING.md: UBI 9 base, runtime as USER 1001:0.
+# Per CONTRIBUTING.md: UBI 10 python-314-minimal base (fallback ubi9/python-314), runtime as USER 1001:0.
 
 # ─── Builder (runs as root; image discarded) ─────────────────────────────────
-FROM registry.access.redhat.com/ubi9/python-312:9.8-1791407922 AS builder
+FROM registry.access.redhat.com/ubi10/python-314-minimal:10.2-1791464217 AS builder
 
 USER 0
 WORKDIR /build
@@ -119,7 +119,7 @@ RUN poetry export --without-hashes --only main -f requirements.txt -o requiremen
     && /opt/venv/bin/pip install --no-cache-dir -r requirements.txt
 
 # ─── Runtime (non-root) ──────────────────────────────────────────────────────
-FROM registry.access.redhat.com/ubi9/python-312:9.8-1791407922 AS runtime
+FROM registry.access.redhat.com/ubi10/python-314-minimal:10.2-1791464217 AS runtime
 
 WORKDIR /opt/app-root/src
 

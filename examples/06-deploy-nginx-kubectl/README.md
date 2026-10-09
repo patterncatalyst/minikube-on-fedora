@@ -14,7 +14,7 @@ here is **building an image and deploying it**.
 
 ## Why we build our own image
 
-Red Hat publishes nginx images at `registry.access.redhat.com/ubi9/nginx-124`
+Red Hat publishes nginx images at `registry.access.redhat.com/ubi10/nginx-126`
 (and `-122`), but those are **s2i (source-to-image) builder images**
 designed for OpenShift, not plain Kubernetes. Their default CMD
 invokes `/usr/libexec/s2i/run` and expects content baked in via the
@@ -24,8 +24,8 @@ document root.
 Rather than coax the s2i image into running directly (possible but
 fragile), the right pattern is to build our own image from a base
 UBI image. The `Containerfile` in this directory does that: a
-builder stage (`ubi9/ubi`) stages content, a runtime stage
-(`ubi9/ubi-minimal`) installs nginx, configures it for non-root +
+builder stage (`ubi10/ubi`) stages content, a runtime stage
+(`ubi10/ubi-minimal`) installs nginx, configures it for non-root +
 port 8080, copies the staged content in, and runs nginx in the
 foreground.
 
@@ -62,7 +62,7 @@ On success, the corresponding §6 reconciliation rows promote.
 
 Expected duration:
 
-- **First run:** 2-4 minutes (downloads `ubi9` and `ubi9/ubi-minimal`
+- **First run:** 2-4 minutes (downloads `ubi10/ubi` and `ubi10/ubi-minimal`
   base images, ~250 MB combined; runs `microdnf install nginx`;
   builds final image)
 - **Subsequent runs:** 25-40 seconds (image cached in cluster's
