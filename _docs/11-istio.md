@@ -128,7 +128,7 @@ minikube start -p istio \
     --kubernetes-version=v1.36.5 \
     --cpus=4 \
     --memory=6144 \
-    --ports=127.0.0.1:8080:30880,127.0.0.1:20001:30201,127.0.0.1:3000:30300,127.0.0.1:9090:30990,127.0.0.1:16686:31686
+    --ports=127.0.0.1:8080:30880,127.0.0.1:20001:30201,127.0.0.1:3000:30300,127.0.0.1:19090:30990,127.0.0.1:16686:31686
 ```
 
 The driver, runtime, and Kubernetes version are the same as §3, on a
@@ -140,8 +140,11 @@ on `127.0.0.1` (the `ISTIO_PORTS` map in `scripts/lib/_helpers.sh`):
 | `127.0.0.1:8080` | 30880 | Istio ingress gateway (Bookinfo) |
 | `127.0.0.1:20001` | 30201 | Kiali |
 | `127.0.0.1:3000` | 30300 | Grafana |
-| `127.0.0.1:9090` | 30990 | Prometheus |
+| `127.0.0.1:19090` | 30990 | Prometheus |
 | `127.0.0.1:16686` | 31686 | Jaeger |
+
+Prometheus is on 19090, not its usual 9090: Fedora Server and RHEL
+enable the Cockpit web console (`cockpit.socket`) on 9090 by default.
 
 Published ports are fixed when the profile is created. If an `istio`
 profile already exists without them, delete and recreate it:
@@ -570,7 +573,7 @@ The addons take about 5 minutes to come up. Then open:
 |---|---|
 | Kiali | `http://127.0.0.1:20001/kiali` |
 | Grafana | `http://127.0.0.1:3000` |
-| Prometheus | `http://127.0.0.1:9090` |
+| Prometheus | `http://127.0.0.1:19090` |
 | Jaeger | `http://127.0.0.1:16686` |
 
 (`host-access/` also holds `ingressgateway-host.yaml`; applying it
@@ -692,7 +695,7 @@ it's open:
      for mesh metrics
    - Jaeger at `http://127.0.0.1:16686` — distributed traces of
      productpage requests through the call graph
-   - Prometheus at `http://127.0.0.1:9090` — raw metrics queries,
+   - Prometheus at `http://127.0.0.1:19090` — raw metrics queries,
      for the curious
 
 This is the moment §11 stops being abstract: every Service-to-

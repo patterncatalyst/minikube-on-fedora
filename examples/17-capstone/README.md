@@ -138,10 +138,13 @@ Postgres) are reached through companion NodePort Services in
 | Istio ingress gateway | `127.0.0.1:8080` | 30880 |
 | KEDA HTTP interceptor | `127.0.0.1:8081` | 30881 |
 | Kiali | `127.0.0.1:20001/kiali` | 30201 |
-| Prometheus | `127.0.0.1:9090` | 30090 |
+| Prometheus | `127.0.0.1:19090` | 30090 |
 | Grafana | `127.0.0.1:3000` | 30300 |
 | Tempo (HTTP) | `127.0.0.1:3200` | 30320 |
 | Tempo (OTLP/HTTP) | `127.0.0.1:4318` | 30418 |
+
+Prometheus uses 19090 because Fedora Server and RHEL run the Cockpit
+web console on 9090 by default.
 
 Credentials are never printed by the scripts. Find them in the
 values files: `openmetadata/om-app-values.yaml` for OpenMetadata and

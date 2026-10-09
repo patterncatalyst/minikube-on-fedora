@@ -27,7 +27,7 @@ doesn't exist, the demo creates it. The recommended sizing:
 ```
 minikube start -p istio --driver=docker --container-runtime=containerd \
     --kubernetes-version=v1.36.5 --cpus=4 --memory=6144 \
-    --ports=127.0.0.1:8080:30880,127.0.0.1:20001:30201,127.0.0.1:3000:30300,127.0.0.1:9090:30990,127.0.0.1:16686:31686
+    --ports=127.0.0.1:8080:30880,127.0.0.1:20001:30201,127.0.0.1:3000:30300,127.0.0.1:19090:30990,127.0.0.1:16686:31686
 ```
 
 These match the §3 settings (Docker Engine, containerd), just on a
@@ -141,7 +141,7 @@ does not remove it.
 | `ingressgateway-host` | 80 -> 8080 | 30880 | `http://127.0.0.1:8080/productpage` |
 | `kiali-host` | 20001 | 30201 | `http://127.0.0.1:20001/kiali` |
 | `grafana-host` | 3000 | 30300 | `http://127.0.0.1:3000/` |
-| `prometheus-host` | 9090 | 30990 | `http://127.0.0.1:9090/` |
+| `prometheus-host` | 19090 | 30990 | `http://127.0.0.1:19090/` |
 | `tracing-host` | 80 -> 16686 | 31686 | `http://127.0.0.1:16686/` |
 
 The demo applies `ingressgateway-host` after the Istio install.
@@ -198,7 +198,7 @@ minikube delete -p istio     # delete, free disk
        minikube start -p istio --driver=docker \
            --container-runtime=containerd \
            --kubernetes-version=v1.36.5 --cpus=4 --memory=6144 \
-           --ports=127.0.0.1:8080:30880,127.0.0.1:20001:30201,127.0.0.1:3000:30300,127.0.0.1:9090:30990,127.0.0.1:16686:31686
+           --ports=127.0.0.1:8080:30880,127.0.0.1:20001:30201,127.0.0.1:3000:30300,127.0.0.1:19090:30990,127.0.0.1:16686:31686
 
 3. **Bookinfo Pods stuck pulling images** — the `docker.io/istio/*`
    images are larger than our nginx-custom image. Check
@@ -215,7 +215,7 @@ minikube delete -p istio     # delete, free disk
    `virtual-service-reviews-jason-v2-v3.yaml` if the canonical
    50/50 file is missing
 
-6. **Port 8080, 20001, 3000, 9090 or 16686 already in use on the
+6. **Port 8080, 20001, 3000, 19090 or 16686 already in use on the
    host** — `ensure_profile` lists the conflicting host port and
    stops before creating the profile. Free the port (a stray
    local server is the usual cause) and re-run

@@ -3,7 +3,7 @@
 # Companion NodePort Service owned by this repo. Reaches Prometheus (apply samples/addons/prometheus.yaml first).
 # It selects the same Pods as the upstream Service, so re-applying the
 # addon or running istioctl install never reverts it. Published by the
-# istio profile as 127.0.0.1:9090 (see ISTIO_PORTS in scripts/lib/_helpers.sh).
+# istio profile as 127.0.0.1:19090 (see ISTIO_PORTS in scripts/lib/_helpers.sh).
 # Selector: verified against samples/addons/prometheus.yaml in the Istio release
 ---
 apiVersion: v1

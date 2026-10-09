@@ -3,7 +3,7 @@
 # Companion NodePort Service owned by this repo. Reaches the Prometheus server UI/API.
 # It selects the same Pods as the upstream Service, so helm upgrade,
 # istioctl install or an addon re-apply never reverts it. Published by the
-# mof-capstone profile as 127.0.0.1:9090 (see CAPSTONE_PORTS in
+# mof-capstone profile as 127.0.0.1:19090 (see CAPSTONE_PORTS in
 # scripts/lib/env.sh).
 # Selector: prometheus-community/prometheus 29.36.1 (helm template, release prometheus, observability/prometheus-values.yaml); server container port 9090.
 #   verify live: kubectl --context mof-capstone get svc -n observability prometheus-server -o jsonpath='{.spec.selector}'

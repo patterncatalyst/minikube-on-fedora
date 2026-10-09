@@ -93,7 +93,7 @@ the start fails because the port is already in use. Either stop the
 first profile, or give the second profile different host ports.
 That is why the example profiles use distinct maps: `minikube`
 publishes 18080, 18081, and 18090; `driver-check` publishes 18079;
-`istio` publishes 8080, 20001, 3000, 9090, and 16686. Stopping a
+`istio` publishes 8080, 20001, 3000, 19090, and 16686. Stopping a
 profile releases its host ports; starting it takes them back.
 
 ### Listing profiles
