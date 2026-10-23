@@ -2,8 +2,8 @@
 
 Each diagram lives as a **pair** of files with the same base name:
 
-- `<name>.svg` — the rendered diagram, what appears on the site
-- `<name>.excalidraw` — the editable JSON source
+- `<name>.svg`: the rendered diagram, what appears on the site
+- `<name>.excalidraw`: the editable JSON source
 
 ## Naming convention
 
@@ -42,14 +42,14 @@ The include automatically:
 1. Open https://excalidraw.com
 2. Drag the `<name>.excalidraw` file in
 3. Edit
-4. **Export → SVG** (NOT PNG) — overwrites `<name>.svg`
-5. **File → Save to file** — overwrites `<name>.excalidraw`
+4. **Export → SVG** (NOT PNG), overwrites `<name>.svg`
+5. **File → Save to file**, overwrites `<name>.excalidraw`
 
 Always update both files; they should stay in sync.
 
 ## Hand-coded SVGs
 
-Sometimes a hand-coded SVG is faster than Excalidraw — especially
+Sometimes a hand-coded SVG is faster than Excalidraw, especially
 for grids, sequence diagrams, and anything heavy on math. You can
 hand-code an SVG and ship a minimal `.excalidraw` source as
 documentation, or omit the `.excalidraw` entirely and adjust the

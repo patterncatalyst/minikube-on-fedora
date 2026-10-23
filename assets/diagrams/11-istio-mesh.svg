@@ -30,7 +30,7 @@
   <rect width="920" height="500" fill="#fdfbf7"/>
   <rect width="920" height="500" fill="url(#grid)"/>
 
-  <text x="460" y="40" text-anchor="middle" class="title">Istio service mesh — control plane and data plane</text>
+  <text x="460" y="40" text-anchor="middle" class="title">Istio service mesh: control plane and data plane</text>
 
   <rect x="380" y="70" width="160" height="56" rx="4" class="neutral"/>
   <text x="460" y="94" text-anchor="middle" class="label">istiod</text>
@@ -91,5 +91,5 @@
 
   <text x="460" y="370" text-anchor="middle" class="sublabel">solid arrows = traffic flow · dashed arrows = xDS config and mTLS certificates pushed by istiod</text>
 
-  <text x="460" y="478" text-anchor="middle" class="footnote">Every workload Pod runs a sidecar envoy. Traffic between Pods is intercepted, mTLS-encrypted, and routed per istiod's config — without app code changes.</text>
+  <text x="460" y="478" text-anchor="middle" class="footnote">Every workload Pod runs a sidecar envoy. Traffic between Pods is intercepted, mTLS-encrypted, and routed per istiod's config: without app code changes.</text>
 </svg>

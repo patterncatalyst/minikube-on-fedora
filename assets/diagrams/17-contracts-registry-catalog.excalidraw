@@ -128,11 +128,11 @@
       "locked": false,
       "fontSize": 12,
       "fontFamily": 2,
-      "text": "PROTOCOL SURFACES \u2014 EACH SERVICE'S CONTRACT",
+      "text": "PROTOCOL SURFACES: EACH SERVICE'S CONTRACT",
       "textAlign": "left",
       "verticalAlign": "top",
       "containerId": null,
-      "originalText": "PROTOCOL SURFACES \u2014 EACH SERVICE'S CONTRACT",
+      "originalText": "PROTOCOL SURFACES: EACH SERVICE'S CONTRACT",
       "lineHeight": 1.25
     },
     {
@@ -868,11 +868,11 @@
       "locked": false,
       "fontSize": 13,
       "fontFamily": 2,
-      "text": "Apicurio Registry \u2014 the contract metadata (one home, many formats)",
+      "text": "Apicurio Registry: the contract metadata (one home, many formats)",
       "textAlign": "left",
       "verticalAlign": "top",
       "containerId": null,
-      "originalText": "Apicurio Registry \u2014 the contract metadata (one home, many formats)",
+      "originalText": "Apicurio Registry: the contract metadata (one home, many formats)",
       "lineHeight": 1.25
     },
     {
@@ -1669,11 +1669,11 @@
       "locked": false,
       "fontSize": 13,
       "fontFamily": 2,
-      "text": "OpenMetadata \u2014 lineage & discovery metadata",
+      "text": "OpenMetadata: lineage & discovery metadata",
       "textAlign": "left",
       "verticalAlign": "top",
       "containerId": null,
-      "originalText": "OpenMetadata \u2014 lineage & discovery metadata",
+      "originalText": "OpenMetadata: lineage & discovery metadata",
       "lineHeight": 1.25
     },
     {
@@ -1838,11 +1838,11 @@
       "locked": false,
       "fontSize": 10,
       "fontFamily": 3,
-      "text": "\u2014[ order.placed ]\u2192 notification-service",
+      "text": "-[ order.placed ]\u2192 notification-service",
       "textAlign": "middle",
       "verticalAlign": "top",
       "containerId": null,
-      "originalText": "\u2014[ order.placed ]\u2192 notification-service",
+      "originalText": "-[ order.placed ]\u2192 notification-service",
       "lineHeight": 1.25
     },
     {

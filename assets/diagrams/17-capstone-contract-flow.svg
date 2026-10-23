@@ -31,18 +31,18 @@
     <marker id="f-ingest" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0,0 L 10,5 L 0,10 z" fill="#5a8a3a"/></marker>
   </defs>
 
-  <text x="600" y="30" text-anchor="middle" class="title">§17 — How a contract flows: runtime path vs discovery path</text>
+  <text x="600" y="30" text-anchor="middle" class="title">§17: How a contract flows: runtime path vs discovery path</text>
   <text x="600" y="50" text-anchor="middle" class="subtitle">two different jobs the registry does, with very different coupling</text>
 
   <!-- ============ TOP FLOW: runtime serialization (Avro event) ============ -->
   <rect x="20" y="72" width="1160" height="270" class="lane-bg"/>
-  <text x="32" y="92" class="lane-label">Runtime path — Avro event serialization (hot, online)</text>
+  <text x="32" y="92" class="lane-label">Runtime path: Avro event serialization (hot, online)</text>
   <text x="32" y="110" class="step-text" style="font-style:italic;">the event will not encode or decode without the registered schema</text>
 
   <!-- registry at top center -->
   <rect x="470" y="128" width="260" height="54" class="registry-box"/>
   <text x="600" y="150" text-anchor="middle" class="registry-label">Apicurio Registry</text>
-  <text x="600" y="168" text-anchor="middle" class="mono">order.placed — Avro v1 (compatibility-checked)</text>
+  <text x="600" y="168" text-anchor="middle" class="mono">order.placed: Avro v1 (compatibility-checked)</text>
 
   <!-- producer -->
   <rect x="80" y="250" width="240" height="64" class="service-box"/>
@@ -73,8 +73,8 @@
 
   <!-- ============ BOTTOM FLOW: discovery / lineage ============ -->
   <rect x="20" y="360" width="1160" height="350" class="lane-bg"/>
-  <text x="32" y="380" class="lane-label">Discovery path — publish contracts, ingest into the catalog (offline)</text>
-  <text x="32" y="398" class="step-text" style="font-style:italic;">nothing fails at runtime if absent; this exists to be discovered — by people, CI, and OpenMetadata</text>
+  <text x="32" y="380" class="lane-label">Discovery path: publish contracts, ingest into the catalog (offline)</text>
+  <text x="32" y="398" class="step-text" style="font-style:italic;">nothing fails at runtime if absent; this exists to be discovered: by people, CI, and OpenMetadata</text>
 
   <!-- services publish contracts -->
   <rect x="60" y="420" width="300" height="120" class="service-box"/>

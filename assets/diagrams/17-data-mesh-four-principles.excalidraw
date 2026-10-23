@@ -31,11 +31,11 @@
       "locked": false,
       "fontSize": 18,
       "fontFamily": 2,
-      "text": "The four principles \u2014 and how they map in practice",
+      "text": "The four principles: and how they map in practice",
       "textAlign": "middle",
       "verticalAlign": "top",
       "containerId": null,
-      "originalText": "The four principles \u2014 and how they map in practice",
+      "originalText": "The four principles: and how they map in practice",
       "lineHeight": 1.25
     },
     {
@@ -200,11 +200,11 @@
       "locked": false,
       "fontSize": 11,
       "fontFamily": 2,
-      "text": "\u2014 schema, lifecycle, evolution. No",
+      "text": "schema, lifecycle, evolution. No",
       "textAlign": "left",
       "verticalAlign": "top",
       "containerId": null,
-      "originalText": "\u2014 schema, lifecycle, evolution. No",
+      "originalText": "schema, lifecycle, evolution. No",
       "lineHeight": 1.25
     },
     {
@@ -888,11 +888,11 @@
       "locked": false,
       "fontSize": 11,
       "fontFamily": 2,
-      "text": "consume \u2014 they don't build Kafka, a",
+      "text": "consume: they don't build Kafka, a",
       "textAlign": "left",
       "verticalAlign": "top",
       "containerId": null,
-      "originalText": "consume \u2014 they don't build Kafka, a",
+      "originalText": "consume: they don't build Kafka, a",
       "lineHeight": 1.25
     },
     {
@@ -1267,11 +1267,11 @@
       "locked": false,
       "fontSize": 11,
       "fontFamily": 2,
-      "text": "by the platform \u2014 not by meetings or",
+      "text": "by the platform: not by meetings or",
       "textAlign": "left",
       "verticalAlign": "top",
       "containerId": null,
-      "originalText": "by the platform \u2014 not by meetings or",
+      "originalText": "by the platform: not by meetings or",
       "lineHeight": 1.25
     },
     {
@@ -1477,11 +1477,11 @@
       "locked": false,
       "fontSize": 12,
       "fontFamily": 2,
-      "text": "The tools are expressions of the pattern, not the pattern itself \u2014 a data mesh is an organizational and architectural shape.",
+      "text": "The tools are expressions of the pattern, not the pattern itself: a data mesh is an organizational and architectural shape.",
       "textAlign": "middle",
       "verticalAlign": "top",
       "containerId": null,
-      "originalText": "The tools are expressions of the pattern, not the pattern itself \u2014 a data mesh is an organizational and architectural shape.",
+      "originalText": "The tools are expressions of the pattern, not the pattern itself: a data mesh is an organizational and architectural shape.",
       "lineHeight": 1.25
     }
   ],

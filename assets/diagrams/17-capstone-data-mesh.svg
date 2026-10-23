@@ -47,7 +47,7 @@
   </defs>
 
   <!-- Title -->
-  <text x="600" y="28" text-anchor="middle" class="section-title">§17 Capstone — A data mesh on minikube</text>
+  <text x="600" y="28" text-anchor="middle" class="section-title">§17 Final project: A data mesh on minikube</text>
 
   <!-- ========== EXTERNAL CLIENTS lane ========== -->
   <rect x="20" y="50" width="1160" height="80" class="lane-bg"/>
@@ -255,5 +255,5 @@
   <line x1="880" y1="704" x2="930" y2="704" class="arrow-otel" marker-end="url(#arrow-otel-head)"/>
   <text x="938" y="708" class="legend-text">OTLP (observability)</text>
 
-  <text x="50" y="734" class="principle-text">Domain ownership · Data as product · Self-serve platform · Federated computational governance — Dehghani 2022</text>
+  <text x="50" y="734" class="principle-text">Domain ownership · Data as product · Self-serve platform · Federated computational governance: Dehghani 2022</text>
 </svg>

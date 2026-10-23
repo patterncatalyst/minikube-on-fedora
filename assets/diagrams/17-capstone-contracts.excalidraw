@@ -31,11 +31,11 @@
       "locked": false,
       "fontSize": 20,
       "fontFamily": 1,
-      "text": "\u00a717 \u2014 Contracts, registry, catalog",
+      "text": "\u00a717: Contracts, registry, catalog",
       "textAlign": "center",
       "verticalAlign": "top",
       "containerId": null,
-      "originalText": "\u00a717 \u2014 Contracts, registry, catalog",
+      "originalText": "\u00a717: Contracts, registry, catalog",
       "lineHeight": 1.25
     },
     {
@@ -159,11 +159,11 @@
       "locked": false,
       "fontSize": 14,
       "fontFamily": 1,
-      "text": "Apicurio Registry \u2014 all four contract types\n(Avro = runtime; OpenAPI/Protobuf/SDL = discovery)",
+      "text": "Apicurio Registry: all four contract types\n(Avro = runtime; OpenAPI/Protobuf/SDL = discovery)",
       "textAlign": "center",
       "verticalAlign": "top",
       "containerId": null,
-      "originalText": "Apicurio Registry \u2014 all four contract types\n(Avro = runtime; OpenAPI/Protobuf/SDL = discovery)",
+      "originalText": "Apicurio Registry: all four contract types\n(Avro = runtime; OpenAPI/Protobuf/SDL = discovery)",
       "lineHeight": 1.25
     },
     {
@@ -223,11 +223,11 @@
       "locked": false,
       "fontSize": 14,
       "fontFamily": 1,
-      "text": "OpenMetadata \u2014 lineage & discovery\n(ingests Apicurio + Postgres + Kafka)",
+      "text": "OpenMetadata: lineage & discovery\n(ingests Apicurio + Postgres + Kafka)",
       "textAlign": "center",
       "verticalAlign": "top",
       "containerId": null,
-      "originalText": "OpenMetadata \u2014 lineage & discovery\n(ingests Apicurio + Postgres + Kafka)",
+      "originalText": "OpenMetadata: lineage & discovery\n(ingests Apicurio + Postgres + Kafka)",
       "lineHeight": 1.25
     },
     {
