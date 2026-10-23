@@ -32,13 +32,13 @@ partial reads still leave you with something useful.
 | 10 | Editor, shell, and terminal integration     | CLion k8s plugin, zsh + kubectx/kubens, warp.dev workflows               | 15 min   |
 | 11 | Istio on minikube                           | Install via `istioctl`, sidecar-enabled demo app, Gateway + VirtualService, mTLS basics  | 30 min   |
 | 12 | KEDA on minikube (optional)                 | Helm install of KEDA + HTTP add-on; HTTP-driven scaling with a `hey` load test           | 25 min   |
-| 13 | Alternatives to minikube                    | Brief tour: kind, k3s, MicroShift — when to pick what                                    | 5 min    |
+| 13 | Alternatives to minikube                    | Brief tour of kind, k3s, and MicroShift: when to pick what                               | 5 min    |
 | 14 | FAQ                                         | Common pain points; cleanup recipes                                                      | 5 min    |
 | 15 | Where to go next                            | Pointers to deeper resources and possible follow-on tutorials                            | 5 min    |
 
 ## How to read this tutorial
 
-**Read §1 first, always.** The prerequisites are non-negotiable —
+**Read §1 first, always.** The prerequisites are non-negotiable:
 the most common failures in later sections trace back to a missing
 or misconfigured prereq.
 
@@ -46,8 +46,8 @@ or misconfigured prereq.
 You need a running minikube cluster with `kubectl` pointed at it
 before you can deploy anything.
 
-**§6 (kubectl) and §9 (helm) are deliberately parallel.** Both
-deploy the same UBI nginx workload — once with `kubectl apply` and
+**§6 (kubectl) and §9 (helm) mirror each other.** Both
+deploy the same UBI nginx workload: once with `kubectl apply` and
 once with a small helm chart. Reading both makes the trade-offs
 between imperative and declarative deployment concrete.
 
@@ -83,7 +83,7 @@ You should already know, roughly:
 - What a Pod, Deployment, and Service are in Kubernetes (one
   paragraph each is enough)
 - How to read YAML and edit it in a text editor
-- The basics of your shell — variables, pipes, redirecting
+- The basics of your shell: variables, pipes, redirecting
 
 If any of those are unfamiliar, the upstream [Kubernetes Basics
 walkthrough][k8s-basics] is the right warm-up.
@@ -99,7 +99,7 @@ walkthrough][k8s-basics] is the right warm-up.
 - A comparison of minikube with managed Kubernetes offerings as a
   recommendation (the "alternatives" section names local-cluster
   options for navigation only)
-- Knative (intentionally out of scope; possible standalone
+- Knative (out of scope here; possible standalone
   follow-on)
 
 Ready? [Start with §1: Prerequisites →]({{ "/docs/01-prerequisites/" | relative_url }})

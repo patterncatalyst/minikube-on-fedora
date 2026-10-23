@@ -1,7 +1,7 @@
 ---
 title: KEDA
 order: 12
-description: Event-driven autoscaling on Kubernetes. Two patterns — Kafka consumer-lag scaling with Strimzi, and HTTP request scaling with the KEDA HTTP add-on — both with scale-to-zero.
+description: "Event-driven autoscaling on Kubernetes: Kafka consumer-lag scaling with Strimzi and HTTP request scaling with the KEDA HTTP add-on, both with scale-to-zero."
 duration: 45 minutes
 ---
 
@@ -11,17 +11,17 @@ that answer should be **zero** during quiet periods, with the
 workload appearing only when there's something to do.
 
 That's the difference between Kubernetes' built-in Horizontal Pod
-Autoscaler (HPA) and **KEDA** — the **K**ubernetes **E**vent-
+Autoscaler (HPA) and **KEDA**, the **K**ubernetes **E**vent-
 **d**riven **A**utoscaler. HPA scales on resource metrics (CPU,
-memory) — it watches the Pods themselves and adds replicas when
-they're hot. KEDA scales on **events** — Kafka consumer lag, RabbitMQ
+memory): it watches the Pods themselves and adds replicas when
+they're hot. KEDA scales on **events**: Kafka consumer lag, RabbitMQ
 queue depth, HTTP request rate, Prometheus query results, AWS
 SQS message age, cron schedules, or any of [70+ built-in
 scalers](https://keda.sh/docs/scalers/). And critically, KEDA can
 scale a workload **all the way to zero replicas** during quiet
 periods, then back up the moment events start flowing.
 
-This is the optional section in the PRD — the §3-§11 core works
+This is the optional section in the PRD; the §3-§11 core works
 without it. But for anyone building consumer-style workloads
 (Kafka pipelines, queue processors, scheduled batch jobs) or
 HTTP services with bursty/intermittent traffic patterns, KEDA
@@ -39,7 +39,7 @@ is the right primitive. By the end you'll have:
 The default HPA reads resource metrics from kubelet via
 metrics-server, then asks the Deployment to scale up or down
 based on CPU/memory pressure. The Pod has to be **running** to
-contribute its CPU number — so HPA can never legitimately scale
+contribute its CPU number. HPA can never legitimately scale
 to zero, because there'd be nothing to measure.
 
 KEDA inverts the model: instead of measuring the Pods, it
@@ -50,21 +50,21 @@ can sit at zero during quiet periods.
 
 ![HPA vs KEDA scaling models]({{ "/assets/diagrams/12-hpa-vs-keda.svg" | relative_url }})
 
-The clever part: **KEDA doesn't replace HPA** — it provides the
+The clever part: **KEDA doesn't replace HPA**; it provides the
 External Metrics API that HPA was already designed to consume.
 When a `ScaledObject` is created, KEDA generates an HPA behind
 the scenes that's wired up to KEDA's own metrics adapter. From
 HPA's perspective, "Kafka consumer lag" is just another external
 metric like any other.
 
-The "scale to zero" comes from KEDA itself — when no events are
+The "scale to zero" comes from KEDA itself: when no events are
 arriving and the deployment has been idle for `cooldownPeriod`
 seconds, KEDA scales the Deployment to zero replicas and deletes
 the underlying HPA (HPA can't manage 0-replica Deployments). The
 moment the next event arrives (next polling cycle, default 30s),
 KEDA scales back up to `minReplicaCount` and recreates the HPA.
 
-## ScaledObject — the central CRD
+## ScaledObject: the central CRD
 
 The KEDA primitive is the `ScaledObject`. A single example:
 
@@ -92,13 +92,13 @@ spec:
 {% endraw %}
 
 The Deployment named in `scaleTargetRef` should start with
-`replicas: 0` — KEDA will own the replica count from that point.
+`replicas: 0`; KEDA will own the replica count from that point.
 Apply both, and KEDA's controller starts polling Kafka every 5
 seconds. When consumer lag exceeds `lagThreshold` × current
 replicas, replicas climb. When lag drops to zero and stays there
 for `cooldownPeriod`, replicas drop to zero.
 
-## Prerequisites — back on the minikube profile
+## Prerequisites: back on the minikube profile
 
 Unlike §11, this section uses the **same minikube profile as
 §3-§10**. No second cluster. Confirm:
@@ -110,7 +110,7 @@ kubectl --context minikube get nodes
 
 Every command below names `--context minikube` explicitly.
 
-Resource sizing: KEDA core is small (~150 MB total — operator +
+Resource sizing: KEDA core is small (~150 MB total: operator +
 metrics adapter + admission webhook). The HTTP add-on adds
 another ~200 MB (interceptor + scaler + operator). Strimzi's
 Cluster Operator is ~300 MB; the Kafka cluster you deploy is
@@ -173,7 +173,7 @@ pattern (so you can `helm uninstall keda-add-ons-http -n keda --kube-context min
 without affecting Kafka scaling if you want a leaner install).
 
 > **Beta notice.** The KEDA HTTP add-on is officially in **beta**
-> at v0.16.0. KEDA's upstream README says plainly that
+> at v0.16.0. KEDA's upstream README states that
 > the add-on is not yet recommended for production use while it is
 > still under development and testing. For the tutorial it
 > works fine; for production you'd evaluate alternatives
@@ -189,7 +189,7 @@ without affecting Kafka scaling if you want a leaner install).
 ## Pattern A: Kafka consumer-lag scaling with Strimzi
 
 The first demo wires up the canonical KEDA pattern: a Kafka
-topic, a consumer that's slow on purpose, and a ScaledObject
+topic, a consumer throttled to simulate real work, and a ScaledObject
 that fires up more consumers when lag builds up.
 
 ### Why Strimzi
@@ -199,8 +199,8 @@ Kubernetes via the operator pattern. You install the Cluster
 Operator once via helm; from then on, Kafka clusters are
 `Kafka` custom resources you `kubectl apply`, topics are
 `KafkaTopic` resources, users are `KafkaUser` resources. The
-operator handles the entire Kafka lifecycle — broker config,
-KRaft setup, certificate rotation, rolling upgrades, the works.
+operator handles the entire Kafka lifecycle: broker config,
+KRaft setup, certificate rotation, and rolling upgrades.
 
 Two practical notes upfront:
 
@@ -217,7 +217,7 @@ Two practical notes upfront:
   KEDA-related
 
 This tutorial uses Strimzi because the operator pattern
-itself is instructive — it's the same shape as KEDA, cert-manager,
+itself is instructive: it's the same shape as KEDA, cert-manager,
 the Istio operator, and dozens of other CNCF projects.
 
 ### Install Strimzi
@@ -235,7 +235,7 @@ kubectl --context minikube get pods -n kafka
 # strimzi-cluster-operator-...               1/1     Running   30s
 ```
 
-One Pod — the Cluster Operator. It watches for `Kafka`,
+One Pod: the Cluster Operator. It watches for `Kafka`,
 `KafkaTopic`, `KafkaUser` custom resources cluster-wide and
 reconciles them into real Kubernetes resources (StatefulSets,
 Services, Secrets, etc.) under the hood.
@@ -243,9 +243,9 @@ Services, Secrets, etc.) under the hood.
 ### Define the Kafka cluster
 
 The `examples/12-keda-kafka/manifests/kafka-cluster.yaml` is
-minimal — a single-node KRaft cluster combining controller and
-broker roles in one Pod (suitable for development, NOT
-production):
+minimal: a single-node KRaft cluster combining controller and
+broker roles in one Pod, suitable for development and not
+production:
 
 {% raw %}
 ```yaml
@@ -301,27 +301,27 @@ spec:
 
 Notable choices:
 
-- **KRaft mode** — no ZooKeeper. Strimzi 1.x is KRaft-only and
+- **KRaft mode**: no ZooKeeper. Strimzi 1.x is KRaft-only and
   uses `KafkaNodePool` resources for every cluster. The manifest keeps
   the `strimzi.io/kraft` and `strimzi.io/node-pools` annotations as
   documentation of that mode; they are harmless on 1.x
-- **Dual-role node** — combines controller + broker in one Pod.
+- **Dual-role node**: combines controller + broker in one Pod.
   Smaller resource footprint than separate controller/broker
   pools. Production deployments split them
-- **Kafka 4.3.1** — pinned. Strimzi 1.x dropped support for
+- **Kafka 4.3.1**: pinned. Strimzi 1.x dropped support for
   Kafka 3.x and ZooKeeper entirely, and accepts only the
   `kafka.strimzi.io/v1` API (`v1beta2` manifests are rejected).
-  The `metadataVersion` field is omitted from the manifest —
+  The `metadataVersion` field is omitted from the manifest;
   Strimzi defaults it to match the Kafka version on first
   cluster creation. Kafka 4.x removed ZooKeeper completely
   (KRaft-only), so there's no zk-vs-kraft choice to make
-- **Replication factor 1** everywhere — single-broker cluster
+- **Replication factor 1** everywhere: a single-broker cluster
   can't replicate, so insisting on RF≥2 would break topic
   creation
-- **Internal listener only** — Pods inside the cluster reach
+- **Internal listener only**: Pods inside the cluster reach
   Kafka via `my-kafka-kafka-bootstrap.kafka:9092`. No external
   exposure needed (KEDA scaler runs in-cluster)
-- **EntityOperator** — runs the Topic Operator and User Operator
+- **EntityOperator**: runs the Topic Operator and User Operator
   as sidecars, which reconcile `KafkaTopic` and `KafkaUser` CRs
   into actual Kafka topics and ACLs
 
@@ -339,22 +339,22 @@ fully-converged state:
 
 Reading top to bottom:
 
-- `kafka/my-kafka  True  <version>  <metadata version>` — the Kafka CR is
+- `kafka/my-kafka  True  <version>  <metadata version>`: the Kafka CR is
   Ready, running Kafka **4.3.1** here (the screenshot was captured on an
   earlier release, so its version columns differ), with Strimzi having
   defaulted the metadata version to the matching 4.3 value (the manifest
   doesn't specify it explicitly, which is why dropping that
   field was safe)
-- `kafkanodepool/dual-role  1  ["controller","broker"]  [0]` —
+- `kafkanodepool/dual-role  1  ["controller","broker"]  [0]`:
   one node pool with one replica playing both controller and
   broker roles, with assigned node ID `0`
-- `pod/my-kafka-dual-role-0  1/1  Running` — the actual Kafka
+- `pod/my-kafka-dual-role-0  1/1  Running`: the actual Kafka
   broker Pod (single-broker development cluster)
-- `pod/my-kafka-entity-operator-...  2/2  Running` — the Topic
+- `pod/my-kafka-entity-operator-...  2/2  Running`: the Topic
   Operator and User Operator running together as a 2-container
   Pod, reconciling `KafkaTopic` and `KafkaUser` CRs into real
   Kafka topics and ACLs
-- `pod/strimzi-cluster-operator-...  1/1  Running` — the
+- `pod/strimzi-cluster-operator-...  1/1  Running`: the
   Cluster Operator itself, watching for `Kafka`-shaped CRs and
   reconciling them. AGE here is much higher because the
   operator was installed earlier via `setup-strimzi.sh`
@@ -363,9 +363,7 @@ If you see this output, everything is wired correctly and the
 Kafka demo will work. If the `kafka/my-kafka` row shows
 `READY=False`, the `WARNINGS` and conditions block in
 `kubectl --context minikube describe kafka/my-kafka -n kafka` will tell you what's
-wrong — most commonly an unsupported version (the error caught
-us during r13's first run before this section was pinned to
-a supported version).
+wrong, most commonly an unsupported Kafka version.
 
 ### Define the topic
 
@@ -387,7 +385,7 @@ spec:
 {% endraw %}
 
 Three partitions so KEDA has room to scale the consumer up to 3
-replicas (one consumer per partition — Kafka's parallelism unit).
+replicas (one consumer per partition: Kafka's parallelism unit).
 The Topic Operator (running in the EntityOperator Pod) sees the
 `KafkaTopic` CR and creates the actual topic.
 
@@ -433,7 +431,7 @@ makes scale-down faster.
 
 ### The Deployment + ScaledObject
 
-The Deployment starts at `replicas: 0` (the key KEDA pattern —
+The Deployment starts at `replicas: 0` (the key KEDA pattern:
 the Deployment is "owned" by KEDA from the moment the
 ScaledObject is created):
 
@@ -531,7 +529,7 @@ KEDA scaler. The shape:
 
 ### Workload
 
-Reuse `nginx-custom:v1` from §6 (no need to rebuild — it's
+Reuse `nginx-custom:v1` from §6 (no need to rebuild; it's
 already cached in the `minikube` profile). The Deployment
 manifest at `examples/12-keda-http/manifests/nginx-deployment.yaml`
 starts at `replicas: 0` and is otherwise identical to §6's:
@@ -635,26 +633,26 @@ header carries the routing key, so requests look like
 6. Apply the `keda-interceptor-host` companion Service
    (nodePort 30080 → `127.0.0.1:18080`)
 7. Fire one request with `Host: nginx.local` to wake the
-   workload — interceptor should buffer until the pod is ready
+   workload; interceptor should buffer until the pod is ready
 8. Run `hey -n 500 -c 50 -host nginx.local
    http://127.0.0.1:18080/` (note: `-host`, not `-H`, since hey
    is written in Go and Go's `net/http` silently strips
-   `Host:` headers set via the headers map — see the §12
+   `Host:` headers set via the headers map; see the §12
    HTTP example's README for the gotcha details)
 9. Watch replica count climb during the load
 10. Wait for `scaledownPeriod + 30s` of idle
 11. Assert replicas = 0 (final state)
 
-The first request post-scale-down is interesting to watch — it
-takes a few seconds because the interceptor is waiting for a
-Pod to come up. Subsequent requests after the Pod is ready are
+The first request post-scale-down takes a few seconds because
+the interceptor is waiting for a Pod to come up. Subsequent
+requests after the Pod is ready are
 fast (single-digit milliseconds).
 
 A note on observed peak replicas: in practice, on minikube with
 this nginx workload, the peak is often **just 1 replica** even
 under `hey -c 50`. The reason is that with nginx's per-request
 latency around 10ms, 500 requests at 50 concurrent finish in
-roughly 100ms — well below the threshold to drive KEDA's
+roughly 100ms, well below the threshold to drive KEDA's
 concurrency metric past `targetValue: 5` for sustained periods.
 The lifecycle is still being demonstrated faithfully (0 → ≥1
 → 0), just at the lower bound. To see scaling to higher peaks,
@@ -666,12 +664,12 @@ load); on the same minikube setup, you'll see peak replicas of
 
 Each demo has two layers of cleanup:
 
-1. **`demo.sh` cleanup trap** — runs automatically on demo exit
+1. **`demo.sh` cleanup trap**: runs automatically on demo exit
    (whether the demo passed, failed, or you Ctrl-C'd it). Removes
    only the per-run workload (consumer / nginx) plus the
    ScaledObject, plus the `keda-interceptor-host` Service. Leaves
    Kafka, Strimzi, and KEDA intact so re-runs are fast
-2. **`cleanup.sh` script** — explicit, deeper teardown. Run when
+2. **`cleanup.sh` script**: explicit, deeper teardown. Run when
    you're done with §12 (or with one of the two patterns) and want
    to free the resources
 

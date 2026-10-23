@@ -5,7 +5,7 @@ description: Enable optional cluster features via minikube addons; the metrics-s
 duration: 10 minutes
 ---
 
-minikube ships a set of optional cluster features as **addons** —
+minikube ships a set of optional cluster features as **addons**:
 self-contained chunks of Kubernetes manifests you can enable or
 disable with a single CLI command. This section covers the addons
 this tutorial uses (and a handful you'll commonly want even outside
@@ -20,10 +20,10 @@ minikube addons list
 You'll see a table of all available addons with their enable/disable
 status. By default only two are enabled:
 
-- `default-storageclass` — provides a `StorageClass` named `standard`
+- `default-storageclass`: provides a `StorageClass` named `standard`
   marked as default, so `PersistentVolumeClaims` without an explicit
   class get bound by `storage-provisioner`
-- `storage-provisioner` — the controller that actually creates
+- `storage-provisioner`: the controller that actually creates
   hostPath PVs when PVCs are created
 
 Both showed up as `Running` pods in the §3 driver-check output. The
@@ -54,7 +54,7 @@ minikube addons enable dashboard
 
 ### `metrics-server`
 
-Provides the Kubernetes Metrics API — what `kubectl top nodes` and
+Provides the Kubernetes Metrics API: what `kubectl top nodes` and
 `kubectl top pods` use. Without it those commands fail with "Metrics
 API not available". §12's KEDA needs metrics-server for any
 CPU-based scaling target.
@@ -67,7 +67,7 @@ kubectl --context minikube top pods -A
 ```
 
 If `kubectl top` errors with "metrics not available yet", give
-metrics-server another 30-60 seconds — it needs to collect samples
+metrics-server another 30-60 seconds: it needs to collect samples
 before it can serve them.
 
 ### `ingress`
@@ -91,7 +91,7 @@ state and an `ingress-nginx-admission-create-*` job `Completed`.
 
 ### `dashboard`
 
-The Kubernetes Dashboard — a web UI for browsing cluster resources.
+The Kubernetes Dashboard: a web UI for browsing cluster resources.
 Covered in its own subsection below since it has its own access
 pattern.
 
@@ -104,12 +104,12 @@ Not needed for this tutorial but worth knowing they exist:
 | `volcano`                   | Batch scheduling for ML/HPC workloads                                                      |
 | `nvidia-gpu-device-plugin`  | GPU support (NVIDIA only)                                                      |
 | `cloud-spanner`             | Cloud Spanner emulator                                                                     |
-| `csi-hostpath-driver`       | A CSI-based version of the default storage class — more flexible than the default hostPath provisioner |
+| `csi-hostpath-driver`       | A CSI-based version of the default storage class: more flexible than the default hostPath provisioner |
 | `inaccel`                   | FPGA accelerator support                                                                   |
 | `headlamp`                  | An alternative dashboard, less venerable than the default but actively maintained          |
-| `gvisor`                    | Run pods inside gVisor sandboxes — kernel-level isolation per pod                          |
+| `gvisor`                    | Run pods inside gVisor sandboxes: kernel-level isolation per pod                           |
 
-Browse the full list with `minikube addons list` — the maintainer
+Browse the full list with `minikube addons list`: the maintainer
 column tells you who owns each chunk of YAML so you know whether
 to expect kubernetes upstream support or community responsiveness.
 
@@ -124,7 +124,7 @@ minikube addons configure registry-creds
 
 This prompts for credentials interactively (or accepts them via
 environment variables). For the addons used in this tutorial
-the defaults are fine — no `configure` step needed.
+the defaults are fine; no `configure` step needed.
 
 ## The Kubernetes Dashboard
 
@@ -187,8 +187,8 @@ kubectl --context minikube delete service dashboard-host -n kubernetes-dashboard
 
 ### Dashboard or kubectl?
 
-The dashboard is genuinely useful for exploring an unfamiliar
-cluster — like joining a project that already has Kubernetes
+The dashboard is useful for exploring an unfamiliar
+cluster, like joining a project that already has Kubernetes
 running. For day-to-day work in this tutorial, `kubectl` is faster
 and more reproducible, and it is what the tutorial uses throughout.
 The dashboard comes up occasionally; nothing relies on it.

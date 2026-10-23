@@ -19,7 +19,7 @@ plugin manager). **Where Fedora has a current package, this
 tutorial uses it.**
 
 If you already have any of these installed at a recent version,
-skip those steps — re-running an install is harmless but slow.
+skip those steps; re-running an install is harmless but slow.
 
 ## Install minikube
 
@@ -38,7 +38,7 @@ minikube version
 ```
 
 You should see output mentioning a default Kubernetes version
-that minikube targets — that's the *cluster* version, distinct
+that minikube targets: that's the *cluster* version, distinct
 from your `kubectl` client version. minikube v1.39.0 has its own
 default Kubernetes version; §3 pins v1.36.5 explicitly so the
 cluster doesn't depend on that default.
@@ -49,7 +49,7 @@ You'll see `curl -LO ... && sudo install ...` instructions in
 the minikube quickstart. They work, but install minikube to
 `/usr/local/bin/` outside of dnf's view, so future updates
 require re-running the curl. The RPM-through-dnf path above
-keeps minikube under dnf's management — `sudo dnf upgrade` picks
+keeps minikube under dnf's management: `sudo dnf upgrade` picks
 it up alongside everything else.
 
 ## Install kubectl
@@ -62,7 +62,7 @@ kubectl version --client=true
 ```
 
 The Kubernetes version skew policy supports a client one minor
-version behind or ahead of the server (±1) — so a kubectl 1.36.x
+version behind or ahead of the server (±1), so a kubectl 1.36.x
 client works against the v1.36.5 cluster §3 starts, and against any
 1.35.x or 1.37.x cluster you might spin up via
 `--kubernetes-version` (for example the 1.35.9 sandbox in §4).
@@ -112,7 +112,7 @@ helm version --short
 You should see `v4.1.x+`. Helm 4 was released in late 2025 and is
 the current stable line. The Helm-3-format charts that every
 public chart on Artifact Hub still ships in (Bitnami, Istio,
-KEDA, etc.) work unchanged on Helm 4 — chart authoring and
+KEDA, etc.) work unchanged on Helm 4: chart authoring and
 consumer-side commands (`install`, `upgrade`, `rollback`,
 `uninstall`) behave the same. §9 covers helm in depth and notes
 the small handful of places to watch for v3 vs. v4 differences.
@@ -123,7 +123,7 @@ These make day-to-day Kubernetes work easier. You can install
 them all now (recommended; it's a few minutes total) or wait
 until specific sections introduce them.
 
-### httpie — friendlier `curl`
+### httpie: friendlier `curl`
 
 Packaged in Fedora 44 repos:
 
@@ -132,7 +132,7 @@ sudo dnf install -y httpie
 http --version
 ```
 
-### yq — YAML query and transform
+### yq: YAML query and transform
 
 mikefarah's `yq` (Go binary, jq-like syntax) is packaged in
 Fedora 44 repos at v4.x:
@@ -148,10 +148,10 @@ A historical note worth knowing: in earlier Fedora versions the
 `yq` package was the unrelated Python tool `python-yq`, which has
 different syntax. Older guides will tell you to grab mikefarah's
 binary from upstream to avoid that confusion. On Fedora 44 the
-`dnf install` is now the right path — Fedora packages mikefarah's
+`dnf install` is now the right path: Fedora packages mikefarah's
 `yq` directly.
 
-### hey — HTTP load generator
+### hey: HTTP load generator
 
 Used heavily in §12 (KEDA HTTP-driven scaling). If you don't
 have it (`hey --help` failing), install via Go:
@@ -173,7 +173,7 @@ source ~/.zshrc
 
 `krew` is the kubectl plugin manager. Many useful kubectl
 extensions ship as krew plugins rather than as standalone
-binaries — including `stern`, `kubectx`, and `kubens`, none of
+binaries, including `stern`, `kubectx`, and `kubens`, none of
 which are packaged in Fedora's repos.
 
 Install krew first (pinned to v0.5.0):
@@ -203,7 +203,7 @@ kubectl krew install stern ctx ns
 
 `ctx` and `ns` are krew's names for what the standalone scripts
 call `kubectx` and `kubens`. They install as `kubectl ctx` and
-`kubectl ns` rather than top-level binaries — slightly more
+`kubectl ns` rather than top-level binaries, slightly more
 typing, but discoverable via `kubectl plugin list`.
 
 Confirm:
@@ -216,7 +216,7 @@ You should see three lines, one per plugin.
 
 ## Verify everything
 
-Re-run the audit script — every tool should now report
+Re-run the audit script; every tool should now report
 a path and a version:
 
 ```bash
@@ -231,7 +231,7 @@ For a quick "are the headliners all working" check:
 minikube version | head -1 && kubectl version --client=true | head -1 && helm version --short
 ```
 
-Three single-line version reports, no errors — you're ready for
+Three single-line version reports, no errors: you're ready for
 §3.
 
 [On to §3: Starting minikube →]({{ "/docs/03-starting-minikube/" | relative_url }})

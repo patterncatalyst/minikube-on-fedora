@@ -61,7 +61,7 @@ chart/
 
 Each file in `templates/` is a Go template that produces a
 Kubernetes manifest when rendered. The template syntax is
-{% raw %}**Go templating + Sprig functions** — `{{ .Values.foo }}` inserts
+{% raw %}**Go templating + Sprig functions**: `{{ .Values.foo }}` inserts
 a value, `{{ if .Values.bar }}` conditionally renders a block,
 `{{ include "..." . | nindent N }}` interpolates a reusable
 template defined in `_helpers.tpl`.{% endraw %}
@@ -81,10 +81,10 @@ version: 0.1.0
 appVersion: "1.20.1"
 ```
 
-- `apiVersion: v2` — chart API v2, the helm 3+/4 format
-- `version: 0.1.0` — the **chart's** version (changes when the
+- `apiVersion: v2`: chart API v2, the helm 3+/4 format
+- `version: 0.1.0`: the **chart's** version (changes when the
   chart itself changes)
-- `appVersion: "1.20.1"` — the **application's** version (the
+- `appVersion: "1.20.1"`: the **application's** version (the
   nginx in the image). String, not numeric
 
 ## Our chart's design
@@ -190,7 +190,7 @@ spec:
 {% endraw %}
 
 The ConfigMap is mounted at `/usr/share/nginx/html`. Same overlay
-trick as §8 — the image's baked-in content is hidden by the mount.
+trick as §8: the image's baked-in content is hidden by the mount.
 
 ### Service
 
@@ -299,7 +299,7 @@ curl http://127.0.0.1:18080/
 The response contains the title and custom line you passed with
 `--set`.
 
-### Dry-run rendering — `helm template`
+### Dry-run rendering: `helm template`
 
 Before `install`, render the chart to stdout and inspect:
 
@@ -311,7 +311,7 @@ This is invaluable for catching template errors or visualizing
 what your overrides actually produce. It doesn't talk to the
 cluster.
 
-### Lint — `helm lint`
+### Lint: `helm lint`
 
 Quick chart sanity check:
 
@@ -368,7 +368,7 @@ helm --kube-context minikube uninstall nginx-helm
 ```
 
 Removes the Deployment, Service, ConfigMap, and the release record,
-freeing nodePort 30080. A clean uninstall — no orphans.
+freeing nodePort 30080: a clean uninstall with no orphans.
 
 ## Verification: examples/09-deploy-nginx-helm/
 
@@ -389,8 +389,8 @@ workflow:
 8. Wait for rollout
 9. Poll `http://127.0.0.1:18080/` until the recreated Pods answer
 10. Curl, verify the upgraded title now appears
-11. `helm history nginx-helm` — show both revisions
-12. `helm uninstall nginx-helm` — clean removal
+11. `helm history nginx-helm`: show both revisions
+12. `helm uninstall nginx-helm`: clean removal
 13. Verify no leftover resources match the chart's label selector
 
 ```bash

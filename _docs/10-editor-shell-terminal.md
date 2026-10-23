@@ -6,7 +6,7 @@ duration: 20 minutes
 ---
 
 §1 through §9 are about Kubernetes. This section is about the
-tools you use to work with Kubernetes — the editor for manifests,
+tools you use to work with Kubernetes: the editor for manifests,
 the shell for commands, the conveniences that make 1000 kubectl
 invocations feel like 100.
 
@@ -21,8 +21,8 @@ work feels natural rather than tedious.
 
 ## Editor: Pulsar
 
-This tutorial's manifests were written and tested in **Pulsar**
-— the community-maintained successor to Atom, which GitHub
+This tutorial's manifests were written and tested in **Pulsar**,
+the community-maintained successor to Atom, which GitHub
 discontinued in 2022 after the Microsoft acquisition. A group of
 contributors forked the editor and continues to ship it under the
 Pulsar name. Open source,
@@ -32,18 +32,18 @@ Fedora `.rpm` is at [pulsar-edit.dev](https://pulsar-edit.dev/).
 Out of the box, Pulsar gives you what matters for editing
 Kubernetes manifests:
 
-- **YAML syntax highlighting** — `apiVersion`, `kind`, list/map
+- **YAML syntax highlighting**: `apiVersion`, `kind`, list/map
   structure all visually distinct
-- **Bracket and indentation matching** — YAML indentation is
-  load-bearing, and a misaligned space wastes hours. Pulsar
-  shows the indent guides
-- **Fuzzy file finder** (Ctrl-T) — type `dep<enter>` to jump to
+- **Bracket and indentation matching**: YAML indentation
+  determines structure, and a misaligned space wastes hours.
+  Pulsar shows the indent guides
+- **Fuzzy file finder** (Ctrl-T): type `dep<enter>` to jump to
   `deployment.yaml` from anywhere in the project
 - **Multi-pane editing** for side-by-side manifests (e.g., the
   Deployment in one pane, the Service in another)
-- **Project-wide search** — useful when you've forgotten which
+- **Project-wide search**: useful when you've forgotten which
   example uses a particular pattern
-- **Git integration** — see what's changed before
+- **Git integration**: see what's changed before
   `git diff`-ing in the terminal
 
 For schema-aware editing (red-underlining unknown fields,
@@ -54,21 +54,21 @@ IDE-grade validation inside a lightweight editor.
 
 ### If Pulsar isn't your thing
 
-This tutorial doesn't depend on the editor — manifests are plain
+This tutorial doesn't depend on the editor: manifests are plain
 YAML; the editor doesn't talk to the cluster. Use whatever you
 like:
 
-- **VS Code** with Microsoft's official Kubernetes extension —
+- **VS Code** with Microsoft's official Kubernetes extension:
   most popular by far; deep schema awareness; integrated kubectl
   panel that shows cluster state alongside the editor. If you
   want a single tool that does everything, this is it
-- **Neovim** with `yaml-language-server` (via Mason or LSP-zero)
-  — terminal-native, fast, mature ecosystem; popular among
+- **Neovim** with `yaml-language-server` (via Mason or LSP-zero):
+  terminal-native, fast, mature ecosystem; popular among
   k8s practitioners who already live in vim
 - **IntelliJ family** (IDEA, GoLand, PyCharm, CLion, …) with
-  JetBrains' Kubernetes plugin — same schema awareness as
+  JetBrains' Kubernetes plugin: same schema awareness as
   VS Code in a heavier IDE
-- **nano / vi / vim** out of the box — works fine for one-off
+- **nano / vi / vim** out of the box: works fine for one-off
   edits; less convenient when you're hopping between multiple
   manifest files in a single example directory
 
@@ -86,7 +86,7 @@ For *interactive* k8s work, **zsh** has a few advantages worth
 the switch:
 
 - Tab completion is more powerful and more configurable than
-  bash's — completing pod names, label keys, resource fields
+  bash's: completing pod names, label keys, resource fields
 - `kubectl`, `helm`, and `minikube` ship with first-class zsh
   completion
 - The `oh-my-zsh` framework ([ohmyz.sh](https://ohmyz.sh/))
@@ -106,11 +106,11 @@ Log out and back in. New terminal sessions launch zsh; the
 `demo.sh` scripts keep working unchanged (they exec their own
 bash).
 
-If you'd rather stick with bash, everything below still works —
+If you'd rather stick with bash, everything below still works:
 substitute `bash` for `zsh` in the completion `source` lines,
 and use `complete -F` instead of `compdef` for the aliases.
 
-## Tab completion — the single biggest win
+## Tab completion: the single biggest win
 
 If you do nothing else in this section, do this. Tab completion
 turns `kubectl get pod nginx-pv-864c5dfd8b-zvpwn` into `kubectl
@@ -140,7 +140,7 @@ kubectl get po<TAB>
 ```
 
 You'll see `pod  podsecuritypolicies  poddisruptionbudgets …`.
-Completion also covers resource names — `kubectl describe pod
+Completion also covers resource names: `kubectl describe pod
 <TAB>` lists the actual Pods in your current namespace.
 
 ## Aliases: the k= shortcut family
@@ -191,10 +191,10 @@ the alias because of the `compdef` lines.
 
 Two variants worth knowing:
 
-- **`kgp -w`** — kubectl's watch flag re-renders Pod state as it
+- **`kgp -w`**: kubectl's watch flag re-renders Pod state as it
   changes. `kgp -w` is the fastest way to see a Deployment roll
   out
-- **oh-my-zsh's `kubectl` plugin** — a turn-key alias set far
+- **oh-my-zsh's `kubectl` plugin**: a turn-key alias set far
   larger than the above. Enable in `~/.zshrc` via `plugins=(...
   kubectl ...)`. The trade-off: more aliases to remember vs.
   copying the curated short list
@@ -204,12 +204,12 @@ Two variants worth knowing:
 Two kubectl subcommands that aren't in §6-§9 but earn their
 keep:
 
-- **`kubectl edit <resource>`** — opens the live object in your
+- **`kubectl edit <resource>`**: opens the live object in your
   `$EDITOR` (set this to `pulsar -w` or your preference). Save
   and the change is applied to the cluster. Useful for one-off
   tweaks; less safe than `apply` from a versioned file but
   faster for exploration
-- **`kubectl explain <resource>.<field>`** — schema lookup. Forgot
+- **`kubectl explain <resource>.<field>`**: schema lookup. Forgot
   what `spec.template.spec.affinity` accepts? `kubectl explain
   deployment.spec.template.spec.affinity` lists the subfields
   with descriptions. Faster than the official docs when you
@@ -228,8 +228,8 @@ kubectl ns kube-system   # switch default namespace
 ```
 
 If you live in a single minikube cluster these matter less; the
-moment you're toggling between minikube and a remote cluster —
-or between `default` and `kube-system` — the gain is obvious.
+moment you're toggling between minikube and a remote cluster,
+or between `default` and `kube-system`, the gain is obvious.
 
 ## Streaming logs from multiple Pods: stern
 
@@ -243,7 +243,7 @@ Tails logs from every Pod matching the label, color-coded by
 Pod name. More useful than `kubectl logs -f <pod>` specifically
 for Deployments where you want all replicas' output interleaved.
 
-## k9s — curses UI for the cluster
+## k9s: curses UI for the cluster
 
 `kubectl get pods` over and over feels like driving by reading
 the speedometer. **k9s** is the dashboard.
@@ -294,15 +294,15 @@ Three approaches to keeping these organized:
 - **Terminal tabs** in whichever GUI terminal emulator you use
   (GNOME Terminal, Kitty, Alacritty, Konsole, …). Simple,
   visual, works everywhere
-- **tmux** — the venerable terminal multiplexer. Detach and
+- **tmux**: the venerable terminal multiplexer. Detach and
   re-attach across SSH sessions, define window layouts, scroll
   back through buffers. Install via `sudo dnf install -y tmux`
-- **zellij** — modern alternative to tmux with friendlier
+- **zellij**: modern alternative to tmux with friendlier
   defaults (the keybindings are discoverable rather than
   cryptic). Check [zellij.dev](https://zellij.dev/)
 
-This tutorial doesn't depend on terminal multiplexing — each
-demo runs in one terminal — but you'll find yourself wanting it
+This tutorial doesn't depend on terminal multiplexing (each
+demo runs in one terminal), but you'll find yourself wanting it
 as the parallelism grows in §11 onwards.
 
 ## Putting it together
@@ -319,7 +319,7 @@ A productive minikube-on-Fedora workflow:
 None of these are required for the examples in §1-§9 to work,
 and none are part of the reconciliation plan (this section is
 reference material). But the §6-§9 demos all become much more
-pleasant to run with this setup — and the §11 Istio work, with
+pleasant to run with this setup, and the §11 Istio work, with
 its handful of long-running watch processes, almost requires
 it.
 

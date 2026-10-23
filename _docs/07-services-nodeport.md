@@ -5,7 +5,7 @@ description: Service types compared, NodePort mechanics, and how minikube publis
 duration: 20 minutes
 ---
 
-§6 exposed nginx through a `ClusterIP` Service — reachable from
+§6 exposed nginx through a `ClusterIP` Service, reachable from
 inside the cluster only. §6's own Service already used the type this
 section explains: **NodePort**, a Service type that opens a port on
 every node and makes the workload reachable from outside the cluster.
@@ -26,32 +26,32 @@ provides:
 | **ClusterIP**    | Inside the cluster only                            | Internal service-to-service communication                    |
 | **NodePort**     | Inside the cluster + `<nodeIP>:<nodePort>`         | Quick external access for testing, internal admin endpoints  |
 | **LoadBalancer** | Same as NodePort + an external load-balancer IP    | Production external access (cloud-provided LB)              |
-| **ExternalName** | A DNS `CNAME` — no real service                    | Map a Kubernetes name to an external DNS                     |
+| **ExternalName** | A DNS `CNAME`: no real service                     | Map a Kubernetes name to an external DNS                     |
 | (Headless)       | DNS-resolves directly to Pod IPs, no virtual IP    | StatefulSets, direct Pod addressing                          |
 
 The default is `ClusterIP`. This section is NodePort. LoadBalancer
 requires cloud integration (an external load-balancer controller)
 that a local minikube node does not have; a `LoadBalancer` Service
 there keeps `<pending>` as its external IP, though it still gets a
-nodePort. Ingress is a different resource type — separate from
-Services — and gets attention via the `ingress` addon you enabled
+nodePort. Ingress is a different resource type, separate from
+Services, and gets attention via the `ingress` addon you enabled
 in §5; §9 helm work uses it.
 
 ## NodePort mechanics
 
 A NodePort Service:
 
-- Has a ClusterIP (just like a ClusterIP Service) — internal access
+- Has a ClusterIP (just like a ClusterIP Service): internal access
   still works
 - **Additionally** opens a TCP port on every node in the cluster
 - Forwards traffic from `<any node's IP>:<nodePort>` to the
   Service's endpoints, which are the matching Pods
 
 The default port range is **30000-32767**. You can let Kubernetes
-assign one for you, or pin a specific port — the manifest below
+assign one for you, or pin a specific port; the manifest below
 shows the pin pattern.
 
-In a multi-node cluster, the NodePort works on *every* node — you
+In a multi-node cluster, the NodePort works on *every* node: you
 can hit it via any node's IP, not just the node a Pod happens to
 be running on. `kube-proxy` handles routing. For our single-node
 minikube cluster, "every node" means the one minikube node;
@@ -85,8 +85,8 @@ spec:
 
 Two new fields compared to §6's ClusterIP Service:
 
-- **`type: NodePort`** — selects the NodePort behavior
-- **`nodePort: 30808`** — pins the cluster-side port. If omitted,
+- **`type: NodePort`**: selects the NodePort behavior
+- **`nodePort: 30808`**: pins the cluster-side port. If omitted,
   Kubernetes picks one in the 30000-32767 range. Pinning is useful
   for documentation and predictability; auto-allocation is useful
   for avoiding conflicts in a busy cluster
@@ -94,7 +94,7 @@ Two new fields compared to §6's ClusterIP Service:
 The Deployment in this example uses the name and label `nginx-np`
 (not the `nginx` from §6) so the two examples can coexist without
 either selector accidentally matching the wrong Pods. Otherwise
-the Deployment is identical to §6 — same multi-stage Containerfile,
+the Deployment is identical to §6: same multi-stage Containerfile,
 same `nginx-custom:v1` image (`imagePullPolicy: Never`, loaded in
 §6), same probes and resources.
 
@@ -155,7 +155,7 @@ The `minikube` profile publishes three ports
 | `127.0.0.1:18081` | 30808  | §7 (`nginx-np`)                                                  |
 | `127.0.0.1:18090` | 30900  | §5 dashboard companion Service                                   |
 
-Slot 30080 is shared on purpose: a nodePort can belong to only one
+Slot 30080 is shared by design: a nodePort can belong to only one
 Service. Each demo's preflight fails with "delete X first" if another
 Service already holds it.
 
@@ -204,7 +204,7 @@ Invalid value: 80: provided port is not in the valid range. The
 range of valid ports is 30000-32767.
 ```
 
-This is a deliberate guardrail — privileged ports below 1024
+This is a deliberate guardrail: privileged ports below 1024
 require special handling, and ports 1024-29999 commonly clash
 with applications running on your nodes (or your dev host).
 
@@ -218,17 +218,17 @@ Every node listens on the chosen NodePort. The kube-proxy forwards
 traffic to the right Pod regardless of which node received the
 request, so you can hit any node's IP. But this means you can't
 reuse the same NodePort across two Services pointing at different
-Pods on different nodes — node ports are a cluster-wide resource.
+Pods on different nodes: node ports are a cluster-wide resource.
 
 ### 3. NodePort isn't a great fit for production
 
 NodePort gives you a numbered port URL with no DNS, no TLS
 termination, no path-based routing, no virtual hosts. It works for
-testing and internal admin endpoints. For real external traffic:
+testing and internal admin endpoints. For production external traffic:
 
-- **`LoadBalancer` Services** — cloud providers front the Service
-  with a real load balancer
-- **Ingress** — host- and path-based HTTP routing via the
+- **`LoadBalancer` Services**: cloud providers front the Service
+  with a load balancer
+- **Ingress**: host- and path-based HTTP routing via the
   `ingress` addon you enabled in §5
 
 We'll touch ingress when §9 deploys a chart that uses it.

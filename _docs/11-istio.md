@@ -1,7 +1,7 @@
 ---
 title: Istio
 order: 11
-description: Service mesh on minikube — install Istio, sidecar-inject an existing Deployment, deploy Bookinfo, and exercise traffic routing and fault injection.
+description: "Service mesh on minikube: install Istio, sidecar-inject an existing Deployment, deploy Bookinfo, and exercise traffic routing and fault injection."
 duration: 40 minutes
 ---
 
@@ -9,7 +9,7 @@ Everything in §6 through §10 has been about getting workloads
 onto Kubernetes and keeping them running. **Istio** is about what
 happens *between* them: how Pods talk to each other, how that
 traffic gets observed, how it gets shaped, and how it gets
-secured — all without changing application code.
+secured, all without changing application code.
 
 This is a reference section. It's the longest one in the tutorial,
 covers two distinct examples (a minimal sidecar injection of our
@@ -34,7 +34,7 @@ nginx serving a request that *would* have made an upstream call
 to a database, if there were one), the networking happened through
 kube-proxy and the Service abstraction. The application code knew
 nothing about retries, timeouts, mutual TLS, load-balancing
-strategy, or which version of an upstream it was talking to —
+strategy, or which version of an upstream it was talking to,
 because those concerns lived inside the application.
 
 A **service mesh** moves application-level networking concerns
@@ -42,24 +42,24 @@ out of the application and into a layer of infrastructure. Each
 Pod gets a small proxy injected as a *sidecar* container; the
 application Pod's traffic is transparently redirected through
 the sidecar; and the sidecar handles mTLS, retries, routing
-rules, traffic splitting, observability — driven by configuration
+rules, traffic splitting, observability: driven by configuration
 from a central control plane.
 
 Istio is the most widely deployed service mesh. The data plane
-is **Envoy** — a high-performance proxy that runs as the sidecar
-in every meshed Pod. The control plane is **istiod** — a single
+is **Envoy**, a high-performance proxy that runs as the sidecar
+in every meshed Pod. The control plane is **istiod**, a single
 binary that configures every Envoy in the mesh.
 
 ## Istio architecture
 
-![Istio service mesh — control plane and data plane]({{ "/assets/diagrams/11-istio-mesh.svg" | relative_url }})
+![Istio service mesh: control plane and data plane]({{ "/assets/diagrams/11-istio-mesh.svg" | relative_url }})
 
 The mechanism: at Pod creation, Istio's admission webhook injects
 a second container (`istio-proxy`, running Envoy) and an init
 container (`istio-init`, which uses iptables to redirect the
 Pod's traffic through Envoy). Both containers are added to the
 Pod spec by the cluster, not by you. The application container
-sees a regular network — but every packet in or out goes through
+sees a regular network, but every packet in or out goes through
 the sidecar.
 
 Sidecar injection is **opt-in per namespace**. You label the
@@ -75,7 +75,7 @@ there will get the sidecar automatically.
 
 minikube nodes are Docker containers that run systemd as PID 1, which
 uses inotify watches for cgroup management. **Fedora's default settings are sized for one
-such container** — and you already have one running (the `minikube`
+such container**, and you already have one running (the `minikube`
 profile from §3). Starting a second cluster on the same host pushes
 past the limits and the new container's systemd fails to initialize.
 
@@ -107,7 +107,7 @@ sudo sysctl -p /etc/sysctl.d/99-kubernetes.conf
 ```
 
 The `examples/11-istio/demo.sh` pre-flight checks these values and
-fails loudly with the same instructions if they're too low — so if
+fails loudly with the same instructions if they're too low, so if
 you skip this section now, the demo tells you about it later.
 
 ## Profile setup
@@ -199,7 +199,7 @@ Should print `client version: 1.31.1`.
 istioctl --context istio install --set profile=demo -y
 ```
 
-The `demo` profile is what Istio's own tutorials use — it
+The `demo` profile is what Istio's own tutorials use: it
 enables the ingressgateway and adds resources appropriate for
 local experimentation. Production deployments would use a
 slimmer profile (e.g., `default` or a custom IstioOperator).
@@ -231,7 +231,7 @@ kubectl --context istio label namespace default istio-injection=enabled
 ```
 
 Every Pod created in `default` from now on gets the
-`istio-proxy` sidecar automatically. Existing Pods don't — you'd
+`istio-proxy` sidecar automatically. Existing Pods don't; you'd
 need to recreate them (e.g., `kubectl --context istio rollout restart deployment/nginx`).
 
 ### Per-Pod annotation (override)
@@ -248,7 +248,7 @@ The annotation overrides the namespace label. Useful when you
 want injection only for a specific Deployment, or want to
 exclude a Pod from injection in an otherwise meshed namespace.
 
-## Sidecar in action — our nginx, now with Envoy
+## Sidecar in action: our nginx, now with Envoy
 
 `examples/11-istio/manifests/nginx-with-sidecar.yaml`:
 
@@ -300,8 +300,8 @@ spec:
 Same image as §6 (the demo rebuilds it and loads it into this
 profile with `docker build` and `minikube image load`; images don't
 cross profiles), same Deployment shape with the
-mesh-injection annotation added. The Service is plain ClusterIP
-— Istio's sidecars provide mTLS between meshed Pods regardless
+mesh-injection annotation added. The Service is plain ClusterIP:
+Istio's sidecars provide mTLS between meshed Pods regardless
 of Service type.
 
 Apply:
@@ -322,7 +322,7 @@ nginx-istio-xxxxxxx-aaaaa     2/2     Running   0          12s
 nginx-istio-xxxxxxx-bbbbb     2/2     Running   0          12s
 ```
 
-**`READY 2/2`** — that's the key visual indicator. The Pod now has
+**`READY 2/2`**: that's the key visual indicator. The Pod now has
 two containers contributing to its readiness: the nginx
 application and the `istio-proxy` Envoy sidecar.
 
@@ -333,7 +333,7 @@ application and the `istio-proxy` Envoy sidecar.
 > init container with `restartPolicy: Always` rather than a main
 > container. Two practical consequences:
 >
-> 1. `kubectl get pods` still shows `2/2` — the Kubernetes
+> 1. `kubectl get pods` still shows `2/2`: the Kubernetes
 >    readiness accounting counts native sidecars in the totals
 > 2. JSONPath queries against `.status.containerStatuses[]` will
 >    NOT find istio-proxy. It's in `.status.initContainerStatuses[]`,
@@ -345,7 +345,7 @@ application and the `istio-proxy` Envoy sidecar.
 > Kubernetes, istio-proxy is still injected as a main container;
 > the demo's spec-based check handles both modes.
 
-`kubectl describe pod` confirms the layout — note where
+`kubectl describe pod` confirms the layout; note where
 istio-proxy appears:
 
 ```
@@ -369,7 +369,7 @@ Containers:
 
 The `istio-init` init container runs once (sets up iptables to
 redirect traffic through Envoy), exits. `istio-proxy` runs for
-the Pod's lifetime — listed under "Init Containers" because it
+the Pod's lifetime, listed under "Init Containers" because it
 runs init-first, but with `restartPolicy: Always` so it never
 "completes" the way a normal init container does.
 
@@ -427,9 +427,9 @@ Architecture:
 Three versions of `reviews` give Istio something to route
 between:
 
-- **v1** — no ratings stars
-- **v2** — black ratings stars (calls `ratings`)
-- **v3** — red ratings stars (calls `ratings`)
+- **v1**: no ratings stars
+- **v2**: black ratings stars (calls `ratings`)
+- **v3**: red ratings stars (calls `ratings`)
 
 By default, traffic round-robins across all three; later steps add
 rules that pin or split.
@@ -442,7 +442,7 @@ kubectl --context istio apply -f ~/.local/share/istio-current/samples/bookinfo/p
 
 (`istio-current` is the symlink the setup script created.)
 
-About 12 Pods come up — productpage, details, ratings, and
+About 12 Pods come up: productpage, details, ratings, and
 three reviews versions, each with 2 containers (app + sidecar).
 Give it 1-2 minutes.
 
@@ -497,7 +497,7 @@ stars) because the default routing is round-robin.
 
 ## Traffic management
 
-This is where Istio earns its keep. The `samples/bookinfo/networking/`
+This is where Istio's traffic control shows what it can do. The `samples/bookinfo/networking/`
 directory has manifests for the common patterns.
 
 ### Pin everything to v1
@@ -517,8 +517,8 @@ kubectl --context istio apply -f ~/.local/share/istio-current/samples/bookinfo/n
 ```
 
 Refresh the productpage a few times. The reviews section is now
-**always no-ratings** (v1). The other versions are still running
-— they're just not getting traffic.
+**always no-ratings** (v1). The other versions are still running;
+they're just not getting traffic.
 
 ### 50/50 between v1 and v3
 
@@ -533,7 +533,7 @@ the metrics, gradually shift more traffic.
 
 ### Fault injection
 
-Istio can synthesize problems for testing — useful for verifying
+Istio can synthesize problems for testing: useful for verifying
 that your app handles upstream failures gracefully.
 
 Add a 7-second delay to all calls hitting ratings:
@@ -580,7 +580,7 @@ The addons take about 5 minutes to come up. Then open:
 again is harmless.)
 
 The most useful Kiali view is the
-**service graph** — visualize the entire mesh as a directed
+**service graph**: visualize the entire mesh as a directed
 graph of Services, with live traffic rates and golden signals on
 each edge. The current routing rules show up as colored edges
 (green for healthy, red for errors). Apply the 50/50 split rule
@@ -601,7 +601,7 @@ Two practical notes for anyone who wants to spend time in Kiali
 visualizing the mesh after the `demo.sh` run completes:
 
 **The demo's cleanup trap deletes Bookinfo on exit.** This is by
-design — `demo.sh` is idempotent, leaves no leftover state on
+design: `demo.sh` is idempotent, leaves no leftover state on
 the `istio` profile, and any subsequent run starts fresh.
 **But it means the productpage and the routing rules are gone
 the moment the demo finishes.** If you open Kiali immediately
@@ -626,7 +626,7 @@ kubectl --context istio apply -f $ISTIO_DIR/samples/bookinfo/networking/destinat
 
 Now Bookinfo is running independently of the demo. Install the
 observability addons (Kiali / Prometheus / Grafana / Jaeger /
-Loki) which the demo deliberately doesn't install — they take
+Loki), which the demo doesn't install by default; they take
 3-5 minutes to come up and aren't required for the routing
 assertions:
 
@@ -656,14 +656,14 @@ runs:
 Navigate to **Traffic Graph → Namespace: default** for the
 mesh visualization. With **Display → Traffic Animation** turned
 on, you see animated dots traveling along the edges between
-services — individual requests flowing through the mesh in
+services: individual requests flowing through the mesh in
 near-real time. Green edges are healthy (100% success); errors
 and slowdowns show as yellow or red:
 
 ![Kiali Traffic Graph showing live mesh traffic with success metrics]({{ "/assets/screenshots/kiali-traffic-graph.png" | relative_url }})
 
 The right-hand panel shows aggregate stats for the selected
-subgraph — requests/second, success rate, error rate, and a
+subgraph: requests/second, success rate, error rate, and a
 histogram of HTTP status codes. Switch namespaces in the
 dropdown (from `istio-system` to `default`) to see the full
 bookinfo call graph: productpage as the hub, branching to
@@ -687,21 +687,21 @@ it's open:
    for i in {1..50}; do curl -s -o /dev/null http://127.0.0.1:8080/productpage; done
    ```
    The ratings edge goes yellow or red as Kiali notices the 7s
-   artificial delay. Refresh productpage in a browser — the
+   artificial delay. Refresh productpage in a browser; the
    ratings panel takes seven seconds to render
 
 3. **Other dashboards** are one URL each:
-   - Grafana at `http://127.0.0.1:3000` — pre-built dashboards
+   - Grafana at `http://127.0.0.1:3000`: pre-built dashboards
      for mesh metrics
-   - Jaeger at `http://127.0.0.1:16686/jaeger/` — distributed traces of
+   - Jaeger at `http://127.0.0.1:16686/jaeger/`: distributed traces of
      productpage requests through the call graph
-   - Prometheus at `http://127.0.0.1:19090` — raw metrics queries,
+   - Prometheus at `http://127.0.0.1:19090`: raw metrics queries,
      for the curious
 
 This is the moment §11 stops being abstract: every Service-to-
 Service call you've configured through DestinationRule and
 VirtualService is happening in front of you, with live
-telemetry, mTLS, and request-level observability — all without
+telemetry, mTLS, and request-level observability, all without
 any application code knowing the mesh exists.
 
 When you're done exploring, remove the addons (they're heavy
@@ -721,7 +721,7 @@ kubectl --context istio delete -f $ISTIO_DIR/samples/bookinfo/networking/
 kubectl --context istio delete -f $ISTIO_DIR/samples/bookinfo/platform/kube/bookinfo.yaml
 ```
 
-The rest of the tutorial uses the `minikube` profile; nothing in
+Later sections use the `minikube` profile again; nothing in
 this chapter changed your current kubectl context, so there is
 nothing to switch back.
 
@@ -769,7 +769,7 @@ minikube delete -p istio
 9. Apply destination rules + all-v1 routing; curl productpage
    N times; verify no v2/v3 stars appear
 10. Apply 50/50 split; curl productpage 20 times; count how
-    many responses contain `glyphicon-star` (v3) — should be
+    many responses contain `glyphicon-star` (v3); should be
     roughly 8-12 of 20 if split is working
 11. Cleanup all bookinfo and nginx resources on exit (trap)
 
@@ -787,7 +787,7 @@ First run after `setup-istio.sh` adds 2-4 minutes for the
 nginx-custom image build and load on the new profile.
 
 This is the longest single demo in the tutorial. The phases are
-idempotent — re-running picks up where the cluster state left
+idempotent: re-running picks up where the cluster state left
 off.
 
 [On to §12: KEDA →]({{ "/docs/12-keda/" | relative_url }})

@@ -6,15 +6,15 @@ duration: 5 minutes
 ---
 
 minikube isn't the only way to run Kubernetes locally. It was
-the right pick for this tutorial — it has the best
+the right pick for this tutorial: it has the best
 multi-profile story and the broadest addon coverage, and its
 docker driver runs each Kubernetes node as a container on Docker
-Engine — but three alternatives are worth knowing about. Each
+Engine. Three alternatives are worth knowing about. Each
 makes different trade-offs.
 
-This section is short and opinionated. The honest framing
-matters more than a comparison matrix that pretends everything
-is roughly equivalent.
+This section is short and opinionated. Stating the trade-offs
+directly matters more than a comparison matrix that pretends
+everything is roughly equivalent.
 
 ## Quick decision framework
 
@@ -27,7 +27,7 @@ is roughly equivalent.
   parity** → MicroShift (directly on RHEL, or via CRC on a
   Fedora laptop)
 
-## kind — Kubernetes IN Docker
+## kind: Kubernetes IN Docker
 
 [kind](https://kind.sigs.k8s.io/) runs each Kubernetes "node"
 as a container on Docker Engine, the same engine this tutorial
@@ -52,7 +52,7 @@ this manifest against three different K8s versions in
 parallel" workflows. Designed originally for testing
 Kubernetes itself, which shows in the polish.
 
-**Where it's weaker:** loading images is awkward — `kind load
+**Where it's weaker:** loading images is awkward: `kind load
 docker-image myapp:v1` is required to get a locally-built
 image into the cluster, since kind's nodes run their own
 containerd that isn't your host's. Persistent state across
@@ -63,7 +63,7 @@ config files.
 **Fedora and RHEL compatibility:** good. Works against Docker
 Engine with no SELinux gotchas in practice.
 
-## k3s — lightweight upstream Kubernetes
+## k3s: lightweight upstream Kubernetes
 
 [k3s](https://k3s.io/) is Rancher Labs' (now SUSE Rancher's)
 take on a smaller, faster Kubernetes. It's CNCF-sandbox and
@@ -77,7 +77,7 @@ sudo systemctl status k3s
 ```
 
 The single-command install brings up a complete cluster as a
-systemd service on the host — no VM, no containers wrapping
+systemd service on the host: no VM, no containers wrapping
 the control plane, just `kubelet` and `containerd` and the
 API server running natively. The default datastore is SQLite,
 which means HA requires switching to embedded etcd. k3s ships
@@ -103,14 +103,15 @@ ports opened (typically 6443/tcp for the API server,
 10250/tcp for the kubelet, and pod-network ports). All
 documented in [the k3s install docs](https://docs.k3s.io/installation/requirements).
 
-## MicroShift — Red Hat's edge OpenShift
+## MicroShift: Red Hat's edge OpenShift
 
 [MicroShift](https://microshift.io/) is Red Hat's
 miniaturized OpenShift, designed for edge computing and
 single-node deployments. It strips OpenShift down to its
 essentials (a CRI runtime, etcd, kubelet, OpenShift's HAProxy
 ingress) and runs as a single systemd service. Minimum
-requirements are 2 CPU / 2 GB / 10 GB — genuinely lean.
+requirements are 2 CPU / 2 GB / 10 GB, a small footprint for
+a Kubernetes distribution.
 
 The interesting property of MicroShift is **API compatibility
 with full OpenShift**. Applications written for MicroShift run
