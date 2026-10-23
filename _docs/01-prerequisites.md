@@ -12,12 +12,12 @@ their requirements are called out here too so you can plan ahead.
 
 By the end of this section you'll have run a handful of checks
 that confirm everything is in place. No installation happens here
-beyond Docker Engine if you don't already have it — the install of
+beyond Docker Engine if you don't already have it; the install of
 minikube, kubectl, helm, and the supporting toolbox lives in §2.
 
 ## Hardware floor
 
-minikube is intentionally light, but Kubernetes itself is not. The
+minikube stays light, but Kubernetes itself is not. The
 control plane alone burns about 1 GB of RAM doing nothing useful.
 Add the addons most readers will end up enabling (dashboard,
 metrics-server, ingress) and the working set climbs. Add Istio
@@ -31,8 +31,8 @@ metrics-server, ingress) and the working set climbs. Add Istio
 
 The **comfortable for all** column is the recommended target if you
 plan to work through the entire tutorial. minikube's defaults are
-2 CPU / 2 GB which is enough to start a cluster and not much more
-— §3 walks through bumping those defaults.
+2 CPU / 2 GB which is enough to start a cluster and not much more;
+§3 walks through bumping those defaults.
 
 Check your hardware on Fedora:
 
@@ -162,12 +162,12 @@ docker info --format '{{.SecurityOptions}}'
 
 ## Tooling installed in §2
 
-You don't need any of the following yet — §2 installs them in one
+You don't need any of the following yet; §2 installs them in one
 go:
 
-- **`minikube`** — the local-cluster tool itself
-- **`kubectl`** — the Kubernetes CLI
-- **`helm`** — the chart-based package manager
+- **`minikube`:** the local-cluster tool itself
+- **`kubectl`:** the Kubernetes CLI
+- **`helm`:** the chart-based package manager
 - **Supporting tools**: `stern` (multi-pod log tailing),
   `kubectx` + `kubens` (context/namespace switching), `yq` (YAML
   query/transform), `krew` (kubectl plugin manager), `httpie`
@@ -190,7 +190,7 @@ following along.
 ## Kernel limits for multi-cluster (needed for §11)
 
 The §3 minikube profile is a containerized Linux that runs systemd
-as PID 1. Systemd uses **inotify** watches to manage cgroups — and
+as PID 1. Systemd uses **inotify** watches to manage cgroups, and
 the Fedora 44 defaults for `fs.inotify.max_user_instances` and
 `fs.inotify.max_user_watches` are sized for **one** such container.
 
@@ -249,7 +249,7 @@ docker run --rm registry.access.redhat.com/ubi10/ubi-minimal:10.2-1791444377 ech
 
 The final `OK` printed from inside the container confirms that
 Docker Engine works for your user without `sudo`, can pull from
-Red Hat's public registry, and can run UBI 10 images — which is the
+Red Hat's public registry, and can run UBI 10 images, which is the
 floor everything in this tutorial builds on. On RHEL, replace the
 first `cat` with `cat /etc/redhat-release`.
 
@@ -261,7 +261,7 @@ including the Docker Engine, group, and context checks:
 ```
 
 If your hardware is short of the comfortable target and you only
-want to go through §1–§10, that's fine — just plan to skip §11
+want to go through §1–§10, that's fine; just plan to skip §11
 and §12 (or revisit them once you have more resources to spare).
 
 Ready? [On to §2: Installation →]({{ "/docs/02-installation/" | relative_url }})

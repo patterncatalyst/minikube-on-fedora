@@ -12,7 +12,7 @@ covers the lifecycle commands you'll use day to day: status,
 pause, stop, delete, upgrade.
 
 At the end of the section, `examples/03-driver-check/demo.sh`
-runs the whole thing as a strict end-to-end script — same
+runs the whole thing as a strict end-to-end script: the same
 commands the prose walks through, packaged as a smoke test.
 
 This section assumes §2 is complete (minikube, kubectl, and the
@@ -62,7 +62,7 @@ You'll see output like:
 🏄  Done! kubectl is now configured to use "minikube" cluster
 ```
 
-The last line is the important one — minikube has updated your
+The last line is the important one: minikube has updated your
 `~/.kube/config` so `kubectl` points at the cluster you just
 started. Exact wording varies between minikube releases.
 
@@ -132,7 +132,7 @@ Three layers stacked up:
 Docker Engine, through its own containerd and runc, runs the
 **node container**. Inside that container a second containerd with
 runc runs your **pods**, and the kubelet drives it over CRI. Most
-readers don't need to think about the bottom two layers much —
+readers don't need to think about the bottom two layers much;
 they're the implementation. What matters day to day is that
 `kubectl` talks to a working Kubernetes cluster and that your
 NodePorts answer on `127.0.0.1`.
@@ -178,7 +178,7 @@ You should see pods in the `kube-system` namespace (`etcd`,
 `coredns`, `storage-provisioner`, `kube-proxy`) all in
 `Running` state.
 
-If anything's not `Running`, give it 30 seconds and retry —
+If anything's not `Running`, give it 30 seconds and retry;
 control-plane pods sometimes take a moment to settle after the
 node first reports Ready.
 
@@ -200,7 +200,7 @@ in [LESSONS-LEARNED, Part
 ## In-cluster container runtime
 
 Separate from the driver is the container runtime *inside* the
-cluster — what the kubelet uses to run Pods. This tutorial uses
+cluster: what the kubelet uses to run Pods. This tutorial uses
 **containerd** with **runc**, selected with
 `--container-runtime=containerd`. Pass it explicitly on every
 `minikube start` that creates a profile; the examples do.
@@ -215,7 +215,7 @@ Three independent choices, easy to conflate:
 
 The first two are about the host's relationship with minikube.
 The third is what the kubelet uses inside the cluster to run
-Pods — *independent* of the first two. Docker Engine on the host
+Pods, *independent* of the first two. Docker Engine on the host
 and containerd in the node never share state: an image you
 `docker build` on the host is not visible to the cluster until you
 load it (`minikube image load`), which §6 shows.
@@ -223,7 +223,7 @@ load it (`minikube image load`), which §6 shows.
 ### A note on docker-as-runtime in modern Kubernetes
 
 Docker as the in-cluster runtime has been deprecated since
-Kubernetes 1.24 (2022) — that release removed the dockershim that
+Kubernetes 1.24 (2022): that release removed the dockershim that
 had bridged the kubelet's CRI interface to Docker's non-CRI
 socket. minikube's `--container-runtime=docker` still works, but
 it routes through `cri-dockerd`, an external shim that adds
@@ -263,7 +263,7 @@ workloads, and the published ports survive `stop`/`start`.
 
 ### Delete
 
-A full reset — removes the cluster, the container, and the
+A full reset, removing the cluster, the container, and the
 persistent state:
 
 ```bash
@@ -328,7 +328,7 @@ Expected duration: 60–90 seconds first run, 30–45 seconds after.
 You should see a `✓ SUCCESS` line at the end.
 
 If anything fails, the script leaves the profile around for
-inspection — `minikube logs -p driver-check` and
+inspection: `minikube logs -p driver-check` and
 `kubectl --context driver-check get events -A --sort-by='.lastTimestamp'`
 are the first two things to look at.
 

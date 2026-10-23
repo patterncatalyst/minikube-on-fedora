@@ -7,8 +7,8 @@ duration: 5 minutes
 
 Reference material, not linear prose. Skim or search for the
 question you're hitting. Every entry here corresponds to
-something that actually went wrong at least once during the
-tutorial's development — none are hypothetical.
+something that went wrong at least once during the
+tutorial's development; none are hypothetical.
 
 ## Installation and startup
 
@@ -37,20 +37,20 @@ cluster. Run `kubectl config current-context` to see which one
 kubectl is using, and `kubectl config get-contexts` to see all
 of them. Pass `--context minikube` on the command, or run
 `kubectl config use-context minikube` to switch. If `minikube`
-isn't in the context list at all, the cluster didn't actually
-start — re-run `minikube start -p minikube` and watch the output
+isn't in the context list at all, the cluster didn't
+start: re-run `minikube start -p minikube` and watch the output
 for errors.
 
 ### Q: my minikube cluster is unbearably slow
 
-Two common causes: (1) the cluster is sized too small — check
+Two common causes: (1) the cluster is sized too small: check
 `minikube profile list` for current CPU/memory allocation, and
 recreate with bigger numbers if needed (`minikube delete -p
 minikube`, then `minikube start -p minikube --driver=docker
 --container-runtime=containerd --kubernetes-version=v1.36.5
 --memory=8192 --cpus=6 --ports=127.0.0.1:18080:30080,127.0.0.1:18081:30808,127.0.0.1:18090:30900`,
 the `CORE_PORTS` map from `scripts/lib/_helpers.sh`); (2) the host
-machine is swapping — `free -h` will tell you. Kubernetes
+machine is swapping; `free -h` will tell you. Kubernetes
 control plane components are CPU- and memory-hungry; less than
 4 GB for the cluster causes constant pressure.
 
@@ -63,7 +63,7 @@ minikube delete -p minikube
 For a wholesale reset, `minikube delete --all --purge` followed by
 `rm -rf ~/.minikube ~/.kube` removes **every** minikube profile on the
 host, including profiles other projects use, plus your kubectl
-config. Useful when something has gotten genuinely
+config. Useful when something has gotten badly
 wedged. The next `minikube start` recreates everything from
 scratch.
 
@@ -141,7 +141,7 @@ isn't being routed to the Pod yet.
 `kubectl logs [pod-name] --previous` shows the logs from the
 previous (crashed) instance, which usually contains the
 actual error. If the logs don't show anything useful, the
-crash is happening so fast the app hasn't logged anything —
+crash is happening so fast the app hasn't logged anything:
 `kubectl describe pod` shows the exit code and the OOMKilled
 flag if the container ran out of memory.
 
@@ -179,7 +179,7 @@ confirm only one Service holds the shared NodePort 30080 (§6, §8,
 You're probably using `hey -H 'Host: nginx.local'`. **hey is
 written in Go, and Go's `net/http` silently strips Host
 headers set via the headers map** (issue golang/go#7682, open
-since 2014). Use `hey -host nginx.local` instead — hey has a
+since 2014). Use `hey -host nginx.local` instead; hey has a
 dedicated flag for this. curl handles `-H 'Host:'` correctly
 because curl treats Host as a special case; many other tools
 do not.
@@ -217,7 +217,7 @@ indefinitely.
 ### Q: I deleted a workload but the PVC is still there
 
 PVCs are not removed when the Deployment that uses them goes
-away — that's intentional, so you don't lose data accidentally.
+away; that's intentional, so you don't lose data by accident.
 `kubectl delete pvc [name]` removes it explicitly. The
 underlying PV's behavior on PVC delete depends on the
 PV's `persistentVolumeReclaimPolicy` (typically `Delete` for
@@ -269,14 +269,14 @@ minikube profile list                     # confirm the minikube profile is stil
 
 Always name the profile. Profile names must be unique per host; if
 another project already uses a name, pick a different one for this
-tutorial (the capstone uses `mof-capstone` for that reason).
+tutorial (the final project uses `mof-capstone` for that reason).
 
 ## Updates and rollouts
 
 ### Q: I changed a ConfigMap but the Pod still shows the old value
 
 Kubernetes doesn't restart Pods when a referenced ConfigMap
-changes — the env vars / volume mounts get the new values only
+changes; the env vars and volume mounts get the new values only
 when the Pod is recreated. Three options:
 
 {% raw %}
@@ -295,7 +295,7 @@ template:
 ```
 {% endraw %}
 
-The §9 helm section covers the checksum approach in detail —
+The §9 helm section covers the checksum approach in detail:
 it's the most robust way to handle ConfigMap-triggered
 rollouts.
 
@@ -314,7 +314,7 @@ For helm-managed deployments, `helm rollback [release] [revision]` is the equiva
 ### Q: Strimzi says "Unsupported Kafka.spec.kafka.version"
 
 Strimzi 1.2.0 supports Kafka **4.2.x and 4.3.x** (this repo pins
-4.3.1) — the entire 3.x line was dropped, and only the
+4.3.1); the entire 3.x line was dropped, and only the
 `kafka.strimzi.io/v1` API is accepted. If you have an older manifest
 pinning Kafka 3.9.x or `v1beta2`, edit `kafka-cluster.yaml` to use
 `apiVersion: kafka.strimzi.io/v1`, `version: 4.3.1` and remove any explicit `metadataVersion`
@@ -346,12 +346,12 @@ Deployment to zero by deleting the underlying HPA (HPA can't
 manage 0-replica Deployments). When traffic returns, KEDA
 recreates the HPA. If your workload IS running but the
 ScaledObject shows 0 desired replicas, check
-`kubectl describe scaledobject [name]` — the conditions block
+`kubectl describe scaledobject [name]`: the conditions block
 shows why KEDA disagrees with the current state.
 
 ## System-level
 
-### Q: my disk is filling up — what should I clean?
+### Q: my disk is filling up, what should I clean?
 
 ```bash
 # Unused Docker images (host)
@@ -365,7 +365,7 @@ minikube delete -p istio
 ```
 
 The minikube image cache inside the profile is the most common
-culprit — `nginx-custom`, `order-processor`, and the Kafka /
+culprit: `nginx-custom`, `order-processor`, and the Kafka and
 Istio images all accumulate. The `crictl rmi --prune` is safe;
 it removes images that aren't currently in use by any Pod.
 
@@ -385,11 +385,11 @@ sudo dnf upgrade -y kubectl
 sudo dnf upgrade -y helm
 ```
 
-minikube is pinned on purpose: the chapters, the port maps, and the
-flag set are tested against v1.39.0, installed from the release RPM
-in §2. Upgrading it is a deliberate change, not a routine update.
-To move, install the newer RPM the same way as §2 and re-run the
-demos before relying on it.
+minikube is pinned for a reason: the chapters, the port maps, and
+the flag set are tested against v1.39.0, installed from the release
+RPM in §2. Treat an upgrade as a deliberate change, not a routine
+update. To move, install the newer RPM the same way as §2 and
+re-run the demos before relying on it.
 
 After upgrading minikube, existing profiles continue working
 on the old Kubernetes version. The tutorial pins
@@ -472,7 +472,7 @@ cd examples/11-istio && ./cleanup.sh --remove-istio --remove-profile
 
 `./cleanup.sh --help` lists every option for each script.
 
-### Full reset — back to a fresh Fedora
+### Full reset: back to a fresh Fedora
 
 ```bash
 minikube delete -p minikube            # repeat for -p istio and any other tutorial profile
@@ -482,8 +482,8 @@ helm repo remove kedacore strimzi      # if you added them
 ```
 
 This leaves your installed binaries (`minikube`, `kubectl`,
-`helm`, `hey`) in place — uninstalling those is rarely what
-you actually want. To remove them too, `sudo dnf remove
+`helm`, `hey`) in place: uninstalling those is rarely what
+you want. To remove them too, `sudo dnf remove
 minikube kubectl helm` (assuming they came from dnf; `hey`
 came from `go install`, so `rm $(go env GOPATH)/bin/hey`).
 
@@ -493,7 +493,7 @@ If you've hit something not listed here, the per-section
 READMEs under `examples/*/README.md` each have a "When this
 fails" section with section-specific symptoms. And the
 diagnostic-dump output from any failing `demo.sh` includes
-the most relevant logs and resource state — the demo scripts
+the most relevant logs and resource state; the demo scripts
 are designed to fail informatively, not silently.
 
 [On to §15: Where to go next →]({{ "/docs/15-where-to-go-next/" | relative_url }})

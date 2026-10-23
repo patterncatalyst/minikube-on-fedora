@@ -11,7 +11,7 @@ resources for a specific cluster beyond the §3 sizing, running
 multiple clusters side by side via **profiles**, and running a single
 cluster with multiple **nodes** via `--nodes`.
 
-None of these need a separate demo — they're CLI patterns you'll use
+None of these need a separate demo; they're CLI patterns you'll use
 when the work demands them. By the end you'll know which lever to
 reach for: a bigger cluster, a parallel cluster, or a multi-node
 cluster.
@@ -21,7 +21,7 @@ cluster.
 §3's start command passed `--cpus=6 --memory=16384` on the command
 line, so there is no shared default to inherit: every profile
 states its own sizing and its own published ports. Sometimes you
-want a one-off cluster with different sizing — a smaller cluster to
+want a one-off cluster with different sizing: a smaller cluster to
 test a low-resource deployment, or a bigger one for Istio + KEDA
 stress:
 
@@ -63,14 +63,14 @@ You've already used profiles without thinking about it. `minikube
 start` without `-p` operates on the profile named `minikube` (the
 default). `examples/03-driver-check/demo.sh` used `-p driver-check`.
 
-The profiles this repo uses by name:
+Profiles this repo defines:
 
 | Profile        | Used by                                            |
 |----------------|----------------------------------------------------|
 | `minikube`     | §3 and §5–§10, §12 (default cluster)               |
 | `driver-check` | §3 smoke test (`examples/03-driver-check`)         |
 | `istio`        | §11 Istio                                          |
-| `mof-capstone` | §17 capstone                                       |
+| `mof-capstone` | §17 final project                                  |
 
 ### Creating profiles
 
@@ -136,7 +136,7 @@ minikube -p sandbox-1.36 stop
 minikube -p sandbox-1.36 addons enable metrics-server
 ```
 
-This is often clearer than switching the active profile and back —
+This is often clearer than switching the active profile and back;
 you stay anchored at your default cluster for the rest of your
 work.
 
@@ -147,7 +147,7 @@ minikube delete -p sandbox-1.35
 ```
 
 Removes the cluster, its Docker container(s), its volumes, its
-network, and its kubeconfig context. Idempotent — re-running is safe.
+network, and its kubeconfig context. Idempotent: re-running is safe.
 
 ### When to reach for profiles
 
@@ -163,7 +163,7 @@ network, and its kubeconfig context. Idempotent — re-running is safe.
 
 ## Multi-node clusters
 
-By default `minikube start` creates a **single-node** cluster — one
+By default `minikube start` creates a **single-node** cluster: one
 node running both the control plane and your workloads. For testing
 things that exercise multi-node behavior (DaemonSets across nodes,
 scheduling with `nodeAffinity`, `PodDisruptionBudget`, taints and
@@ -207,9 +207,9 @@ control plane components run on every CP node.
 
 ### When you don't need multi-node
 
-Most of the rest of this tutorial works on single-node. §6 onwards
-deploys workloads — pods, services, persistent volumes, ingress, a
-helm chart, an Istio mesh. The Kubernetes scheduler doesn't care
+Single-node clusters are enough for nearly every chapter here. §6
+onwards deploys workloads: pods, services, persistent volumes,
+ingress, a helm chart, an Istio mesh. The Kubernetes scheduler doesn't care
 about node count for these examples; a single-node cluster runs
 them identically to a three-node one. Reach for multi-node when the
 thing you're testing is *specifically* about multi-node behavior.
@@ -223,7 +223,7 @@ side projects:
 |----------------|-----------------|----------------------------------------------------|
 | `minikube`     | 6 CPU / 16 GB   | The default; everyday work, §5–§10 and §12          |
 | `istio`        | 6 CPU / 16 GB   | §11 Istio work, created by the example's setup      |
-| `mof-capstone` | see §17         | The capstone; created by its setup script           |
+| `mof-capstone` | see §17         | The final project; created by its setup script      |
 | `scratch`      | 2 CPU / 4 GB    | Disposable sandbox, no published ports              |
 
 Run one workshop profile at a time: each node container reserves

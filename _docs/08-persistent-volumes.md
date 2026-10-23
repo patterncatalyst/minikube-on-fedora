@@ -1,19 +1,19 @@
 ---
 title: Persistent volumes
 order: 8
-description: PersistentVolumes, PersistentVolumeClaims, and StorageClasses — giving stateful workloads storage that outlives any Pod.
+description: "PersistentVolumes, PersistentVolumeClaims, and StorageClasses: giving stateful workloads storage that outlives any Pod."
 duration: 25 minutes
 ---
 
-Containers in Kubernetes are ephemeral. When a Pod dies — and
-they do, for upgrades, node drains, OOM kills, your own `kubectl
-delete pod` — everything written to the container's filesystem
+Containers in Kubernetes are ephemeral. When a Pod dies, and
+they do, for upgrades, node drains, OOM kills, or your own `kubectl
+delete pod`, everything written to the container's filesystem
 disappears with it. For stateless workloads like the nginx
 servers in §6 and §7 that's fine: spin up another Pod and you
 get the same baked-in content.
 
 Stateful workloads are different. A database, a CMS, an upload
-endpoint, a build cache — anything that produces data that must
+endpoint, a build cache: anything that produces data that must
 survive past one Pod's lifecycle. This section covers the three
 Kubernetes resources that handle that case, and walks through an
 example that *inverts* the §6 pattern: same image, content that
@@ -21,19 +21,19 @@ lives in storage, not the image.
 
 ## Three volume concepts
 
-Worth getting clear up front because they're easy to conflate.
+These three terms are easy to conflate, so here's the distinction up front.
 
 ### Volume
 
 A **Volume** is a directory mounted into a container. Its
 lifetime is tied to the Pod that uses it: when the Pod is
-deleted, the Volume goes with it (with one important exception —
+deleted, the Volume goes with it (with one important exception,
 see PVs below).
 
 You define Volumes in the Pod spec under `spec.volumes` and
 mount them into containers via `spec.containers[*].volumeMounts`.
 This is the basic plumbing every Pod uses, even ones that don't
-need persistence — `emptyDir` Volumes are how containers in a
+need persistence; `emptyDir` Volumes are how containers in a
 single Pod share files, for example.
 
 ### PersistentVolume (PV)
@@ -41,8 +41,8 @@ single Pod share files, for example.
 A **PersistentVolume** is a cluster-scoped storage resource. The
 actual disk, NFS export, cloud volume, or hostPath that bytes get
 written to. PVs are typically created by cluster operators or
-provisioned dynamically by a StorageClass (see below) —
-application developers don't usually write PV manifests by hand.
+provisioned dynamically by a StorageClass (see below); application
+developers don't usually write PV manifests by hand.
 
 The "Persistent" part means: PV lifetime is **independent of any
 Pod's lifetime**. A Pod can be deleted, recreated, scheduled to a
@@ -52,7 +52,7 @@ Pod to mount.
 ### PersistentVolumeClaim (PVC)
 
 A **PersistentVolumeClaim** is a Pod's request for storage. The
-PVC says "I need 100Mi of storage that I can read and write" —
+PVC says "I need 100Mi of storage that I can read and write,"
 not *where* that storage comes from. Kubernetes binds the PVC to
 a suitable PV, and the Pod mounts the PVC.
 
@@ -78,7 +78,7 @@ provisions a new PV.
 
 minikube ships with a default StorageClass via the
 `default-storageclass` and `storage-provisioner` addons (both
-enabled by default — `minikube addons list` confirms):
+enabled by default; `minikube addons list` confirms):
 
 ```bash
 kubectl get storageclass
@@ -134,15 +134,15 @@ spec:
 
 Three fields worth understanding:
 
-- **`accessModes: [ReadWriteOnce]`** — RWO. Volume can be mounted
+- **`accessModes: [ReadWriteOnce]`:** RWO. Volume can be mounted
   by Pods on **one node at a time** with read+write access. For
   nginx with one replica on one minikube node, that's fine; for
   multi-node clusters with multiple replicas you'd want
   `ReadWriteMany` and a backend that supports it (NFS, CephFS,
-  EFS, etc.)
-- **`resources.requests.storage: 100Mi`** — 100 mebibytes. The
+  EFS, and similar)
+- **`resources.requests.storage: 100Mi`:** 100 mebibytes. The
   provisioner allocates at least this much; you may get more
-- **No `storageClassName`** — falls through to the default
+- **No `storageClassName`:** falls through to the default
   StorageClass (`standard`)
 
 ### The Deployment
@@ -233,13 +233,13 @@ container runs **before** nginx starts. It checks if
 If not, it writes a timestamped HTML page. Because the
 initContainer only writes when the file is missing, the
 timestamp stays fixed at the time of *first* Pod startup. On
-restarts, the initContainer sees the file and skips — the
+restarts, the initContainer sees the file and skips; the
 timestamp persists.
 
 **Volume mount overlays the image's content.** The nginx
 container mounts the PVC at `/usr/share/nginx/html`. That path
 exists in `nginx-custom:v1` (with the §6-baked index.html). When
-the PVC is mounted, the mount **overlays** the image's content —
+the PVC is mounted, the mount **overlays** the image's content;
 nginx sees only the PV's contents, not the image's. This is
 exactly how you'd run a generic image with content that lives in
 a separate, persistent location.
@@ -307,7 +307,7 @@ Curl the published port:
 curl http://127.0.0.1:18080/
 ```
 
-You should see a timestamped HTML page — note the timestamp.
+You should see a timestamped HTML page; note the timestamp.
 
 ### Watching persistence in action
 
@@ -341,9 +341,9 @@ When you delete a PVC, what happens to its PV depends on the
 PV's **reclaim policy**:
 
 - **`Delete`** (the default for the minikube standard
-  StorageClass) — the PV is deleted along with the PVC, data
+  StorageClass): the PV is deleted along with the PVC, data
   gone
-- **`Retain`** — the PV is kept in a `Released` state after the
+- **`Retain`:** the PV is kept in a `Released` state after the
   PVC is deleted. An operator must reclaim it manually. Useful
   for "I might still need this data" scenarios
 
@@ -374,8 +374,8 @@ storage-provisioner.
 7. **Deletes the Pod;** waits for the Deployment's replacement
    to be Ready
 8. Polls `http://127.0.0.1:18080/` until the replacement Pod answers
-9. Curls again; **verifies the timestamp matches** — persistence
-   confirmed
+9. Curls again; **verifies the timestamp matches**, confirming
+   persistence
 10. Cleans up Deployment + Service + PVC on exit, freeing nodePort
     30080
 
