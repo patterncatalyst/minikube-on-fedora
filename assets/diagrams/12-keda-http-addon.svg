@@ -29,7 +29,7 @@
   <rect width="920" height="500" fill="#fdfbf7"/>
   <rect width="920" height="500" fill="url(#grid)"/>
 
-  <text x="460" y="40" text-anchor="middle" class="title">KEDA HTTP add-on — data flow and control loop</text>
+  <text x="460" y="40" text-anchor="middle" class="title">KEDA HTTP add-on: data flow and control loop</text>
 
   <rect x="40" y="200" width="110" height="80" rx="4" class="tan"/>
   <text x="95" y="226" text-anchor="middle" class="label">External</text>
@@ -80,7 +80,7 @@
   <path d="M 700 212 Q 670 250 654 280" class="control-arrow" marker-end="url(#arrow-thin)"/>
   <text x="688" y="262" class="arrow-label">scale 0 ↔ N</text>
 
-  <text x="460" y="408" text-anchor="middle" class="sublabel">When backend replicas = 0, interceptor holds the request until the operator brings a Pod up — caller sees added latency, not a 503.</text>
+  <text x="460" y="408" text-anchor="middle" class="sublabel">When backend replicas = 0, interceptor holds the request until the operator brings a Pod up: caller sees added latency, not a 503.</text>
 
   <text x="460" y="468" text-anchor="middle" class="footnote">Solid arrows = HTTP traffic. Dashed arrows = control loop: scaler measures, operator decides, Deployment changes.</text>
 </svg>

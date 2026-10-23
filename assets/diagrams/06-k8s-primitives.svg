@@ -24,7 +24,7 @@
   <rect width="920" height="500" fill="#fdfbf7"/>
   <rect width="920" height="500" fill="url(#grid)"/>
 
-  <text x="460" y="40" text-anchor="middle" class="title">Kubernetes workload primitives — ownership and selection</text>
+  <text x="460" y="40" text-anchor="middle" class="title">Kubernetes workload primitives: ownership and selection</text>
 
   <rect x="120" y="80" width="180" height="58" rx="4" class="blue"/>
   <text x="210" y="104" text-anchor="middle" class="label">Deployment</text>
@@ -75,5 +75,5 @@
   <path d="M 660 428 L 706 428" class="arrow" marker-end="url(#arrow)"/>
   <text x="683" y="420" text-anchor="middle" class="arrow-label">binds</text>
 
-  <text x="460" y="478" text-anchor="middle" class="footnote">Deployments don't manage Pods directly — they own a ReplicaSet, which owns the Pods. Services find Pods by label, not by name.</text>
+  <text x="460" y="478" text-anchor="middle" class="footnote">Deployments don't manage Pods directly: they own a ReplicaSet, which owns the Pods. Services find Pods by label, not by name.</text>
 </svg>

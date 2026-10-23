@@ -29,12 +29,12 @@
     <marker id="ah-ingest" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M 0,0 L 10,5 L 0,10 z" fill="#5a8a3a"/></marker>
   </defs>
 
-  <text x="600" y="30" text-anchor="middle" class="title">§17 — Contracts, the registry, and the catalog</text>
+  <text x="600" y="30" text-anchor="middle" class="title">§17: Contracts, the registry, and the catalog</text>
   <text x="600" y="50" text-anchor="middle" class="subtitle">every protocol's contract lives in Apicurio; OpenMetadata builds lineage from it</text>
 
   <!-- ===== TOP: the four protocol surfaces ===== -->
   <rect x="20" y="70" width="1160" height="118" class="lane-bg"/>
-  <text x="32" y="88" class="lane-label">Protocol surfaces — each service's contract</text>
+  <text x="32" y="88" class="lane-label">Protocol surfaces: each service's contract</text>
 
   <!-- REST -->
   <rect x="60" y="104" width="250" height="68" class="service-box"/>
@@ -62,7 +62,7 @@
 
   <!-- ===== MIDDLE: Apicurio registry ===== -->
   <rect x="120" y="270" width="960" height="150" class="registry-box"/>
-  <text x="600" y="298" text-anchor="middle" class="registry-label">Apicurio Registry — the contract metadata (one home, many formats)</text>
+  <text x="600" y="298" text-anchor="middle" class="registry-label">Apicurio Registry: the contract metadata (one home, many formats)</text>
 
   <rect x="150" y="320" width="210" height="78" class="artifact-box"/>
   <text x="255" y="344" text-anchor="middle" class="artifact-label">OpenAPI artifacts</text>
@@ -96,12 +96,12 @@
 
   <!-- ===== BOTTOM: OpenMetadata + its other sources ===== -->
   <rect x="120" y="500" width="960" height="150" class="catalog-box"/>
-  <text x="600" y="528" text-anchor="middle" class="catalog-label">OpenMetadata — lineage &amp; discovery metadata</text>
+  <text x="600" y="528" text-anchor="middle" class="catalog-label">OpenMetadata: lineage &amp; discovery metadata</text>
   <text x="600" y="548" text-anchor="middle" class="catalog-sub">ingests contracts + data sources, assembles the "who produces / who consumes" graph</text>
 
   <rect x="430" y="566" width="340" height="64" style="fill:#f4f9ef; stroke:#5a8a3a; stroke-width:1; rx:4;"/>
   <text x="600" y="590" text-anchor="middle" class="catalog-sub" style="font-weight:600;">lineage graph</text>
-  <text x="600" y="610" text-anchor="middle" class="mono" style="fill:#3a6a2a;">order-service —[order.placed]→ notification-service</text>
+  <text x="600" y="610" text-anchor="middle" class="mono" style="fill:#3a6a2a;">order-service -[order.placed]→ notification-service</text>
 
   <!-- other ingestion sources flanking -->
   <rect x="150" y="566" width="210" height="64" class="source-box"/>
@@ -121,7 +121,7 @@
   <!-- ===== legend ===== -->
   <rect x="20" y="668" width="1160" height="40" class="lane-bg"/>
   <line x1="40" y1="688" x2="80" y2="688" class="arrow-runtime" marker-end="url(#ah-runtime)"/>
-  <text x="90" y="692" class="legend-text">runtime contract — producer/consumer serialize against the registry (the event won't encode without it)</text>
+  <text x="90" y="692" class="legend-text">runtime contract: producer/consumer serialize against the registry (the event won't encode without it)</text>
   <line x1="640" y1="688" x2="680" y2="688" class="arrow-publish" marker-end="url(#ah-publish)"/>
   <text x="690" y="692" class="legend-text">publish (discovery)</text>
   <line x1="830" y1="688" x2="870" y2="688" class="arrow-ingest" marker-end="url(#ah-ingest)"/>

@@ -32,11 +32,11 @@
 
   <rect x="100" y="190" width="720" height="220" rx="4" class="neutral-2"/>
   <text x="118" y="212" class="label">minikube node container</text>
-  <text x="118" y="228" class="sublabel">single-node Kubernetes — kubelet · kube-proxy · API server · etcd</text>
+  <text x="118" y="228" class="sublabel">single-node Kubernetes: kubelet · kube-proxy · API server · etcd</text>
 
   <rect x="130" y="250" width="660" height="140" rx="3" class="neutral-3"/>
   <text x="148" y="272" class="label">containerd</text>
-  <text x="148" y="288" class="sublabel">Kubernetes CRI runtime — chosen via <tspan font-family="ui-monospace, SFMono-Regular, Menlo, monospace" fill="#2c2c2c">--container-runtime=containerd</tspan></text>
+  <text x="148" y="288" class="sublabel">Kubernetes CRI runtime: chosen via <tspan font-family="ui-monospace, SFMono-Regular, Menlo, monospace" fill="#2c2c2c">--container-runtime=containerd</tspan></text>
 
   <rect x="170" y="310" width="140" height="60" rx="3" class="blue"/>
   <text x="240" y="334" text-anchor="middle" class="label">Pod</text>

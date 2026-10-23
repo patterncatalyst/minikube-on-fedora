@@ -48,7 +48,7 @@
   <path d="M 135 365 Q 30 365 30 128 L 46 128" class="arrow" stroke-dasharray="3 3" marker-end="url(#arrow)"/>
   <text x="22" y="246" class="sublabel" transform="rotate(-90 22 246)">scale</text>
 
-  <text x="230" y="438" text-anchor="middle" class="footnote">Pods must be running to report CPU —</text>
+  <text x="230" y="438" text-anchor="middle" class="footnote">Pods must be running to report CPU</text>
   <text x="230" y="455" text-anchor="middle" class="footnote">HPA cannot scale to zero.</text>
 
   <line x1="460" y1="80" x2="460" y2="470" class="divider"/>
