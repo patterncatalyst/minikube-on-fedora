@@ -5,6 +5,18 @@ description: A brief tour of kind, k3s, and MicroShift. When each is the right c
 duration: 5 minutes
 ---
 
+## Learning objectives
+
+By the end of this chapter you can:
+
+- Choose between minikube, kind, k3s, and MicroShift using a decision framework
+- Start a kind cluster for CI-style ephemeral testing
+- Install k3s as a lightweight systemd service for edge and IoT hosts
+- Start MicroShift via CRC for OpenShift API parity on Fedora
+- Compare the four distributions' architecture and Fedora/RHEL compatibility
+
+## Why this matters
+
 minikube isn't the only way to run Kubernetes locally. It was
 the right pick for this tutorial: it has the best
 multi-profile story and the broadest addon coverage, and its

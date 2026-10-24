@@ -5,16 +5,23 @@ description: Service types compared, NodePort mechanics, and how minikube publis
 duration: 20 minutes
 ---
 
+## Learning objectives
+
+By the end of this chapter you can:
+
+- Compare ClusterIP, NodePort, and LoadBalancer Service types for a given use case
+- Configure a NodePort Service with a pinned or auto-assigned port
+- Trace how the minikube profile publishes NodePorts to 127.0.0.1 on the host
+- Diagnose the NodePort range, cluster-wide scope, and production-fit gotchas
+
+## Why this matters
+
 §6 exposed nginx through a `ClusterIP` Service, reachable from
 inside the cluster only. §6's own Service already used the type this
 section explains: **NodePort**, a Service type that opens a port on
 every node and makes the workload reachable from outside the cluster.
 
-By the end you'll know when to reach for NodePort vs ClusterIP vs
-LoadBalancer, how the `minikube` profile publishes NodePorts to
-`127.0.0.1` on your host, and which gotchas are worth knowing before
-NodePort touches a real network. Commands assume the `minikube`
-kubectl context from §4.
+Commands assume the `minikube` kubectl context from §4.
 
 ## Service types: a tour
 

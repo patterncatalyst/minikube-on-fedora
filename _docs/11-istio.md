@@ -5,6 +5,19 @@ description: "Service mesh on minikube: install Istio, sidecar-inject an existin
 duration: 40 minutes
 ---
 
+## Learning objectives
+
+By the end of this chapter you can:
+
+- Install Istio on a separate `istio` minikube profile
+- Inject an Envoy sidecar into the `nginx-custom:v1` Deployment
+- Deploy Bookinfo (4 microservices) and reach it through the Istio ingress gateway
+- Pin and split traffic between reviews versions with routing rules
+- Inject a fault to simulate a slow ratings service
+- Visualize the mesh with Kiali, Prometheus, Grafana, and Jaeger (optional)
+
+## Why this matters
+
 Everything in §6 through §10 has been about getting workloads
 onto Kubernetes and keeping them running. **Istio** is about what
 happens *between* them: how Pods talk to each other, how that
@@ -15,17 +28,7 @@ This is a reference section. It's the longest one in the tutorial,
 covers two distinct examples (a minimal sidecar injection of our
 existing nginx, then the full Istio Bookinfo sample with routing
 and fault injection), and uses a dedicated minikube profile to
-avoid stepping on §6-§9 work. By the end you'll have:
-
-1. Istio installed on a separate `istio` minikube profile
-2. Our `nginx-custom:v1` Deployment running with an Envoy sidecar
-3. Bookinfo (4 microservices) deployed and reachable through
-   the Istio ingress gateway
-4. Traffic-routing rules pinning reviews to a single version,
-   then splitting 50/50 between two
-5. Fault injection slowing the ratings service
-6. Optional: Kiali / Prometheus / Grafana / Jaeger for visualizing
-   the mesh
+avoid stepping on §6-§9 work.
 
 ## What's a service mesh
 

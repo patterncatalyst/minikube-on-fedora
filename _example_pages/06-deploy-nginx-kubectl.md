@@ -17,7 +17,7 @@ response content, then scales.
 
 This isn't a cluster-startup test (that was §3's
 `examples/03-driver-check/`). The cluster needs to already be
-running — the script will start it for you if not, but the focus
+running; the script will start it for you if not, but the focus
 here is **building an image and deploying it**.
 
 ## Why we build our own image
@@ -37,7 +37,7 @@ builder stage (`ubi10/ubi`) stages content, a runtime stage
 port 8080, copies the staged content in, and runs nginx in the
 foreground.
 
-Both base images are **freely redistributable** — no
+Both base images are **freely redistributable**: no
 subscription-manager registration needed to install packages from
 the public UBI repos.
 
@@ -86,7 +86,7 @@ minikube -p minikube image rm nginx-custom:v1
 ## What you should see
 
 A series of `==> step` lines for each phase, with build output and
-`kubectl` output inlined. The build step is the most verbose — you'll
+`kubectl` output inlined. The build step is the most verbose; you'll
 see microdnf installing nginx and a few hundred kilobytes of
 package metadata. The script finishes with
 `✓ SUCCESS — image built + Deployment + NodePort Service + scaling all working`
@@ -146,30 +146,30 @@ nothing changed; the image is reloaded into the cluster each run.
 
 The most likely failure modes, in order:
 
-1. **`docker build` fails on UBI image pull** — transient
+1. **`docker build` fails on UBI image pull**: transient
    network issue reaching `registry.access.redhat.com`. Retry
-2. **`microdnf install nginx` fails inside the build** — UBI repos
+2. **`microdnf install nginx` fails inside the build**: UBI repos
    transiently unreachable. Retry
-3. **Cluster not reachable** — `minikube status` errors. The script
+3. **Cluster not reachable**: `minikube status` errors. The script
    will try `minikube start` automatically; if that fails, work the
    failure like §3 (driver or runtime config issue)
-4. **Pods stuck in `CrashLoopBackOff`** — most likely a permissions
+4. **Pods stuck in `CrashLoopBackOff`**: most likely a permissions
    issue inside the container. The demo's `kubectl wait` failure
    path automatically dumps logs from current and previous
    containers, which usually tells you exactly what nginx is
    complaining about. Common causes: misconfigured port (try
    `kubectl describe pod <name>` for the actual port), permission
    denied on a directory the non-root user can't write
-5. **Image-pull failure on `nginx-custom:v1`** — minikube's image
+5. **Image-pull failure on `nginx-custom:v1`**: minikube's image
    cache didn't pick up the build for some reason. Confirm with
-   `minikube -p minikube image ls | grep nginx-custom` — if absent,
+   `minikube -p minikube image ls | grep nginx-custom`; if absent,
    rerun `docker build -f Containerfile -t nginx-custom:v1 .` and
    `minikube -p minikube image load nginx-custom:v1` from this
    directory (the Deployment uses `imagePullPolicy: Never`)
-6. **`nodePort 30080 is held by Service ...`** — another example
+6. **`nodePort 30080 is held by Service ...`**: another example
    holds the shared slot. Run the `kubectl delete svc` command the
    script prints
-7. **`does not publish nodePort 30080`** — the profile was created
+7. **`does not publish nodePort 30080`**: the profile was created
    without the port map. Run the delete-and-recreate command the
    script prints
 

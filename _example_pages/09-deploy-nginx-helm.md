@@ -48,9 +48,9 @@ publishes for nodePort 30080 via `--ports=127.0.0.1:18080:30080`):
 6. The `checksum/configmap` annotation in the Deployment template
    triggers a Pod rollout when only the ConfigMap changes
    (otherwise upgrading only `content.*` values wouldn't roll the
-   Pods — the Deployment spec itself would be unchanged)
+   Pods, since the Deployment spec itself would be unchanged)
 7. After upgrade rollout, the served HTML contains the
-   **upgrade-time** title — old content gone
+   **upgrade-time** title; old content is gone
 8. `helm uninstall` removes Deployment + Service + ConfigMap with
    no leftovers (and frees the shared nodePort 30080)
 
@@ -102,7 +102,7 @@ Uses the **default minikube cluster** with the release name
 
 The cleanup label selector relies on the
 `app.kubernetes.io/instance=nginx-helm` label that the chart
-applies to all resources — that's how the post-uninstall
+applies to all resources; that's how the post-uninstall
 leftover check works.
 
 The release Service is `type: NodePort` with `nodePort: 30080`. That
@@ -115,7 +115,7 @@ and `helm` call to the `minikube` context.
 
 `demo.sh` installs a `trap cleanup EXIT` that:
 
-1. Runs `helm uninstall nginx-helm` (idempotent — succeeds even
+1. Runs `helm uninstall nginx-helm` (idempotent: succeeds even
    if no release exists)
 
 `nginx-custom:v1` stays in the cluster's image cache.
@@ -131,29 +131,29 @@ kubectl --context minikube get all,configmap -l app.kubernetes.io/instance=nginx
 
 ## When this fails
 
-1. **`helm lint` fails** — likely a Chart.yaml field missing or a
+1. **`helm lint` fails**: likely a Chart.yaml field missing or a
    template syntax error. The lint output points at the offending
    file and line
-2. **`helm template` fails** — usually a `{{ ... }}` syntax error
+2. **`helm template` fails**: usually a `{{ ... }}` syntax error
    or a value reference that doesn't resolve. The template output
    is full Go-template error messages with file:line markers
-3. **`helm install` succeeds but Deployment never goes Available**
-   — typically image not loaded (the pre-flight should have
+3. **`helm install` succeeds but Deployment never goes Available**:
+   typically image not loaded (the pre-flight should have
    built and loaded it; check `minikube -p minikube image ls`; the
    chart uses `pullPolicy: Never`)
-4. **First curl returns wrong content** — values weren't
+4. **First curl returns wrong content**: values weren't
    templated as expected. `helm get values nginx-helm` shows
    what helm thought your values were
 5. **Upgrade rollout doesn't happen / served HTML still shows
-   old title** — likely the `checksum/configmap` annotation isn't
+   old title**: likely the `checksum/configmap` annotation isn't
    working. `kubectl --context minikube get deployment nginx-helm -o yaml | grep
    checksum` to confirm the annotation is present and changing
    across revisions
 7. **`nodePort 30080 is held by Service ...`** or **`does not
-   publish nodePort 30080`** — another example holds the shared slot,
+   publish nodePort 30080`**: another example holds the shared slot,
    or the profile was created without the port map. Run the command
    the script prints
-6. **`helm uninstall` leaves resources behind** — check the chart
+6. **`helm uninstall` leaves resources behind**: check the chart
    for any resource that doesn't have the standard labels (every
    resource the chart creates should include the
    `nginx-helm.labels` block from `_helpers.tpl`)

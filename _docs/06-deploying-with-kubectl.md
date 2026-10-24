@@ -5,17 +5,24 @@ description: "Deploy a workload with kubectl: Pods, Deployments, Services, scali
 duration: 25 minutes
 ---
 
+## Learning objectives
+
+By the end of this chapter you can:
+
+- Write a Deployment manifest for a containerized workload
+- Build a multi-stage UBI container image and load it into minikube
+- Apply manifests with kubectl and inspect Pod and Deployment status
+- Expose a Deployment through a NodePort Service
+- Scale a Deployment up and down
+- Roll out and roll back a new image version
+
+## Why this matters
+
 This is the first section that actually deploys a workload. §1-§5
 got you a cluster you can talk to; §6 puts something useful inside
 it. The example stays small: one UBI nginx Deployment
 and a Service, so the moving parts each get attention rather than
 getting lost in a more realistic application.
-
-By the end you'll have written a Deployment manifest, applied it,
-watched the Pods come up, exposed them through a Service, reached
-the Service from your host, scaled the Deployment up and down, and
-rolled out a new image version. Same vocabulary you'll use for
-every real workload after this.
 
 Commands in this chapter assume the `minikube` kubectl context that
 §4 creates. Run `kubectl config use-context minikube` once if another

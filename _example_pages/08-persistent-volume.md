@@ -13,7 +13,7 @@ Demonstrates Kubernetes **PersistentVolumes** (PVs) and
 served from a PV instead of baked into the image. The demo
 includes a real persistence test: capture content from
 `http://127.0.0.1:18080/`, delete the Pod, poll the same URL until the
-replacement Pod answers, capture again — timestamps match → PV did its job.
+replacement Pod answers, capture again: timestamps match → PV did its job.
 
 The example inverts the §6 pattern. §6 baked content into the
 image. §8 uses a generic image; content lives in a PV and outlives
@@ -37,7 +37,7 @@ Seven §8 claims:
 6. Deleting the Pod triggers a replacement that re-mounts the
    same PVC
 7. **The replacement Pod sees the same content the original
-   wrote** — timestamps match → PV is independent of Pod
+   wrote**: timestamps match → PV is independent of Pod
    lifecycle
 
 ## Running
@@ -115,28 +115,28 @@ kubectl get pv
 
 ## When this fails
 
-1. **PVC stays `Pending` forever** — the storage-provisioner addon
+1. **PVC stays `Pending` forever**: the storage-provisioner addon
    is disabled. `minikube addons list` to confirm; `minikube
    addons enable storage-provisioner default-storageclass` to fix
 2. **Deployment Pending: `pod has unbound immediate
-   PersistentVolumeClaims`** — same root cause as above. The PVC
+   PersistentVolumeClaims`**: same root cause as above. The PVC
    isn't binding because there's no provisioner
-3. **initContainer crashes** — typically a sh syntax issue (the
+3. **initContainer crashes**: typically a sh syntax issue (the
    heredoc), or permission denied writing to /content. The
    demo's failure path dumps the initContainer log
-4. **Timestamps don't match** — the PV genuinely didn't persist.
+4. **Timestamps don't match**: the PV didn't persist.
    Most likely: the PVC was deleted between Pod lifecycles (the
-   demo's cleanup runs on script exit, not between phases — so
+   demo's cleanup runs on script exit, not between phases, so
    this shouldn't happen in the demo, but might if you've been
    experimenting manually)
-5. **The NodePort never answers after the Pod is replaced** — the
+5. **The NodePort never answers after the Pod is replaced**: the
    new endpoint needs a few seconds to register. The demo polls for
    30s; longer than that suggests a Service selector mismatch
    (`kubectl --context minikube get endpoints nginx-pv`)
-6. **`nodePort 30080 is held by Service ...`** — §6, §9 or §12-http
+6. **`nodePort 30080 is held by Service ...`**: §6, §9 or §12-http
    holds the shared slot. Run the `kubectl delete svc` command the
    script prints
-7. **`does not publish nodePort 30080`** — the profile was created
+7. **`does not publish nodePort 30080`**: the profile was created
    without the port map. Run the delete-and-recreate command the
    script prints
 

@@ -47,7 +47,7 @@ Eight §12 Kafka claims:
    consumer up to ≥1 replica within 120 seconds
 7. The consumer drains the topic (messages get processed)
 8. After `cooldownPeriod` (30s) of zero lag, KEDA scales back
-   to zero replicas — confirming the full 0→N→0 lifecycle
+   to zero replicas, confirming the full 0→N→0 lifecycle
 
 ## Running
 
@@ -83,7 +83,7 @@ Key log lines:
 The peak replica count is bounded by:
 - `maxReplicaCount: 3` in the ScaledObject
 - The number of partitions in the topic (also 3)
-- `(message_lag / lagThreshold)` — with 200 messages
+- `(message_lag / lagThreshold)`: with 200 messages
   and `lagThreshold: 5`, KEDA would ask for 40 replicas,
   but is capped at 3
 
@@ -93,29 +93,29 @@ So expected peak: **3 replicas**.
 
 Most likely failure modes, in rough order of frequency:
 
-1. **Strimzi Cluster Operator stuck reconciling** — the Kafka
+1. **Strimzi Cluster Operator stuck reconciling**: the Kafka
    CR never reaches Ready. Demo dumps the operator logs +
    Kafka status + events on failure. Common fixes:
    - `helm uninstall strimzi -n kafka` + `kubectl delete
      namespace kafka` + `./scripts/setup-strimzi.sh` (fresh
      start)
-   - Check the operator logs for `KafkaUpgradeException` —
+   - Check the operator logs for `KafkaUpgradeException`:
      this means you're using an unsupported Kafka version
      (Strimzi 1.2.0 accepts only Kafka 4.2.x and 4.3.x)
-2. **Image pull failures for Kafka itself** — Strimzi pulls
+2. **Image pull failures for Kafka itself**: Strimzi pulls
    `quay.io/strimzi/kafka:1.2.0-kafka-4.3.1` (~600 MB). On
    slow connections this can take 5+ minutes. Check
    `kubectl describe pod -n kafka <kafka-pod>` for image-pull
    progress
-3. **KEDA doesn't scale up** — check `kubectl describe
+3. **KEDA doesn't scale up**: check `kubectl describe
    scaledobject order-processor-scaler` and KEDA operator
    logs. Common issue: KEDA can't reach Kafka at the configured
    bootstrap-servers address (typo or wrong DNS name)
-4. **Consumer can't reach Kafka** — same root cause as #3,
+4. **Consumer can't reach Kafka**: same root cause as #3,
    but from the consumer Pod's side. `kubectl logs
    deployment/order-processor` should show connection errors
 
-If something else fails, paste the demo's diagnostic output —
+If something else fails, paste the demo's diagnostic output;
 it includes Strimzi logs, KEDA logs, ScaledObject status, and
 recent events.
 
@@ -149,13 +149,13 @@ start.
 - **Tune `cooldownPeriod`** for different shapes. Long
   cooldowns (5+ min) reduce flapping but keep workloads
   running longer
-- **Try `offsetResetPolicy: latest`** instead of `earliest` —
+- **Try `offsetResetPolicy: latest`** instead of `earliest`:
   the consumer ignores backlog and only processes new messages
   (relevant when you want KEDA-based autoscaling but don't
   want a fresh consumer to chew through historical data)
-- **Add multiple triggers** to the same ScaledObject — KEDA
+- **Add multiple triggers** to the same ScaledObject: KEDA
   ORs them, scaling up if any single trigger fires. Useful
   for "scale up if EITHER Kafka lag OR CPU is high"
-- **Replace Strimzi with Bitnami** — the KEDA ScaledObject
+- **Replace Strimzi with Bitnami**: the KEDA ScaledObject
   manifest is Kafka-implementation-agnostic; it just needs a
   reachable bootstrap-servers address

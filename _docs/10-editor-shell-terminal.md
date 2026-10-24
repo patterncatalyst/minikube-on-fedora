@@ -5,6 +5,19 @@ description: Practical tooling for fast feedback when editing manifests, running
 duration: 20 minutes
 ---
 
+## Learning objectives
+
+By the end of this chapter you can:
+
+- Configure an editor (Pulsar, VS Code, Neovim, or an IntelliJ IDE) with YAML schema awareness for Kubernetes manifests
+- Switch to zsh and enable kubectl, helm, and minikube tab completion
+- Build a curated kubectl alias set (`k`, `kgp`, `kgs`, …) with completion wired through `compdef`
+- Use `kubectl edit` and `kubectl explain`, and switch contexts and namespaces with kubectx/kubens
+- Stream multi-pod logs with stern and monitor live cluster state with k9s
+- Organize multiple long-running panes with terminal tabs, tmux, or zellij
+
+## Why this matters
+
 §1 through §9 are about Kubernetes. This section is about the
 tools you use to work with Kubernetes: the editor for manifests,
 the shell for commands, the conveniences that make 1000 kubectl

@@ -5,6 +5,18 @@ description: "Event-driven autoscaling on Kubernetes: Kafka consumer-lag scaling
 duration: 45 minutes
 ---
 
+## Learning objectives
+
+By the end of this chapter you can:
+
+- Install KEDA core via helm on the existing `minikube` profile
+- Scale a Strimzi-managed Kafka consumer from 0 to N based on consumer lag, then back to 0 (Pattern A)
+- Scale an nginx Deployment from 0 to N based on HTTP traffic with the KEDA HTTP add-on, then back to 0 (Pattern B)
+- Define a `ScaledObject` to connect a trigger to a scale target
+- Compare HPA's resource-based scaling with KEDA's event-based scaling to zero
+
+## Why this matters
+
 §11 was about traffic *between* services. **§12 is about how many
 copies of a service should be running.** And specifically: when
 that answer should be **zero** during quiet periods, with the
@@ -25,14 +37,7 @@ This is the optional section in the PRD; the §3-§11 core works
 without it. But for anyone building consumer-style workloads
 (Kafka pipelines, queue processors, scheduled batch jobs) or
 HTTP services with bursty/intermittent traffic patterns, KEDA
-is the right primitive. By the end you'll have:
-
-1. KEDA core installed via helm on the existing `minikube` profile
-2. **Pattern A**: Strimzi-managed Kafka cluster + Python consumer
-   that scales from 0 to N based on consumer lag, then back to 0
-3. **Pattern B**: nginx-custom Deployment scaling from 0 to N
-   based on HTTP traffic (via the KEDA HTTP add-on), then back
-   to 0 after the load stops
+is the right primitive.
 
 ## HPA vs KEDA
 

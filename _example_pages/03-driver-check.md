@@ -63,7 +63,7 @@ under the default profile.
 ## Cleanup
 
 `demo.sh` installs a `trap cleanup EXIT` that deletes the
-`driver-check` profile on script exit — success **or** failure.
+`driver-check` profile on script exit, success **or** failure.
 If something pathological happens (Ctrl-C at the wrong moment,
 script killed mid-cleanup), do the cleanup by hand:
 
@@ -76,7 +76,7 @@ Then `minikube profile list` should no longer show
 
 ## Re-running
 
-The script is idempotent — re-running it from any state (fresh,
+The script is idempotent: re-running it from any state (fresh,
 profile already exists, profile is half-dead) does the right
 thing. It deletes any existing `driver-check` profile up front,
 then starts fresh.
@@ -85,21 +85,21 @@ then starts fresh.
 
 The most likely failure modes, in order:
 
-1. **`minikube: command not found`** — §2 install of minikube
+1. **`minikube: command not found`**: §2 install of minikube
    didn't take. Fix: rerun `sudo dnf install -y
    https://github.com/kubernetes/minikube/releases/download/v1.39.0/minikube-1.39.0-0.x86_64.rpm`
-2. **`require_docker_engine` fails** — the docker context is not
+2. **`require_docker_engine` fails**: the docker context is not
    `default` or the daemon is stopped. Follow the fix line the
    script prints (`docker context use default`,
    `sudo systemctl enable --now docker`)
-3. **Docker can't pull the kicbase image** — usually a transient
+3. **Docker can't pull the kicbase image**: usually a transient
    network issue. Rerun. Persistent failures point to
    `registry.k8s.io` reachability problems
 4. **`minikube start` times out around "Verifying Kubernetes
-   components"** — typically resource starvation on the host.
+   components"**: typically resource starvation on the host.
    Confirm `free -h` shows enough headroom; the demo asks for
    4 CPU / 8 GB which is well below the §1 floor
-5. **`kubectl get nodes` errors with "connection refused"** —
+5. **`kubectl get nodes` errors with "connection refused"**:
    kubectl's context isn't pointing at the new profile. The
    script uses explicit `--context driver-check` to avoid this,
    so if it surfaces, paste the error in the iteration thread

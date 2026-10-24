@@ -5,6 +5,19 @@ description: Helm 4 as a Kubernetes package manager; authoring a small chart tha
 duration: 25 minutes
 ---
 
+## Learning objectives
+
+By the end of this chapter you can:
+
+- Author a helm chart with templated manifests and a values.yaml
+- Parameterize a Deployment, Service, and ConfigMap using Go templates
+- Install a chart with helm install and override values with --set
+- Upgrade a release and trigger a rolling Pod restart via a config checksum
+- Inspect release history and roll back to a previous revision
+- Uninstall a release cleanly
+
+## Why this matters
+
 §6 through §8 wrote Kubernetes manifests by hand: Deployment,
 Service, PVC. Each kept some constants (image name, replica count,
 service port) hardcoded. For a single example that's fine. For
@@ -22,9 +35,7 @@ everything cleanly.
 
 This section walks through building a small chart that deploys
 `nginx-custom:v1` (the same image from §6/§7/§8) with content
-parameterized via `values.yaml`. By the end you'll have authored
-a working chart and exercised the install/upgrade/history/uninstall
-loop.
+parameterized via `values.yaml`.
 
 Every `helm` command here carries `--kube-context minikube`, and every
 `kubectl` command assumes the `minikube` context from §4 (add
