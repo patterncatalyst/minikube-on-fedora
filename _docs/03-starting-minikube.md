@@ -5,6 +5,19 @@ description: Start a minikube cluster with the docker driver and containerd, pub
 duration: 15 minutes
 ---
 
+## Learning objectives
+
+By the end of this chapter you can:
+
+- Start a minikube cluster with the docker driver and the containerd runtime
+- Publish NodePorts to loopback so host-facing Services are reachable at 127.0.0.1
+- Verify cluster health with minikube status, kubectl get nodes, and a system pod check
+- Manage the cluster lifecycle with pause/unpause, stop/start, and delete
+- Upgrade minikube through dnf and check for new releases
+- Run the examples/03-driver-check/demo.sh smoke test end to end
+
+## Why this matters
+
 This section starts your first minikube cluster, walks through
 the layers involved (Docker Engine, the in-cluster runtime, the
 cluster itself), publishes the NodePorts later sections use, and

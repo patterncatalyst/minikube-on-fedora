@@ -99,16 +99,16 @@ kubectl --context minikube delete -f manifests/ --ignore-not-found=true
 
 ## When this fails
 
-1. **`profile 'minikube' does not publish nodePort 30808`** — the
+1. **`profile 'minikube' does not publish nodePort 30808`**: the
    profile was created without `--ports`. Run the delete-and-recreate
    command the script prints
-2. **`cannot publish ports for profile`** — another process holds
+2. **`cannot publish ports for profile`**: another process holds
    host port 18080, 18081 or 18090. Free it and re-run
-3. **`curl` returns no response** — the port is published but the
+3. **`curl` returns no response**: the port is published but the
    Service has no ready endpoints. `kubectl --context minikube get
    endpoints nginx-np` should list Pod IPs; if empty, the selector
    isn't matching any ready Pod
-4. **`curl` returns wrong content** — pods responding but content
+4. **`curl` returns wrong content**: pods responding but content
    differs from expected. Compare `kubectl exec` into a Pod with
    what's actually being served
 

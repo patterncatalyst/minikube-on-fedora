@@ -5,6 +5,19 @@ description: Override CPU/memory per cluster, run multiple clusters side by side
 duration: 15 minutes
 ---
 
+## Learning objectives
+
+By the end of this chapter you can:
+
+- Override CPU and memory sizing for an individual cluster profile
+- Create, list, switch, and delete named cluster profiles
+- Run profile-scoped commands without switching the active profile
+- Create a multi-node cluster with `--nodes` and add or remove nodes after start
+- Start a highly available cluster with multiple control-plane nodes via `--ha`
+- Choose a profile layout for running several workshop clusters side by side
+
+## Why this matters
+
 After §3 you have a single minikube cluster running on its default
 profile. This section covers three related capabilities: overriding
 resources for a specific cluster beyond the §3 sizing, running

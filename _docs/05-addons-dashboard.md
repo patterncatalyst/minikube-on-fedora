@@ -5,6 +5,18 @@ description: Enable optional cluster features via minikube addons; the metrics-s
 duration: 10 minutes
 ---
 
+## Learning objectives
+
+By the end of this chapter you can:
+
+- Enable and disable minikube addons with a single CLI command
+- Enable metrics-server, ingress, and dashboard for the sections that follow
+- Verify that the metrics-server, ingress, and dashboard addons are running
+- Expose the Kubernetes Dashboard through a companion NodePort Service
+- Configure an addon that requires credentials or other parameters
+
+## Why this matters
+
 minikube ships a set of optional cluster features as **addons**:
 self-contained chunks of Kubernetes manifests you can enable or
 disable with a single CLI command. This section covers the addons

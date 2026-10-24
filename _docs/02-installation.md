@@ -5,6 +5,18 @@ description: Install minikube, kubectl, helm, and the supporting toolbox on Fedo
 duration: 20 minutes
 ---
 
+## Learning objectives
+
+By the end of this chapter you can:
+
+- Install minikube on Fedora 44 via the upstream RPM so dnf manages future upgrades
+- Install a version-pinned kubectl binary compatible with the cluster's Kubernetes version
+- Install helm from Fedora's packaged v4.x release
+- Install supporting tools (httpie, yq, hey, and krew-managed stern/kubectx/kubens)
+- Verify every tool is on PATH with the prerequisites audit script
+
+## Why this matters
+
 This section installs the tools you'll use to drive minikube and
 work with the cluster it spins up: **minikube** itself, **kubectl**,
 **helm**, and a handful of supporting utilities (`httpie`, `yq`,

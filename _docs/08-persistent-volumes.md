@@ -5,6 +5,19 @@ description: "PersistentVolumes, PersistentVolumeClaims, and StorageClasses: giv
 duration: 25 minutes
 ---
 
+## Learning objectives
+
+By the end of this chapter you can:
+
+- Distinguish Volumes, PersistentVolumes, and PersistentVolumeClaims
+- Create a PersistentVolumeClaim backed by a dynamic StorageClass
+- Seed a PersistentVolume's content with an initContainer
+- Mount a PVC into a Deployment to persist content across Pod restarts
+- Verify data survives a Pod deletion and recreation
+- Configure a PersistentVolume's reclaim policy for cleanup
+
+## Why this matters
+
 Containers in Kubernetes are ephemeral. When a Pod dies, and
 they do, for upgrades, node drains, OOM kills, or your own `kubectl
 delete pod`, everything written to the container's filesystem
