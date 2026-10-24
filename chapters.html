@@ -1,0 +1,37 @@
+---
+layout: default
+title: Chapters
+description: "The full table of contents: every section of the minikube on Fedora guide, in reading order."
+permalink: /docs/00-index/
+---
+
+<section class="section">
+  <div class="container container-prose">
+    <span class="hero__eyebrow">Chapters</span>
+    <h1>The whole guide, in order.</h1>
+    <p class="hero__lead">
+      Every section, linked. Read it top to bottom the first time through; each
+      section also stands on its own once the cluster is up. New here? Start with
+      the <a href="{{ '/docs/00-outline/' | relative_url }}">Tutorial outline</a>.
+    </p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container container-prose">
+    {%- assign chapters = site.docs | sort: "order" -%}
+    <ol class="toc-list">
+      {%- for doc in chapters -%}
+        {%- unless doc.url == '/docs/00-outline/' -%}
+        <li>
+          <a href="{{ doc.url | relative_url }}">
+            <span class="toc-list__num">{{ doc.order }}</span>
+            <span>{{ doc.title }}</span>
+          </a>
+          {%- if doc.description -%}<small>{{ doc.description }}</small>{%- endif -%}
+        </li>
+        {%- endunless -%}
+      {%- endfor -%}
+    </ol>
+  </div>
+</section>
