@@ -206,9 +206,15 @@ zsh paste safety, etc.).
 
 ## License
 
-Apache License, Version 2.0. See [`LICENSE`](LICENSE).
+This project is dual-licensed to separate the code from the writing:
 
-The 2023 predecessor of this tutorial lives at
-[github.com/patterncatalyst/minikube](https://github.com/patterncatalyst/minikube)
-for historical reference; it covers Kubernetes 1.22, which is
-stale for current work.
+- **Code** — everything under `examples/`, plus build and helper scripts and
+  inline code snippets — is licensed under the **Apache License 2.0**
+  ([`LICENSE`](LICENSE)).
+- **Content** — the tutorial and book prose (chapters under `_docs/`),
+  diagrams and images under `assets/`, and the slide decks under
+  `presentation/` — is licensed under **Creative Commons Attribution 4.0
+  International (CC BY 4.0)** ([`LICENSE-docs.md`](LICENSE-docs.md)).
+
+Copyright 2026 PatternCatalyst (Robert Sedor).
+
