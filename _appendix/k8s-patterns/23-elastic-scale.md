@@ -21,7 +21,7 @@ Every autoscaler in this chapter answers the same question, "how many replicas s
 
 KEDA, the **K**ubernetes **E**vent-**d**riven **A**utoscaler, answers the same question from outside the Pods entirely: Kafka consumer lag, HTTP request concurrency, a queue depth, a cron schedule, any of dozens of external signals a workload's own absence doesn't prevent from existing. A Kafka topic still has a lag number when its consumer has zero replicas; an HTTP request still arrives at an interceptor sitting in front of a Deployment that currently has zero Pods. That's the entire mechanism behind scale-to-zero, and it's also exactly the gap this appendix's reconciliation plan flagged when it replaced a Knative Serving lane with KEDA: Knative's own scale-to-zero autoscaler reads request concurrency the same way KEDA's HTTP add-on does, just bundled inside a heavier serving abstraction this appendix doesn't otherwise need. KEDA gets the same scale-to-zero property on top of plain Deployments, with no separate serving runtime to adopt.
 
-This chapter works through resource-based scaling on `shipping-service` first, then switches to event-based scaling on `graphql-gateway` for the scale-to-zero half of the story, and closes with a manifest-only look at the Kafka consumer-lag trigger this appendix's own `shipping-service` skeleton can't yet exercise live. `[verify]`: more of this chapter's content (installing and operating cluster-wide autoscaling infrastructure) sits closer to the CKA curriculum's own territory than CKAD's; CKAD's own competency is narrower, understanding *that* an HPA/VPA exists and what it does to a workload, not necessarily configuring the autoscaling stack itself.
+This chapter works through resource-based scaling on `shipping-service` first, then switches to event-based scaling on `graphql-gateway` for the scale-to-zero half of the story, and closes with a manifest-only look at the Kafka consumer-lag trigger this appendix's own `shipping-service` skeleton can't yet exercise live. A note on scope: more of this chapter's content (installing and operating cluster-wide autoscaling infrastructure) sits closer to the CKA curriculum's territory than CKAD's; the CKAD competency is narrower, understanding *that* an HPA or VPA exists and what it does to a workload, not configuring the autoscaling stack itself.
 
 ## HorizontalPodAutoscaler: replicas from CPU
 
@@ -142,7 +142,7 @@ Nothing in this chapter asks a reader to choose HPA versus KEDA as though they w
 
 > **🎓 CKAD exam lens**
 >
-> **Domain:** Application Deployment (20%) `[verify]` (note: HPA/VPA/KEDA installation and tuning lean closer to CKA's cluster-operations territory; CKAD's own competency is understanding what each autoscaler reads and does to a workload, not configuring the autoscaling stack from scratch)
+> **Domain:** Application Deployment (20%): note: HPA/VPA/KEDA installation and tuning lean toward CKA's cluster-operations territory; the CKAD competency is understanding what each autoscaler reads and does to a workload, not configuring the autoscaling stack from scratch
 > **Competency:** Understand HorizontalPodAutoscaler and VerticalPodAutoscaler for elastic scaling, including event-driven scale-to-zero
 > **Drill:** `kubectl get hpa,scaledobject,httpscaledobject -n patterns`
 

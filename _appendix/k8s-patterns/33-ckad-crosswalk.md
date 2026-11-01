@@ -11,12 +11,12 @@ runnable example of its own. It closes the appendix by mapping every chapter
 back to the exam it reconciles against, so the set doubles as a revision
 tool once you've read the patterns themselves.
 
-Some rows below point at chapters from families still in flight on their own
-branches (Behavioral, Advanced, Security) rather than merged to `main` yet.
-Their links resolve once those families land; their domain/competency
-entries come from this appendix's own CKAD reconciliation plan and carry
-**[verify]** wherever that plan's mapping hasn't been checked against a
-published chapter's own exam-lens callout.
+A few patterns sit at the edge of the CKAD curriculum and lean toward CKA's
+cluster-operations territory rather than CKAD's application-developer scope:
+scheduling (Automated Placement), DaemonSets, PodDisruptionBudgets (Singleton
+Service), and autoscaling (Elastic Scale). Those rows say so. Custom controllers
+and CRD-based operators, by contrast, are squarely in CKAD's "discover and use
+resources that extend Kubernetes" competency.
 
 ## The five domains, by weight
 
@@ -39,15 +39,15 @@ published chapter's own exam-lens callout.
 | 02 | [Declarative Deployment]({{ '/appendix/k8s-patterns/02-declarative-deployment/' | relative_url }}) | Foundational | Application Deployment (20%) | Apply rolling and non-rolling update strategies, and use kubectl to manage rollouts |
 | 03 | [Health Probe]({{ '/appendix/k8s-patterns/03-health-probe/' | relative_url }}) | Foundational | Observability and Maintenance (15%) | Understand and configure liveness, readiness, and startup probes |
 | 04 | [Managed Lifecycle]({{ '/appendix/k8s-patterns/04-managed-lifecycle/' | relative_url }}) | Foundational | Application Design & Build (20%) | Understand multi-container Pod design and the container lifecycle, including startup and shutdown hooks |
-| 05 | [Automated Placement]({{ '/appendix/k8s-patterns/05-automated-placement/' | relative_url }}) | Foundational | Application Design & Build (20%) **[verify]** | Understand the Kubernetes scheduler, including node selectors, affinity/anti-affinity, and taints/tolerations |
+| 05 | [Automated Placement]({{ '/appendix/k8s-patterns/05-automated-placement/' | relative_url }}) | Foundational | Application Design & Build (20%) (leans CKA) | Understand the Kubernetes scheduler, including node selectors, affinity/anti-affinity, and taints/tolerations |
 | 06 | [Init Container]({{ '/appendix/k8s-patterns/06-init-container/' | relative_url }}) | Structural | Application Design and Build (20%) | Understand multi-container Pod design, including an init container that must complete before the main container starts |
 | 07 | [Sidecar]({{ '/appendix/k8s-patterns/07-sidecar/' | relative_url }}) | Structural | Application Design and Build (20%) | Understand multi-container Pod design, including a sidecar container and its startup/shutdown ordering relative to the main container |
 | 08 | [Adapter]({{ '/appendix/k8s-patterns/08-adapter/' | relative_url }}) | Structural | Application Observability and Maintenance (15%) | Understand multi-container Pod design applied to observability, including a sidecar that exposes metrics in a standard format |
 | 09 | [Ambassador]({{ '/appendix/k8s-patterns/09-ambassador/' | relative_url }}) | Structural | Application Design and Build (20%) | Understand multi-container Pod design, including a proxy sidecar that brokers the main container's outbound connection |
 | 10 | Batch Job | Behavioral | Application Design & Build (20%) | Understand Jobs and CronJobs, including `completions`, `parallelism`, and indexed completion mode |
 | 11 | Periodic Job | Behavioral | Application Design & Build (20%) | Understand Jobs and CronJobs, including schedule, concurrencyPolicy, and manual Job creation from a CronJob template |
-| 12 | Daemon Service | Behavioral | Application Design & Build (20%) **[verify]** | Understand DaemonSets, including node placement, tolerations, and update strategy |
-| 13 | Singleton Service | Behavioral | Application Deployment (20%) **[verify]** | Understand PodDisruptionBudget and the distinction between voluntary and involuntary disruption |
+| 12 | Daemon Service | Behavioral | Application Design & Build (20%) (leans CKA) | Understand DaemonSets, including node placement, tolerations, and update strategy |
+| 13 | Singleton Service | Behavioral | Application Deployment (20%) (leans CKA) | Understand PodDisruptionBudget and the distinction between voluntary and involuntary disruption |
 | 14 | Stateless Service | Behavioral | Application Design & Build (20%) | Understand storage and volume concepts well enough to recognize when a workload has none, and what distinguishes it from one that does |
 | 15 | Stateful Service | Behavioral | Application Design & Build (20%), storage | Understand StatefulSets, headless Services, and `volumeClaimTemplates` for stable per-Pod storage |
 | 16 | Service Discovery | Behavioral | Services & Networking (20%) | Understand Services (ClusterIP, NodePort, LoadBalancer), DNS resolution, and Ingress path-based routing |
@@ -56,10 +56,10 @@ published chapter's own exam-lens callout.
 | 19 | [Configuration Resource]({{ '/appendix/k8s-patterns/19-configuration-resource/' | relative_url }}) | Configuration | Environment, Configuration & Security (25%) | Bulk-expose a ConfigMap or Secret with envFrom and mount the same resource as a volume; reason about which consumption mode updates live |
 | 20 | [Configuration Template]({{ '/appendix/k8s-patterns/20-configuration-template/' | relative_url }}) | Configuration | Environment, Configuration & Security (25%) | Use an init container to prepare a shared volume for the main container, including config rendered from a ConfigMap-backed template |
 | 21 | [Immutable Configuration]({{ '/appendix/k8s-patterns/21-immutable-configuration/' | relative_url }}) | Configuration | Environment, Configuration & Security (25%) | Create an immutable ConfigMap, explain why an in-place edit is rejected, and roll a configuration change through a Deployment update |
-| 22 | [Controller]({{ '/appendix/k8s-patterns/22-controller/' | relative_url }}) | Advanced | Environment, Configuration & Security (25%) **[verify]** | Understand a custom controller's watch-and-reconcile loop extending the Kubernetes control plane |
-| 23 | [Elastic Scale]({{ '/appendix/k8s-patterns/23-elastic-scale/' | relative_url }}) | Advanced | Application Deployment (20%) **[verify]** | Understand HorizontalPodAutoscaler and VerticalPodAutoscaler for elastic scaling, including event-driven scale-to-zero |
+| 22 | [Controller]({{ '/appendix/k8s-patterns/22-controller/' | relative_url }}) | Advanced | Environment, Configuration & Security (25%) | Understand a custom controller's watch-and-reconcile loop extending the Kubernetes control plane |
+| 23 | [Elastic Scale]({{ '/appendix/k8s-patterns/23-elastic-scale/' | relative_url }}) | Advanced | Application Deployment (20%) (leans CKA) | Understand HorizontalPodAutoscaler and VerticalPodAutoscaler for elastic scaling, including event-driven scale-to-zero |
 | 24 | [Image Builder]({{ '/appendix/k8s-patterns/24-image-builder/' | relative_url }}) | Advanced | Application Design and Build (20%) | Build and reference a container image produced in-cluster |
-| 25 | [Operator]({{ '/appendix/k8s-patterns/25-operator/' | relative_url }}) | Advanced | Environment, Configuration & Security (25%) **[verify]** | Understand a CRD-based Operator packaging an application's own operational knowledge as a Kubernetes API |
+| 25 | [Operator]({{ '/appendix/k8s-patterns/25-operator/' | relative_url }}) | Advanced | Environment, Configuration & Security (25%) | Understand a CRD-based Operator packaging an application's own operational knowledge as a Kubernetes API |
 | 26 | Access Control | Security | Environment, Configuration & Security (25%) | Create a ServiceAccount, Role, and RoleBinding scoping access to specific resources and verbs |
 | 27 | Network Segmentation | Security | Services and Networking (20%) | Restrict pod-to-pod traffic with a NetworkPolicy |
 | 28 | Process Containment | Security | Environment, Configuration & Security (25%) | Configure a SecurityContext and understand Pod Security Standards enforcement |

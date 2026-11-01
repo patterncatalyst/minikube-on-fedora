@@ -205,7 +205,7 @@ considers QoS class when choosing what to evict under a resource squeeze. A
 `scopeSelector` (a quota that applies only to pods at or above a given
 priority), which lets an operator grant a generous quota to high-priority
 workloads and a tighter one to everything else in the same namespace.
-Building that scoped example is **[verify]** left out of this chapter's
+Building that scoped example is left out of this chapter's
 runnable manifests since it needs more exam-irrelevant setup than it's worth,
 but it's a real, documented field worth knowing exists. The three mechanisms
 layer cleanly: `ResourceQuota` caps the whole namespace, `LimitRange` bounds
