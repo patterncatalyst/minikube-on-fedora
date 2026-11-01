@@ -1,0 +1,11 @@
+# Production overlay: the same two keys, different values. Swapping which
+# overlay the init container's envFrom points at (see 04-deployment.yaml) is
+# the whole mechanism for moving this config between environments.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: inventory-prod-overlay
+  namespace: patterns
+data:
+  ENV_LABEL: production
+  LOG_LEVEL: warning

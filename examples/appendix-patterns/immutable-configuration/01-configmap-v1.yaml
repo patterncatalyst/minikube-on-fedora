@@ -1,0 +1,13 @@
+# The first version of graphql-gateway's config, marked immutable. Once
+# created, the API server rejects any attempt to change its data. The only
+# way to change a value is to create a new ConfigMap under a new name.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gateway-config-v1
+  namespace: patterns
+immutable: true
+data:
+  service_name: graphql-gateway
+  order_rest_url: "http://order-service"
+  inventory_grpc_addr: "inventory-service:50051"

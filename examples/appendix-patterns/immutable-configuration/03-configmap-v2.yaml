@@ -1,0 +1,14 @@
+# A second, also-immutable version, with order_rest_url pointed at a
+# canary-style alternate name. Creating this ConfigMap changes nothing by
+# itself: no running Pod reads it until a Deployment is updated to
+# reference it by name.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gateway-config-v2
+  namespace: patterns
+immutable: true
+data:
+  service_name: graphql-gateway
+  order_rest_url: "http://order-service-v2"
+  inventory_grpc_addr: "inventory-service:50051"

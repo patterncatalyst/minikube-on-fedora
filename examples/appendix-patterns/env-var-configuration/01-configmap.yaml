@@ -1,0 +1,15 @@
+# Non-secret, environment-shaped values for notification-service's Kafka
+# consumer and the Apicurio schema registry it decodes against. These belong
+# in a ConfigMap rather than literals baked into the Deployment because ops
+# might reasonably change a bootstrap address or topic name per environment
+# without wanting a new container image for it.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: notification-config
+  namespace: patterns
+data:
+  kafka_bootstrap: "kafka.invalid:9092"
+  kafka_order_topic: "order-placed"
+  kafka_group: "notification-service"
+  apicurio_url: "http://apicurio.invalid:8080"

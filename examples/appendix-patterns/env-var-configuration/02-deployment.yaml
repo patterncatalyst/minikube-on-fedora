@@ -1,0 +1,118 @@
+# notification-service, with the EnvVarConfiguration pattern applied: one
+# env block, three sources. SERVICE_SCHEMA and the Postgres host/port are
+# literals (fixed for this example, never varying). PG_USER/PG_PASSWORD/
+# PG_DATABASE come from the patterns-postgres-app Secret. KAFKA_BOOTSTRAP,
+# KAFKA_ORDER_TOPIC, KAFKA_GROUP, and APICURIO_URL come from the
+# notification-config ConfigMap created in 01-configmap.yaml.
+#
+# KAFKA_BOOTSTRAP deliberately points at nothing reachable: this example is
+# scoped to env var sourcing, not a live Kafka pipeline (no Strimzi install
+# on the mof-patterns profile). notification-service's own background
+# consumer task is fire-and-forget: a failed connection attempt logs a
+# warning and never blocks /health or /healthz, both of which depend only on
+# the process and on Postgres.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: notification-service
+  namespace: patterns
+  labels:
+    app.kubernetes.io/name: notification-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: notification-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: notification-service
+    spec:
+      containers:
+        - name: notification-service
+          image: notification-service:v1
+          imagePullPolicy: Never
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            # Literal: fixed for this service, baked straight into the manifest.
+            - name: SERVICE_SCHEMA
+              value: notifications
+            - name: PG_HOST
+              value: patterns-postgres.patterns.svc.cluster.local
+            - name: PG_PORT
+              value: "5432"
+            # Secret key: credentials, one name per key, resolved at container start.
+            - name: PG_USER
+              valueFrom:
+                secretKeyRef:
+                  name: patterns-postgres-app
+                  key: username
+            - name: PG_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: patterns-postgres-app
+                  key: password
+            - name: PG_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: patterns-postgres-app
+                  key: dbname
+            # ConfigMap key: non-secret, environment-shaped values.
+            - name: KAFKA_BOOTSTRAP
+              valueFrom:
+                configMapKeyRef:
+                  name: notification-config
+                  key: kafka_bootstrap
+            - name: KAFKA_ORDER_TOPIC
+              valueFrom:
+                configMapKeyRef:
+                  name: notification-config
+                  key: kafka_order_topic
+            - name: KAFKA_GROUP
+              valueFrom:
+                configMapKeyRef:
+                  name: notification-config
+                  key: kafka_group
+            - name: APICURIO_URL
+              valueFrom:
+                configMapKeyRef:
+                  name: notification-config
+                  key: apicurio_url
+          resources:
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              memory: 512Mi
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            failureThreshold: 30
+            periodSeconds: 2
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: notification-service
+  namespace: patterns
+spec:
+  selector:
+    app.kubernetes.io/name: notification-service
+  ports:
+    - port: 80
+      targetPort: 8080

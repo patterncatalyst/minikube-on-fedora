@@ -1,0 +1,10 @@
+# Development overlay: the values the init container substitutes into
+# app.conf.tmpl for a dev environment.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: inventory-dev-overlay
+  namespace: patterns
+data:
+  ENV_LABEL: development
+  LOG_LEVEL: debug
