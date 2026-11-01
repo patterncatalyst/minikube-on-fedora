@@ -114,7 +114,7 @@ Nothing in this chapter installs this operator through the Operator Lifecycle Ma
 
 > **🎓 CKAD exam lens**
 >
-> **Domain:** Environment, Configuration & Security (25%) `[verify]`
+> **Domain:** Application Environment, Configuration & Security (25%): discover and use resources that extend Kubernetes (CRDs, Operators)
 > **Competency:** Understand a CRD-based Operator packaging an application's own operational knowledge as a Kubernetes API
 > **Drill:** `kubectl get shippingpolicy ground-standard -n patterns -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}'`
 

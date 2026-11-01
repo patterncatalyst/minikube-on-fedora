@@ -127,7 +127,7 @@ A `NoSchedule` taint only blocks new scheduling; it has no effect on a Pod alrea
 
 > **🎓 CKAD exam lens**
 >
-> **Domain:** Application Design & Build (20%) [verify]
+> **Domain:** Application Design & Build (20%): scheduling basics; node affinity, taints, and tolerations lean toward the CKA exam
 > **Competency:** Understand the Kubernetes scheduler, including node selectors, affinity/anti-affinity, and taints/tolerations
 > **Drill:** `kubectl get pods -n patterns -o custom-columns=NAME:.metadata.name,NODE:.spec.nodeName`
 

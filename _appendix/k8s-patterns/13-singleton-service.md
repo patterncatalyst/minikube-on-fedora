@@ -95,7 +95,7 @@ A PDB protects a singleton from *voluntary* disruption, but it does nothing abou
 
 > **🎓 CKAD exam lens**
 >
-> **Domain:** Application Deployment (20%) [verify]
+> **Domain:** Application Deployment (20%): disruption handling; PodDisruptionBudget leans toward the CKA exam
 > **Competency:** Understand PodDisruptionBudget and the distinction between voluntary and involuntary disruption
 > **Drill:** `kubectl get pdb order-service-pdb -n patterns -o jsonpath='{.status.disruptionsAllowed}'`
 

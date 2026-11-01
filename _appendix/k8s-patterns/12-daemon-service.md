@@ -126,7 +126,7 @@ A less common but still exam-relevant alternative for "something on every node" 
 
 > **🎓 CKAD exam lens**
 >
-> **Domain:** Application Design & Build (20%) [verify]
+> **Domain:** Application Design & Build (20%): workload resources; DaemonSet node-level operations lean toward the CKA exam
 > **Competency:** Understand DaemonSets, including node placement, tolerations, and update strategy
 > **Drill:** `kubectl get daemonset node-collector -n patterns -o jsonpath='{.status.desiredNumberScheduled}{" "}{.status.numberReady}'`
 

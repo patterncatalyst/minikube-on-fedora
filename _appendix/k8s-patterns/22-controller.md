@@ -110,7 +110,7 @@ Nothing described above was written as a self-healing mechanism specifically. Th
 
 > **🎓 CKAD exam lens**
 >
-> **Domain:** Application Environment, Configuration & Security (25%) `[verify]`
+> **Domain:** Application Environment, Configuration & Security (25%): discover and use resources that extend Kubernetes (CRDs, Operators)
 > **Competency:** Understand a custom controller's watch-and-reconcile loop extending the Kubernetes control plane
 > **Drill:** `kubectl get pod -n patterns -l app.kubernetes.io/name=shipping-service -o jsonpath='{.items[*].metadata.ownerReferences[0].name}'`
 
