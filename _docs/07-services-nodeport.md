@@ -190,8 +190,7 @@ Service would need `minikube tunnel` to receive an external IP, so
 this tutorial uses NodePort for everything host-facing.
 <!-- policy-exempt:end -->
 
-- **The node IP directly.** `curl "http://$(minikube -p minikube
-  ip):30808/"` works on the docker driver from the host. The address
+- **The node IP directly.** `curl "http://$(minikube -p minikube ip):30808/"` works on the docker driver from the host. The address
   changes when the profile is recreated, and it is not reachable from
   other machines or VMs, so the loopback ports are the stable choice
 - **Ingress.** HTTP routing by host and path through the `ingress`
@@ -211,7 +210,7 @@ Invalid value: 80: provided port is not in the valid range. The
 range of valid ports is 30000-32767.
 ```
 
-This is a deliberate guardrail: privileged ports below 1024
+This is a guardrail: privileged ports below 1024
 require special handling, and ports 1024-29999 commonly clash
 with applications running on your nodes (or your dev host).
 

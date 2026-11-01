@@ -170,8 +170,7 @@ but each piece is straightforward in isolation.
 
 - **[GitHub Actions docs](https://docs.github.com/en/actions)**
   for the build-and-push pipeline
-- **[ko](https://ko.build/)** as an alternative to `docker
-  build` for Go services: it handles the image-building step
+- **[ko](https://ko.build/)** as an alternative to `docker build` for Go services: it handles the image-building step
   with no Containerfile
 - **[ArgoCD auto-sync](https://argo-cd.readthedocs.io/en/stable/user-guide/auto_sync/)**
   for the rollout step

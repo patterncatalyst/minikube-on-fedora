@@ -19,22 +19,21 @@ By the end of this chapter you can:
 ## Why this matters
 
 Containers in Kubernetes are ephemeral. When a Pod dies, and
-they do, for upgrades, node drains, OOM kills, or your own `kubectl
-delete pod`, everything written to the container's filesystem
+they do, for upgrades, node drains, OOM kills, or your own `kubectl delete pod`, everything written to the container's filesystem
 disappears with it. For stateless workloads like the nginx
 servers in §6 and §7 that's fine: spin up another Pod and you
 get the same baked-in content.
 
 Stateful workloads are different. A database, a CMS, an upload
 endpoint, a build cache: anything that produces data that must
-survive past one Pod's lifecycle. This section covers the three
-Kubernetes resources that handle that case, and walks through an
-example that *inverts* the §6 pattern: same image, content that
+survive past one Pod's lifecycle. Three
+Kubernetes resources handle that case. The
+example here *inverts* the §6 pattern: same image, content that
 lives in storage, not the image.
 
 ## Three volume concepts
 
-These three terms are easy to conflate, so here's the distinction up front.
+These three terms are often conflated, so here's the distinction up front.
 
 ### Volume
 
@@ -126,7 +125,7 @@ The mechanism is an **initContainer** that seeds the volume with
 content the first time it's empty. On subsequent Pod restarts
 the content is already there, so the initContainer leaves it
 alone. The before/after timestamps in the seeded content make
-persistence trivially observable.
+persistence directly observable.
 
 ### The PVC
 
@@ -287,8 +286,7 @@ spec:
 
 A NodePort Service on 30080, the same slot §6 used and the one the
 `minikube` profile publishes to `127.0.0.1:18080`. **Delete §6's
-`nginx` Service first** (`kubectl delete -f
-examples/06-deploy-nginx-kubectl/manifests/`): two Services cannot
+`nginx` Service first** (`kubectl delete -f examples/06-deploy-nginx-kubectl/manifests/`): two Services cannot
 hold the same nodePort, and the demo's preflight stops with a "delete
 X first" message if one does. Commands in this chapter assume the
 `minikube` kubectl context from §4.

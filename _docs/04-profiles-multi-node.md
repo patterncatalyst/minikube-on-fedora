@@ -19,7 +19,7 @@ By the end of this chapter you can:
 ## Why this matters
 
 After §3 you have a single minikube cluster running on its default
-profile. This section covers three related capabilities: overriding
+profile. Three related capabilities follow: overriding
 resources for a specific cluster beyond the §3 sizing, running
 multiple clusters side by side via **profiles**, and running a single
 cluster with multiple **nodes** via `--nodes`.
@@ -72,8 +72,7 @@ state: its own Docker container(s), its own kubeconfig context, its
 own configuration. Profiles let you have multiple clusters running
 side by side or stored as named experiments.
 
-You've already used profiles without thinking about it. `minikube
-start` without `-p` operates on the profile named `minikube` (the
+You've already used profiles without thinking about it. `minikube start` without `-p` operates on the profile named `minikube` (the
 default). `examples/03-driver-check/demo.sh` used `-p driver-check`.
 
 Profiles this repo defines:

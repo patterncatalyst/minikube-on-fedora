@@ -165,8 +165,7 @@ minikube profile list
 docker port istio
 ```
 
-`minikube stop -p istio` stops the istio cluster; `minikube delete -p
-istio` removes it entirely.
+`minikube stop -p istio` stops the istio cluster; `minikube delete -p istio` removes it entirely.
 
 ## Installing Istio
 
@@ -339,7 +338,7 @@ application and the `istio-proxy` Envoy sidecar.
 > 1. `kubectl get pods` still shows `2/2`: the Kubernetes
 >    readiness accounting counts native sidecars in the totals
 > 2. JSONPath queries against `.status.containerStatuses[]` will
->    NOT find istio-proxy. It's in `.status.initContainerStatuses[]`,
+>    not find istio-proxy. It's in `.status.initContainerStatuses[]`,
 >    or `.spec.initContainers[]` on the spec side
 >
 > If you want to verify injection in a script, look at both
@@ -548,7 +547,7 @@ kubectl --context istio apply -f ~/.local/share/istio-current/samples/bookinfo/n
 Refresh the productpage. The ratings panel takes 7 seconds to
 appear (or times out and shows an error, depending on the
 productpage's timeout). The slowness is **synthetic, configured
-in Istio**, not actually slow code.
+in Istio**, not slow code.
 
 Other patterns the same directory has manifests for (worth
 exploring on your own):

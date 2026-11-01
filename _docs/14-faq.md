@@ -45,10 +45,7 @@ for errors.
 
 Two common causes: (1) the cluster is sized too small: check
 `minikube profile list` for current CPU/memory allocation, and
-recreate with bigger numbers if needed (`minikube delete -p
-minikube`, then `minikube start -p minikube --driver=docker
---container-runtime=containerd --kubernetes-version=v1.36.5
---memory=8192 --cpus=6 --ports=127.0.0.1:18080:30080,127.0.0.1:18081:30808,127.0.0.1:18090:30900`,
+recreate with bigger numbers if needed (`minikube delete -p minikube`, then `minikube start -p minikube --driver=docker --container-runtime=containerd --kubernetes-version=v1.36.5 --memory=8192 --cpus=6 --ports=127.0.0.1:18080:30080,127.0.0.1:18081:30808,127.0.0.1:18090:30900`,
 the `CORE_PORTS` map from `scripts/lib/_helpers.sh`); (2) the host
 machine is swapping; `free -h` will tell you. Kubernetes
 control plane components are CPU- and memory-hungry; less than
@@ -79,8 +76,7 @@ The Events block will tell you what went wrong. Most common
 reasons: the image name is wrong (typo), the image tag doesn't
 exist on the registry, the registry requires authentication
 you haven't configured, or your minikube profile can't reach
-the internet (try `minikube ssh -p minikube -- ping -c 2
-8.8.8.8`).
+the internet (try `minikube ssh -p minikube -- ping -c 2 8.8.8.8`).
 
 ### Q: why containerd with runc, and why not mix runtimes?
 
@@ -97,8 +93,7 @@ ran containers with crun and needed containerd on top of it, while
 the Docker path runs containerd with runc. Switching a profile's
 runtime or driver in place leaves state from the old pairing
 behind, and the symptom is an opaque `runc` "paused" check failure
-at start. If you change driver or runtime, `minikube delete -p
-[profile]` first and create a fresh profile.
+at start. If you change driver or runtime, `minikube delete -p [profile]` first and create a fresh profile.
 <!-- policy-exempt:end -->
 
 ### Q: my image built locally but Kubernetes can't find it
@@ -119,8 +114,7 @@ instead of trying a public registry. Don't run
 `eval $(minikube docker-env)` with containerd: that variable points
 the docker CLI at a Docker daemon inside the node, and a containerd
 node doesn't run one, so builds land nowhere useful. After loading a
-new image under an existing tag, `kubectl --context minikube rollout
-restart deployment/[name]` makes the Pods pick it up.
+new image under an existing tag, `kubectl --context minikube rollout restart deployment/[name]` makes the Pods pick it up.
 
 ### Q: Pod is Running but the app inside isn't responding
 
@@ -151,7 +145,7 @@ flag if the container ran out of memory.
 
 This tutorial reaches every Service through a NodePort published on
 `127.0.0.1` when the profile is created. Check what the node
-actually publishes:
+publishes:
 
 ```bash
 docker port minikube
@@ -177,9 +171,9 @@ confirm only one Service holds the shared NodePort 30080 (§6, §8,
 ### Q: requests through the KEDA HTTP interceptor return 404
 
 You're probably using `hey -H 'Host: nginx.local'`. **hey is
-written in Go, and Go's `net/http` silently strips Host
-headers set via the headers map** (issue golang/go#7682, open
-since 2014). Use `hey -host nginx.local` instead; hey has a
+written in Go, and Go's `net/http` strips Host
+headers set via the headers map** (long-standing Go behavior).
+Use `hey -host nginx.local` instead; hey has a
 dedicated flag for this. curl handles `-H 'Host:'` correctly
 because curl treats Host as a special case; many other tools
 do not.
@@ -296,8 +290,7 @@ template:
 {% endraw %}
 
 The §9 helm section covers the checksum approach in detail:
-it's the most robust way to handle ConfigMap-triggered
-rollouts.
+it handles ConfigMap-triggered rollouts reliably.
 
 ### Q: I want to roll back a Deployment to a previous version
 
@@ -335,8 +328,7 @@ Three things to verify, in order:
 
 Note: in Istio 1.29+, the sidecar appears as an **initContainer
 with `restartPolicy: Always`** (KEP-753 native sidecars), not
-as a regular container. `kubectl get pod [name] -o
-jsonpath='{.spec.initContainers[*].name}'` is the check that
+as a regular container. `kubectl get pod [name] -o jsonpath='{.spec.initContainers[*].name}'` is the check that
 works on both old and new Istio versions.
 
 ### Q: KEDA's HPA shows zero replicas but my workload is running
@@ -344,7 +336,7 @@ works on both old and new Istio versions.
 That's normal during the cooldown period. KEDA scales the
 Deployment to zero by deleting the underlying HPA (HPA can't
 manage 0-replica Deployments). When traffic returns, KEDA
-recreates the HPA. If your workload IS running but the
+recreates the HPA. If your workload is running but the
 ScaledObject shows 0 desired replicas, check
 `kubectl describe scaledobject [name]`: the conditions block
 shows why KEDA disagrees with the current state.
@@ -387,8 +379,8 @@ sudo dnf upgrade -y helm
 
 minikube is pinned for a reason: the chapters, the port maps, and
 the flag set are tested against v1.39.0, installed from the release
-RPM in §2. Treat an upgrade as a deliberate change, not a routine
-update. To move, install the newer RPM the same way as §2 and
+RPM in §2. Treat an upgrade as a change that needs testing.
+To move, install the newer RPM the same way as §2 and
 re-run the demos before relying on it.
 
 After upgrading minikube, existing profiles continue working
@@ -483,8 +475,7 @@ helm repo remove kedacore strimzi      # if you added them
 
 This leaves your installed binaries (`minikube`, `kubectl`,
 `helm`, `hey`) in place: uninstalling those is rarely what
-you want. To remove them too, `sudo dnf remove
-minikube kubectl helm` (assuming they came from dnf; `hey`
+you want. To remove them too, `sudo dnf remove minikube kubectl helm` (assuming they came from dnf; `hey`
 came from `go install`, so `rm $(go env GOPATH)/bin/hey`).
 
 ---

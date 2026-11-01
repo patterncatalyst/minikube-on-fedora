@@ -19,8 +19,8 @@ By the end of this chapter you can:
 
 minikube ships a set of optional cluster features as **addons**:
 self-contained chunks of Kubernetes manifests you can enable or
-disable with a single CLI command. This section covers the addons
-this tutorial uses (and a handful you'll commonly want even outside
+disable with a single CLI command. The addons
+this tutorial uses follow (and a handful you'll commonly want even outside
 it), plus the Kubernetes Dashboard which is itself an addon.
 
 ## Listing addons
@@ -35,7 +35,7 @@ status. By default only two are enabled:
 - `default-storageclass`: provides a `StorageClass` named `standard`
   marked as default, so `PersistentVolumeClaims` without an explicit
   class get bound by `storage-provisioner`
-- `storage-provisioner`: the controller that actually creates
+- `storage-provisioner`: the controller that creates
   hostPath PVs when PVCs are created
 
 Both showed up as `Running` pods in the §3 driver-check output. The
@@ -216,7 +216,7 @@ minikube addons list | grep -E '(STATUS|metrics-server|ingress |dashboard)'
 Should show all three as `enabled` (the regex avoids matching
 `ingress-dns` which is a separate addon).
 
-For a deeper check that the addons' workloads are actually running:
+For a deeper check that the addons' workloads are running:
 
 ```bash
 kubectl --context minikube get pods -A | grep -E '(metrics-server|ingress-nginx|kubernetes-dashboard)'

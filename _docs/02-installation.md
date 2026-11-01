@@ -22,7 +22,7 @@ work with the cluster it spins up: **minikube** itself, **kubectl**,
 **helm**, and a handful of supporting utilities (`httpie`, `yq`,
 `hey`, `stern`, `kubectx`/`kubens`, and `krew`).
 
-The mix of install paths reflects what's actually in Fedora 44's
+The mix of install paths reflects what's in Fedora 44's
 repos in mid-2026: `helm` and `httpie` are packaged and install
 cleanly via `dnf`; `minikube` and `kubectl` aren't packaged and
 install from their upstream RPM/binary; the rest install via a
@@ -105,8 +105,7 @@ kubectl version --client=true
 
 ### `minikube kubectl` is also a thing
 
-minikube ships its own kubectl invocable as `minikube kubectl --
-...`, automatically version-matched to the cluster. It's fine
+minikube ships its own kubectl invocable as `minikube kubectl -- ...`, automatically version-matched to the cluster. It's fine
 for occasional use, but standalone `kubectl` is shorter to type,
 integrates with shell completion (covered in §10), and is what
 every other Kubernetes guide assumes. This tutorial uses

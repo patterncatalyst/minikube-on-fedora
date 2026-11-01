@@ -7,3 +7,6 @@
 # Python bytecode
 __pycache__/
 *.pyc
+
+# Jekyll build output
+_site/
