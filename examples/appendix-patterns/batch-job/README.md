@@ -32,6 +32,17 @@ kubectl --context mof-patterns wait --for=condition=Complete job/shipping-report
 kubectl --context mof-patterns logs -n patterns job/shipping-report-seed
 ```
 
+A completed Job's Pods reach `Succeeded` the moment their container exits,
+and Kubernetes never allows `kubectl exec` into a container that isn't
+running, so inspecting the CSVs a Job leaves on the PVC needs a separate,
+long-lived Pod mounting that same volume. Start it once, up front, and
+reuse it for both Jobs below:
+
+```bash
+kubectl --context mof-patterns apply -n patterns -f batch-job/05-report-viewer.yaml
+kubectl --context mof-patterns wait --for=condition=Ready pod/shipping-report-viewer -n patterns --timeout=60s
+```
+
 ### Plain Job: completions and parallelism
 
 ```bash
@@ -46,8 +57,7 @@ tagged with its own Pod name:
 ```bash
 JOB=$(kubectl --context mof-patterns get jobs -n patterns -l app.kubernetes.io/name=shipping-report-plain -o jsonpath='{.items[0].metadata.name}')
 kubectl --context mof-patterns wait --for=condition=Complete "job/$JOB" -n patterns --timeout=60s
-POD=$(kubectl --context mof-patterns get pods -n patterns -l job-name="$JOB" -o jsonpath='{.items[0].metadata.name}')
-kubectl --context mof-patterns exec -n patterns "$POD" -- ls -la /var/lib/shipping-reports
+kubectl --context mof-patterns exec -n patterns shipping-report-viewer -- ls -la /var/lib/shipping-reports
 ```
 
 Three `report-<pod-name>.csv` files, each the full 300-row report.
@@ -58,8 +68,7 @@ Three `report-<pod-name>.csv` files, each the full 300-row report.
 kubectl --context mof-patterns create -f batch-job/04-job-indexed.yaml
 IJOB=$(kubectl --context mof-patterns get jobs -n patterns -l app.kubernetes.io/name=shipping-report-indexed -o jsonpath='{.items[0].metadata.name}')
 kubectl --context mof-patterns wait --for=condition=Complete "job/$IJOB" -n patterns --timeout=60s
-IPOD=$(kubectl --context mof-patterns get pods -n patterns -l job-name="$IJOB" -o jsonpath='{.items[0].metadata.name}')
-kubectl --context mof-patterns exec -n patterns "$IPOD" -- ls -la /var/lib/shipping-reports
+kubectl --context mof-patterns exec -n patterns shipping-report-viewer -- ls -la /var/lib/shipping-reports
 ```
 
 `report-0.csv`, `report-1.csv`, `report-2.csv`: three disjoint partitions of
@@ -70,6 +79,7 @@ indexed run's partitions at once unless you've run both.
 ## Cleanup
 
 ```bash
+kubectl --context mof-patterns delete -n patterns -f batch-job/05-report-viewer.yaml
 kubectl --context mof-patterns delete jobs -n patterns -l app.kubernetes.io/name=shipping-report-plain
 kubectl --context mof-patterns delete jobs -n patterns -l app.kubernetes.io/name=shipping-report-indexed
 kubectl --context mof-patterns delete -n patterns -f batch-job/02-seed-job.yaml
