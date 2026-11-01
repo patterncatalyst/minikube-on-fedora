@@ -50,6 +50,13 @@ collections:
   capstone:
     output: true
     permalink: /capstone/:path/
+  # appendix is the Kubernetes-patterns + CKAD reference, organized as its own
+  # internally-numbered set under a subdirectory (like capstone). permalink uses
+  # :path so _appendix/k8s-patterns/01-predictable-demands.md →
+  # /appendix/k8s-patterns/01-predictable-demands/.
+  appendix:
+    output: true
+    permalink: /appendix/:path/
 
 # Default front-matter — saves typing `layout: tutorial` on every doc.
 defaults:
@@ -70,6 +77,12 @@ defaults:
     values:
       layout: tutorial
       sectionid: capstone
+  - scope:
+      path: ""
+      type: appendix
+    values:
+      layout: tutorial
+      sectionid: appendix
 
 # Files that Jekyll should not process or include in the built site.
 exclude:
