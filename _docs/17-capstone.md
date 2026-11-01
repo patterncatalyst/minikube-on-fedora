@@ -29,4 +29,8 @@ Use this final project to see how §1–§12 fit together on one minikube
 profile; use the reference architectures when the data mesh itself
 is the subject.
 
+The Python reference architecture is the source of truth for the shared
+data-mesh service code. The capstone here is a teaching snapshot taken when it
+was forked; where the two drift, the reference architecture is canonical.
+
 <p><a class="btn btn--primary" href="{{ '/capstone/data-mesh/' | relative_url }}">Start the final project: a data mesh on minikube →</a></p>
