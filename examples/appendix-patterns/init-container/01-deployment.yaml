@@ -44,21 +44,21 @@ spec:
               value: patterns-postgres.patterns.svc.cluster.local
             - name: PG_PORT
               value: "5432"
+            # Plain values, not secretKeyRef: this chapter's whole point is
+            # applying this Deployment BEFORE 00-postgres.yaml exists (see
+            # README), and the patterns-postgres-app Secret is created by
+            # that same manifest. A secretKeyRef here would block the
+            # kubelet from even starting this container
+            # (CreateContainerConfigError) instead of letting `alembic
+            # upgrade head` run and fail to connect, which is the failure
+            # this chapter demonstrates. Values match 00-postgres.yaml's
+            # patterns-postgres-app Secret.
             - name: PG_USER
-              valueFrom:
-                secretKeyRef:
-                  name: patterns-postgres-app
-                  key: username
+              value: capstone_app
             - name: PG_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: patterns-postgres-app
-                  key: password
+              value: changeme
             - name: PG_DATABASE
-              valueFrom:
-                secretKeyRef:
-                  name: patterns-postgres-app
-                  key: dbname
+              value: capstone
       containers:
         - name: notification-service
           image: notification-service:v1
