@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 880 400" font-family="'Red Hat Text', system-ui, sans-serif" role="img">
+<defs><marker id="a" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#555"/></marker><marker id="am" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b8650a"/></marker></defs>
+<rect x="20" y="30" width="840" height="340" rx="12" fill="#fafafa" stroke="#ddd"/>
+<text x="32" y="50" font-size="12" font-weight="700" fill="#888">namespace: patterns</text>
+<rect x="60" y="70" width="350" height="70" rx="9" fill="#fff8ef" stroke="#e8870c" stroke-width="2"/>
+<text x="235.0" y="103.0" font-size="13.5" font-weight="700" fill="#111111" text-anchor="middle">ResourceQuota</text>
+<text x="235.0" y="120.0" font-size="11.5" fill="#555555" text-anchor="middle">caps total requests/limits/pods</text>
+<rect x="470" y="70" width="350" height="70" rx="9" fill="#fff8ef" stroke="#e8870c" stroke-width="2"/>
+<text x="645.0" y="103.0" font-size="13.5" font-weight="700" fill="#111111" text-anchor="middle">LimitRange</text>
+<text x="645.0" y="120.0" font-size="11.5" fill="#555555" text-anchor="middle">default . min . max per container</text>
+<rect x="60" y="180" width="220" height="60" rx="9" fill="#ffffff" stroke="#111111" stroke-width="2"/>
+<text x="170.0" y="208.0" font-size="13.5" font-weight="700" fill="#111111" text-anchor="middle">shipping-service</text>
+<text x="170.0" y="225.0" font-size="11.5" fill="#555555" text-anchor="middle">explicit requests/limits</text>
+<rect x="320" y="180" width="220" height="60" rx="9" fill="#f1f5f9" stroke="#64748b" stroke-width="2"/>
+<text x="430.0" y="208.0" font-size="13.5" font-weight="700" fill="#111111" text-anchor="middle">inventory-service</text>
+<text x="430.0" y="225.0" font-size="11.5" fill="#555555" text-anchor="middle">no resources set</text>
+<rect x="580" y="180" width="240" height="60" rx="9" fill="#ffffff" stroke="#999999" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="700.0" y="208.0" font-size="13.5" font-weight="700" fill="#111111" text-anchor="middle">3rd replica</text>
+<text x="700.0" y="225.0" font-size="11.5" fill="#555555" text-anchor="middle">Forbidden: quota exceeded</text>
+<rect x="60" y="280" width="760" height="60" rx="9" fill="#ffffff" stroke="#999999" stroke-width="1.5"/>
+<text x="440.0" y="308.0" font-size="13.5" font-weight="700" fill="#111111" text-anchor="middle">PriorityClass: patterns-high-priority</text>
+<text x="440.0" y="325.0" font-size="11.5" fill="#555555" text-anchor="middle">scheduling + eviction order, independent of quota</text>
+<path d="M235,140 L170,180" fill="none" stroke="#555" stroke-width="2" marker-end="url(#a)"/>
+<text x="208.5" y="154.0" font-size="11" fill="#ffffff" stroke="#ffffff" stroke-width="3" paint-order="stroke" text-anchor="middle">counted</text>
+<text x="208.5" y="154.0" font-size="11" fill="#555" text-anchor="middle">counted</text>
+<path d="M645,140 L430,180" fill="none" stroke="#555" stroke-width="2" marker-end="url(#a)"/>
+<text x="543.5" y="154.0" font-size="11" fill="#ffffff" stroke="#ffffff" stroke-width="3" paint-order="stroke" text-anchor="middle">defaulted</text>
+<text x="543.5" y="154.0" font-size="11" fill="#555" text-anchor="middle">defaulted</text>
+<path d="M235,140 L700,180" fill="none" stroke="#555" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#a)"/>
+<text x="473.5" y="154.0" font-size="11" fill="#ffffff" stroke="#ffffff" stroke-width="3" paint-order="stroke" text-anchor="middle">rejects</text>
+<text x="473.5" y="154.0" font-size="11" fill="#555" text-anchor="middle">rejects</text>
+<text x="440" y="20" font-size="11" fill="#888" text-anchor="middle" font-weight="700">the namespace-level complement to a pod&#x27;s own requests and limits</text>
+</svg>

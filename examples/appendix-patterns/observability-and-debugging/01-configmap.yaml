@@ -1,0 +1,9 @@
+# shipping-service reads its Postgres schema name from this key (Env Var
+# Configuration pattern — a non-secret, environment-shaped value).
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: shipping-config
+  namespace: patterns
+data:
+  schema: shipping

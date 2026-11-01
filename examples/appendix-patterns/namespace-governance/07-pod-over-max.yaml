@@ -1,0 +1,23 @@
+# Deliberately violates 03-limitrange.yaml's max (cpu 500m / memory 512Mi):
+# applying this after the LimitRange exists fails admission outright, with no
+# pod created at all — a LimitRange rejects out-of-band values the same way
+# it supplies defaults for missing ones.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: inventory-over-max
+  namespace: patterns
+  labels:
+    app.kubernetes.io/name: inventory-service-placeholder
+spec:
+  containers:
+    - name: placeholder
+      image: registry.access.redhat.com/ubi10/ubi-minimal:latest
+      command: ["sleep", "infinity"]
+      resources:
+        requests:
+          cpu: 600m
+          memory: 768Mi
+        limits:
+          cpu: 600m
+          memory: 768Mi

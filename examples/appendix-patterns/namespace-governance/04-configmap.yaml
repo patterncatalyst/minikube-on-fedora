@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: shipping-config
+  namespace: patterns
+data:
+  schema: shipping

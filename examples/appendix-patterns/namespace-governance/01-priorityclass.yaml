@@ -1,0 +1,11 @@
+# Recap of the PriorityClass half of Predictable Demands: pod-level priority
+# is independent of the namespace-level quota and limit range this chapter
+# adds, but the three are meant to be read together — a cluster operator sets
+# the quota and limit range, and a workload author sets priority and its own
+# requests/limits within them.
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: patterns-high-priority
+value: 1000000
+globalDefault: false
