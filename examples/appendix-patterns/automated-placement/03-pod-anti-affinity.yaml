@@ -1,0 +1,37 @@
+# Two shipping-service replicas that refuse to share a node: a required
+# podAntiAffinity rule keyed on the Pod's own label, with topologyKey set to
+# the per-node hostname. This is the availability pattern behind spreading any
+# stateless service's replicas: a single node failure can take out at most one
+# replica.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shipping-ha
+  namespace: patterns
+  labels:
+    app.kubernetes.io/name: shipping-ha-placeholder
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: shipping-ha-placeholder
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: shipping-ha-placeholder
+    spec:
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchLabels:
+                  app.kubernetes.io/name: shipping-ha-placeholder
+              topologyKey: kubernetes.io/hostname
+      containers:
+        - name: placeholder
+          image: registry.access.redhat.com/ubi10/ubi-minimal:latest
+          command: ["sleep", "infinity"]
+          resources:
+            requests:
+              cpu: 50m
+              memory: 32Mi

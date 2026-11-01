@@ -1,0 +1,46 @@
+# Two otherwise-identical Pods pinned to the tainted node by nodeSelector.
+# fulfillment-no-toleration has no toleration for the dedicated=fulfillment
+# taint and stays Pending once that taint is applied. fulfillment-with-
+# toleration tolerates it and schedules normally.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fulfillment-no-toleration
+  namespace: patterns
+  labels:
+    app.kubernetes.io/name: fulfillment-placeholder
+spec:
+  nodeSelector:
+    zone: warehouse-a
+  containers:
+    - name: placeholder
+      image: registry.access.redhat.com/ubi10/ubi-minimal:latest
+      command: ["sleep", "infinity"]
+      resources:
+        requests:
+          cpu: 50m
+          memory: 32Mi
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: fulfillment-with-toleration
+  namespace: patterns
+  labels:
+    app.kubernetes.io/name: fulfillment-placeholder
+spec:
+  nodeSelector:
+    zone: warehouse-a
+  tolerations:
+    - key: dedicated
+      operator: Equal
+      value: fulfillment
+      effect: NoSchedule
+  containers:
+    - name: placeholder
+      image: registry.access.redhat.com/ubi10/ubi-minimal:latest
+      command: ["sleep", "infinity"]
+      resources:
+        requests:
+          cpu: 50m
+          memory: 32Mi

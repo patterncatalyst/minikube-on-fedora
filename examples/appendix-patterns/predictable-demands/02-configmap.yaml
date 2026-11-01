@@ -1,0 +1,10 @@
+# A hard requirement: shipping-service reads its Postgres schema name from
+# this key. Deploy 04-deployment.yaml before this ConfigMap exists and the
+# Pod sits in CreateContainerConfigError until it's applied.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: shipping-config
+  namespace: patterns
+data:
+  schema: shipping

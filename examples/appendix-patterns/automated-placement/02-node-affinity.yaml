@@ -1,0 +1,34 @@
+# A stand-in Pod for order-service. The required rule only schedules onto a
+# node labeled tier=fulfillment; the preferred rule additionally steers away
+# from the mof-patterns control-plane node when another candidate exists.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: order-fulfillment
+  namespace: patterns
+  labels:
+    app.kubernetes.io/name: order-service-placeholder
+spec:
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: tier
+                operator: In
+                values: ["fulfillment"]
+      preferredDuringSchedulingIgnoredDuringExecution:
+        - weight: 10
+          preference:
+            matchFields:
+              - key: metadata.name
+                operator: NotIn
+                values: ["mof-patterns"]
+  containers:
+    - name: placeholder
+      image: registry.access.redhat.com/ubi10/ubi-minimal:latest
+      command: ["sleep", "infinity"]
+      resources:
+        requests:
+          cpu: 50m
+          memory: 32Mi

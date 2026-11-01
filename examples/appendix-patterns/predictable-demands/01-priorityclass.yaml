@@ -1,0 +1,13 @@
+# A cluster-scoped PriorityClass. shipping-service gets this class below, so
+# the scheduler and the kubelet's node-pressure eviction favor it over
+# default-priority pods when the mof-patterns profile is short on memory.
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: patterns-high-priority
+value: 1000000
+globalDefault: false
+description: >-
+  High priority for the Predictable Demands example: fulfillment traffic
+  (shipping-service) outranks default-priority pods for scheduling and for
+  eviction order under memory pressure.
