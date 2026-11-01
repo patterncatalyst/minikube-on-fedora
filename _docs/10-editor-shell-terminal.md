@@ -25,9 +25,8 @@ invocations feel like 100.
 
 **None of what's below is required for the examples in this
 tutorial to work.** The examples have been written to copy-paste
-directly. But by §6 you've probably noticed that typing `kubectl
-get deployment nginx -n default -o yaml` for the fifteenth time
-gets old; by §11 (Istio) it gets very old.
+directly. But by §6 you've probably noticed that typing `kubectl get deployment nginx -n default -o yaml` for the fifteenth time
+gets old, and only more so by §11 (Istio).
 
 The goal here: enough productivity wins that the rest of your k8s
 work feels natural rather than tedious.
@@ -98,7 +97,7 @@ interactive shell.
 For *interactive* k8s work, **zsh** has a few advantages worth
 the switch:
 
-- Tab completion is more powerful and more configurable than
+- Tab completion is more configurable than
   bash's: completing pod names, label keys, resource fields
 - `kubectl`, `helm`, and `minikube` ship with first-class zsh
   completion
@@ -126,8 +125,7 @@ and use `complete -F` instead of `compdef` for the aliases.
 ## Tab completion: the single biggest win
 
 If you do nothing else in this section, do this. Tab completion
-turns `kubectl get pod nginx-pv-864c5dfd8b-zvpwn` into `kubectl
-get pod nginx-pv<TAB>` and lets the shell fill in the rest.
+turns `kubectl get pod nginx-pv-864c5dfd8b-zvpwn` into `kubectl get pod nginx-pv` followed by <kbd>Tab</kbd>, and lets the shell fill in the rest.
 
 Add to `~/.zshrc`:
 
@@ -146,20 +144,13 @@ source <(helm completion bash)
 source <(minikube completion bash)
 ```
 
-Reload (`source ~/.zshrc`) and try:
-
-```
-kubectl get po<TAB>
-```
-
+Reload (`source ~/.zshrc`), type `kubectl get po`, and press <kbd>Tab</kbd>.
 You'll see `pod  podsecuritypolicies  poddisruptionbudgets …`.
-Completion also covers resource names: `kubectl describe pod
-<TAB>` lists the actual Pods in your current namespace.
+Completion also covers resource names: type `kubectl describe pod` and press <kbd>Tab</kbd> to list the actual Pods in your current namespace.
 
 ## Aliases: the k= shortcut family
 
-The de facto convention among k8s practitioners is `alias
-k=kubectl`. Three keystrokes per command saved; small-sounding
+The de facto convention among k8s practitioners is `alias k=kubectl`. Three keystrokes per command saved; small-sounding
 until you've run kubectl a few hundred times.
 
 If you're not normally an alias user (some good reasons not to:
@@ -193,13 +184,8 @@ compdef __start_kubectl k
 compdef __start_helm h
 ```
 
-After `source ~/.zshrc`:
-
-```
-k g<TAB>
-```
-
-… completes to `get`, just like `kubectl`. Tab completion follows
+After `source ~/.zshrc`, type `k g` and press <kbd>Tab</kbd>.
+It completes to `get`, just like `kubectl`. Tab completion follows
 the alias because of the `compdef` lines.
 
 Two variants worth knowing:
@@ -208,8 +194,7 @@ Two variants worth knowing:
   changes. `kgp -w` is the fastest way to see a Deployment roll
   out
 - **oh-my-zsh's `kubectl` plugin**: a turn-key alias set far
-  larger than the above. Enable in `~/.zshrc` via `plugins=(...
-  kubectl ...)`. The trade-off: more aliases to remember vs.
+  larger than the above. Enable in `~/.zshrc` via `plugins=(... kubectl ...)`. The trade-off: more aliases to remember vs.
   copying the curated short list
 
 ## kubectl built-ins worth knowing
@@ -223,8 +208,7 @@ keep:
   tweaks; less safe than `apply` from a versioned file but
   faster for exploration
 - **`kubectl explain <resource>.<field>`**: schema lookup. Forgot
-  what `spec.template.spec.affinity` accepts? `kubectl explain
-  deployment.spec.template.spec.affinity` lists the subfields
+  what `spec.template.spec.affinity` accepts? `kubectl explain deployment.spec.template.spec.affinity` lists the subfields
   with descriptions. Faster than the official docs when you
   already know the resource name
 

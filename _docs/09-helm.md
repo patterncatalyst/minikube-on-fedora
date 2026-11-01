@@ -33,7 +33,7 @@ cluster, and tracks the deployment as a **release**. Later you can
 changed, `helm rollback` to revert, or `helm uninstall` to remove
 everything cleanly.
 
-This section walks through building a small chart that deploys
+Here you build a small chart that deploys
 `nginx-custom:v1` (the same image from §6/§7/§8) with content
 parameterized via `values.yaml`.
 
@@ -236,8 +236,7 @@ Service lands on the slot the `minikube` profile publishes to
 optional: `--set service.nodePort=null` lets Kubernetes pick one, and
 `--set service.type=ClusterIP` with `nodePort=null` gives an internal
 Service. Only one Service can hold 30080 at a time, so **delete §8's
-Service first** (`kubectl delete -f
-examples/08-persistent-volume/manifests/`); the demo's preflight stops
+Service first** (`kubectl delete -f examples/08-persistent-volume/manifests/`); the demo's preflight stops
 with a "delete X first" message if something holds the port.
 
 ### _helpers.tpl
@@ -319,7 +318,7 @@ helm --kube-context minikube template nginx-helm ./chart --set content.title="Pr
 ```
 
 This is invaluable for catching template errors or visualizing
-what your overrides actually produce. It doesn't talk to the
+what your overrides produce. It doesn't talk to the
 cluster.
 
 ### Lint: `helm lint`

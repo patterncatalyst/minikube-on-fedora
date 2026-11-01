@@ -51,8 +51,7 @@ images and create resources.
 This tutorial is written and tested against **Fedora 44**, on a
 host or in a Fedora VM. **RHEL 9+**, on a host or in a RHEL VM, uses
 the same commands; the one difference is the Docker repo URL below.
-Package names occasionally differ, so verify with `dnf info
-<package>` before installing.
+Package names occasionally differ, so verify with `dnf info <package>` before installing.
 
 Confirm your release:
 
@@ -146,7 +145,7 @@ docker info --format '{{.SecurityOptions}}'
   labels on containers. This tutorial's manifests need no host
   labelling either way
 
-### What this tutorial does NOT require
+### What this tutorial does not require
 
 - **No KVM or qemu.** The docker driver runs
   Kubernetes nodes as containers on your host, not as VMs. No

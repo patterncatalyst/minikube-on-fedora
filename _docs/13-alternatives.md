@@ -64,8 +64,7 @@ this manifest against three different K8s versions in
 parallel" workflows. Designed originally for testing
 Kubernetes itself, which shows in the polish.
 
-**Where it's weaker:** loading images is awkward: `kind load
-docker-image myapp:v1` is required to get a locally-built
+**Where it's weaker:** loading images is awkward: `kind load docker-image myapp:v1` is required to get a locally-built
 image into the cluster, since kind's nodes run their own
 containerd that isn't your host's. Persistent state across
 restarts works but isn't the design center. The default
@@ -190,7 +189,7 @@ minikube can also run on rootless Podman, and an earlier revision of
 this tutorial did. It was dropped because the node's network and
 storage depended on workarounds that Docker Engine does not need:
 unroutable node IPs forced tunnels and port-forwards, runtime pairing
-rules were easy to break, and image loading was unreliable. The
+rules were fragile, and image loading was unreliable. The
 full record, one symptom at a time, is in
 [Lessons learned, Part 4](https://github.com/patterncatalyst/minikube-on-fedora/blob/main/onboarding/LESSONS-LEARNED.md).
 The FAQ entry "Why did this tutorial move off rootless podman?"

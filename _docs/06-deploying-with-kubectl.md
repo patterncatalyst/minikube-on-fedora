@@ -18,7 +18,7 @@ By the end of this chapter you can:
 
 ## Why this matters
 
-This is the first section that actually deploys a workload. §1-§5
+This is the first section that deploys a workload. §1-§5
 got you a cluster you can talk to; §6 puts something useful inside
 it. The example stays small: one UBI nginx Deployment
 and a Service, so the moving parts each get attention rather than
@@ -256,8 +256,7 @@ docker build -f Containerfile -t nginx-custom:v1 .
 minikube -p minikube image load nginx-custom:v1
 ```
 
-No registry push, no `docker save` plumbing. `minikube -p minikube
-image build -t nginx-custom:v1 -f Containerfile .` builds inside the
+No registry push, no `docker save` plumbing. `minikube -p minikube image build -t nginx-custom:v1 -f Containerfile .` builds inside the
 node instead and skips the load step; the demo uses the host build
 because it reuses Docker's layer cache.
 

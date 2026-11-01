@@ -33,7 +33,7 @@ scalers](https://keda.sh/docs/scalers/). And critically, KEDA can
 scale a workload **all the way to zero replicas** during quiet
 periods, then back up the moment events start flowing.
 
-This is the optional section in the PRD; the §3-§11 core works
+This section is optional; the core workflow works
 without it. But for anyone building consumer-style workloads
 (Kafka pipelines, queue processors, scheduled batch jobs) or
 HTTP services with bursty/intermittent traffic patterns, KEDA
@@ -639,11 +639,10 @@ header carries the routing key, so requests look like
    (nodePort 30080 → `127.0.0.1:18080`)
 7. Fire one request with `Host: nginx.local` to wake the
    workload; interceptor should buffer until the pod is ready
-8. Run `hey -n 500 -c 50 -host nginx.local
-   http://127.0.0.1:18080/` (note: `-host`, not `-H`, since hey
+8. Run `hey -n 500 -c 50 -host nginx.local http://127.0.0.1:18080/` (note: `-host`, not `-H`, since hey
    is written in Go and Go's `net/http` silently strips
    `Host:` headers set via the headers map; see the §12
-   HTTP example's README for the gotcha details)
+   HTTP example's README for details)
 9. Watch replica count climb during the load
 10. Wait for `scaledownPeriod + 30s` of idle
 11. Assert replicas = 0 (final state)

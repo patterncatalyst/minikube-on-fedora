@@ -61,7 +61,7 @@ Source: [`{{ ex.example_dir }}/`](https://github.com/patterncatalyst/minikube-on
 
 {% endfor %}
 
-## What's NOT an example
+## What's not an example
 
 Some tutorial sections introduce concepts or commands without
 ever bundling a runnable example:

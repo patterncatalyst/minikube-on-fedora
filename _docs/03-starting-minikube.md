@@ -35,8 +35,7 @@ supporting tools are on `PATH`).
 
 ## Start the cluster
 
-Pass everything on the command line. Do **not** use `minikube
-config set` for the driver or runtime: it writes
+Pass everything on the command line. Do **not** use `minikube config set` for the driver or runtime: it writes
 `~/.minikube/config/config.json`, which every minikube project on
 the machine shares, so one project's choice silently changes
 another's.
@@ -218,7 +217,7 @@ cluster: what the kubelet uses to run Pods. This tutorial uses
 `--container-runtime=containerd`. Pass it explicitly on every
 `minikube start` that creates a profile; the examples do.
 
-Three independent choices, easy to conflate:
+Three independent choices, often conflated:
 
 | Layer                        | Used here                              |
 |------------------------------|-----------------------------------------------|
