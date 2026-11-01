@@ -1,0 +1,133 @@
+# shipping-service, unmodified, plus a native sidecar that polls its two
+# health endpoints over localhost (the Pod's shared network namespace) every
+# five seconds and appends the result to a shared emptyDir volume. The
+# sidecar is declared as an initContainers entry with restartPolicy: Always —
+# the native-sidecar mechanism — rather than as a second ordinary container,
+# so it starts before shipping-service, stays running for the Pod's whole
+# life, and is the last thing the kubelet stops when the Pod terminates.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shipping-service
+  namespace: patterns
+  labels:
+    app.kubernetes.io/name: shipping-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: shipping-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: shipping-service
+    spec:
+      initContainers:
+        - name: probe-tailer
+          # Native sidecar (CKAD-current Kubernetes): an init container with
+          # restartPolicy: Always starts before the main container, runs
+          # alongside it for the Pod's whole lifetime, and only stops after
+          # the main container has already stopped. [verify] the exact
+          # Kubernetes minor version this graduated to stable in upstream.
+          restartPolicy: Always
+          image: registry.access.redhat.com/ubi10/python-314-minimal:10.2-1791464217
+          command: ["python3", "-c"]
+          args:
+            - |
+              import datetime
+              import time
+              import urllib.request
+
+              LOG_PATH = "/var/log/shipping-service/probe-tail.log"
+
+              def probe(path):
+                  try:
+                      with urllib.request.urlopen(f"http://127.0.0.1:8080{path}", timeout=2) as resp:
+                          return resp.status
+                  except Exception as exc:
+                      return f"error:{exc.__class__.__name__}"
+
+              while True:
+                  ts = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                  health = probe("/health")
+                  ready = probe("/healthz")
+                  with open(LOG_PATH, "a") as f:
+                      f.write(f"{ts} health={health} ready={ready}\n")
+                  time.sleep(5)
+          volumeMounts:
+            - name: probe-log
+              mountPath: /var/log/shipping-service
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              memory: 64Mi
+      containers:
+        - name: shipping-service
+          image: shipping-service:v1
+          imagePullPolicy: Never
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: SERVICE_SCHEMA
+              value: shipping
+            - name: PG_HOST
+              value: patterns-postgres.patterns.svc.cluster.local
+            - name: PG_PORT
+              value: "5432"
+            - name: PG_USER
+              valueFrom:
+                secretKeyRef:
+                  name: patterns-postgres-app
+                  key: username
+            - name: PG_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: patterns-postgres-app
+                  key: password
+            - name: PG_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: patterns-postgres-app
+                  key: dbname
+          resources:
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              memory: 512Mi
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            failureThreshold: 30
+            periodSeconds: 2
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: probe-log
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: shipping-service
+  namespace: patterns
+spec:
+  selector:
+    app.kubernetes.io/name: shipping-service
+  ports:
+    - port: 80
+      targetPort: 8080

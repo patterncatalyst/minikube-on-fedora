@@ -1,0 +1,142 @@
+# shipping-service, unmodified, plus an adapter sidecar that polls its own
+# /healthz endpoint over localhost and re-serves the result as Prometheus
+# exposition text on a separate port. shipping-service's own output
+# (a JSON body, {"status": "ready", ...}) is a perfectly fine health signal
+# for a human or another FastAPI service, but it isn't something a
+# Prometheus-compatible scraper can ingest; the adapter's only job is that
+# translation, not inventing new data the app doesn't already produce.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shipping-service
+  namespace: patterns
+  labels:
+    app.kubernetes.io/name: shipping-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: shipping-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: shipping-service
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9100"
+        prometheus.io/path: "/metrics"
+    spec:
+      containers:
+        - name: shipping-service
+          image: shipping-service:v1
+          imagePullPolicy: Never
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: SERVICE_SCHEMA
+              value: shipping
+            - name: PG_HOST
+              value: patterns-postgres.patterns.svc.cluster.local
+            - name: PG_PORT
+              value: "5432"
+            - name: PG_USER
+              valueFrom:
+                secretKeyRef:
+                  name: patterns-postgres-app
+                  key: username
+            - name: PG_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: patterns-postgres-app
+                  key: password
+            - name: PG_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: patterns-postgres-app
+                  key: dbname
+          resources:
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              memory: 512Mi
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            failureThreshold: 30
+            periodSeconds: 2
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+        - name: metrics-adapter
+          image: registry.access.redhat.com/ubi10/python-314-minimal:10.2-1791464217
+          command: ["python3", "-c"]
+          args:
+            - |
+              import http.server
+              import urllib.request
+
+              APP_URL = "http://127.0.0.1:8080/healthz"
+
+              class Handler(http.server.BaseHTTPRequestHandler):
+                  def do_GET(self):
+                      if self.path != "/metrics":
+                          self.send_response(404)
+                          self.end_headers()
+                          return
+                      try:
+                          with urllib.request.urlopen(APP_URL, timeout=2) as resp:
+                              up = 1 if resp.status == 200 else 0
+                      except Exception:
+                          up = 0
+                      body = (
+                          "# HELP shipping_service_up Whether shipping-service's /healthz reported ready.\n"
+                          "# TYPE shipping_service_up gauge\n"
+                          f"shipping_service_up {up}\n"
+                      ).encode()
+                      self.send_response(200)
+                      self.send_header("Content-Type", "text/plain; version=0.0.4")
+                      self.send_header("Content-Length", str(len(body)))
+                      self.end_headers()
+                      self.wfile.write(body)
+
+                  def log_message(self, fmt, *args):
+                      pass
+
+              http.server.HTTPServer(("0.0.0.0", 9100), Handler).serve_forever()
+          ports:
+            - name: metrics
+              containerPort: 9100
+          resources:
+            requests:
+              cpu: 20m
+              memory: 32Mi
+            limits:
+              memory: 64Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: shipping-service
+  namespace: patterns
+spec:
+  selector:
+    app.kubernetes.io/name: shipping-service
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080
+    - name: metrics
+      port: 9100
+      targetPort: 9100
