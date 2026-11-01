@@ -1,0 +1,78 @@
+# A minimal, disposable Postgres for the appendix examples. This is NOT the
+# CloudNativePG-managed cluster the §17 capstone runs — no operator, no
+# persistent storage, no replication. It exists only so the init container's
+# migration has something real to run against. Losing its data on a restart
+# is fine for this example.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: patterns-postgres-app
+  namespace: patterns
+type: Opaque
+stringData:
+  username: capstone_app
+  password: changeme
+  dbname: capstone
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: patterns-postgres
+  namespace: patterns
+  labels:
+    app.kubernetes.io/name: patterns-postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: patterns-postgres
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: patterns-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: docker.io/library/postgres:17-alpine
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: patterns-postgres-app
+                  key: username
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: patterns-postgres-app
+                  key: password
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: patterns-postgres-app
+                  key: dbname
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "capstone_app"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: patterns-postgres
+  namespace: patterns
+spec:
+  selector:
+    app.kubernetes.io/name: patterns-postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
