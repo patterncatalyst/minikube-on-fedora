@@ -1,0 +1,15 @@
+# payment-service has no legitimate caller in the current capstone codebase,
+# so unlike inventory-service, this chapter never writes a corresponding
+# allow rule for it. Deny-all-ingress is the entire policy story here: total
+# isolation until a real consumer is wired up and earns an explicit rule.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-all-payment
+  namespace: patterns
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: payment-service
+  policyTypes:
+    - Ingress

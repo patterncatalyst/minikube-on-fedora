@@ -1,0 +1,104 @@
+# review-service, with the Process Containment pattern applied: a non-root
+# UID matching the image's own USER 1001:0, every Linux capability dropped,
+# no privilege escalation, a read-only root filesystem, and an emptyDir at
+# /tmp for the one path that still needs to be writable.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: review-service
+  namespace: patterns
+  labels:
+    app.kubernetes.io/name: review-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: review-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: review-service
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 0
+        fsGroup: 0
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: review-service
+          image: review-service:v1
+          imagePullPolicy: Never
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: SERVICE_SCHEMA
+              value: reviews
+            - name: PG_HOST
+              value: patterns-postgres.patterns.svc.cluster.local
+            - name: PG_PORT
+              value: "5432"
+            - name: PG_USER
+              valueFrom:
+                secretKeyRef:
+                  name: patterns-postgres-app
+                  key: username
+            - name: PG_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: patterns-postgres-app
+                  key: password
+            - name: PG_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: patterns-postgres-app
+                  key: dbname
+          resources:
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              memory: 512Mi
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            failureThreshold: 30
+            periodSeconds: 2
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: review-service
+  namespace: patterns
+spec:
+  selector:
+    app.kubernetes.io/name: review-service
+  ports:
+    - port: 80
+      targetPort: 8080

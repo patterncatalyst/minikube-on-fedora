@@ -1,0 +1,32 @@
+# A Pod that satisfies both the baseline standard this namespace enforces
+# and the restricted standard it only warns about, admitted cleanly with no
+# warning at all. Uses the same ubi-minimal "placeholder" image the
+# Automated Placement chapter's examples use, since this Pod's role is only
+# to exist, not to run a real service.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pss-compliant
+  namespace: patterns-pss-demo
+  labels:
+    app.kubernetes.io/name: pss-compliant
+spec:
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 1001
+    runAsGroup: 0
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: placeholder
+      image: registry.access.redhat.com/ubi10/ubi-minimal:latest
+      command: ["sleep", "infinity"]
+      securityContext:
+        allowPrivilegeEscalation: false
+        capabilities:
+          drop: ["ALL"]
+        readOnlyRootFilesystem: true
+      resources:
+        requests:
+          cpu: 50m
+          memory: 32Mi

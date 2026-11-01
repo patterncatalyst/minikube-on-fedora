@@ -1,0 +1,23 @@
+# This Pod is never meant to be admitted. It sets privileged: true, which
+# violates the baseline standard patterns-pss-demo enforces: applying it is
+# rejected outright by the API server's admission controller before the Pod
+# object is ever created. Keep it out of any apply script that assumes every
+# manifest in a directory should succeed.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: privileged-demo
+  namespace: patterns-pss-demo
+  labels:
+    app.kubernetes.io/name: privileged-demo
+spec:
+  containers:
+    - name: demo
+      image: registry.access.redhat.com/ubi10/ubi-minimal:latest
+      command: ["sleep", "infinity"]
+      securityContext:
+        privileged: true
+      resources:
+        requests:
+          cpu: 50m
+          memory: 32Mi

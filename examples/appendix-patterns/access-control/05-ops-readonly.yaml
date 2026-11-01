@@ -1,0 +1,25 @@
+# A second ServiceAccount, bound to Kubernetes' built-in "view" ClusterRole
+# through a namespaced RoleBinding rather than a ClusterRoleBinding. roleRef
+# can name a ClusterRole from a RoleBinding, and when it does, the grant is
+# confined to the RoleBinding's own namespace: ops-readonly gets view's full
+# read-only rule set inside patterns only, not cluster-wide the way a
+# ClusterRoleBinding to the same ClusterRole would.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: ops-readonly
+  namespace: patterns
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: ops-readonly-binding
+  namespace: patterns
+subjects:
+  - kind: ServiceAccount
+    name: ops-readonly
+    namespace: patterns
+roleRef:
+  kind: ClusterRole
+  name: view
+  apiGroup: rbac.authorization.k8s.io

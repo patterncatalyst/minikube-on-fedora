@@ -1,0 +1,41 @@
+# inventory-service's only two legitimate egress destinations: DNS (to
+# resolve patterns-postgres's and its own cluster-internal names) and the
+# Postgres Pod itself. Once this policy's policyTypes includes Egress, every
+# other outbound path is denied by default, including any reach toward the
+# public internet a compromised dependency might otherwise attempt.
+#
+# kube-dns's namespace is matched by the automatic kubernetes.io/metadata.name
+# label every namespace carries since Kubernetes 1.21, rather than an empty
+# namespaceSelector ({}), which would also match any same-labeled Pod sitting
+# in the patterns namespace itself.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: inventory-egress-restricted
+  namespace: patterns
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: inventory-service
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+          podSelector:
+            matchLabels:
+              k8s-app: kube-dns
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    - to:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: patterns-postgres
+      ports:
+        - protocol: TCP
+          port: 5432

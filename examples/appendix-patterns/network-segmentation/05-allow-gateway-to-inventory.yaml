@@ -1,0 +1,23 @@
+# The one exception to inventory-service's default-deny: graphql-gateway's
+# Pods, and only on the gRPC port (50051), not inventory-service's REST port.
+# Combined additively with deny-all-inventory.yaml: deny-by-default plus one
+# explicit, narrowly scoped allow.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-gateway-to-inventory
+  namespace: patterns
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: inventory-service
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: graphql-gateway
+      ports:
+        - protocol: TCP
+          port: 50051

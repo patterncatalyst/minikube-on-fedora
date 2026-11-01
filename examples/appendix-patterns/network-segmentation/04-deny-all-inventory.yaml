@@ -1,0 +1,15 @@
+# Default-deny ingress, scoped to inventory-service's own Pods only. An empty
+# podSelector ({}) would flip every Pod in the patterns namespace to deny-all
+# at once, including Postgres and every other chapter's leftover examples;
+# this policy's podSelector names exactly the one workload it's for.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: deny-all-inventory
+  namespace: patterns
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: inventory-service
+  policyTypes:
+    - Ingress
