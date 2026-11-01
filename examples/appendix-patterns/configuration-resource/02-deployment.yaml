@@ -78,14 +78,21 @@ spec:
             items:
               - key: payment-service.conf
                 path: payment-service.conf
-            defaultMode: 0400
+            # 0440 (owner+group read), not 0400: projected volume files are
+            # always owned by root:root, and this container runs as a
+            # non-root UID (the UBI image default) whose group is 0/root.
+            # 0400 would make the file unreadable by the app itself
+            # (Permission denied) since the app's UID never matches root;
+            # 0440 still blocks world and every other group while matching
+            # the container's own gid.
+            defaultMode: 0440
         - name: payment-pg-password-file
           secret:
             secretName: payment-pg-credentials
             items:
               - key: pg_password
                 path: pg_password
-            defaultMode: 0400
+            defaultMode: 0440
 ---
 apiVersion: v1
 kind: Service
