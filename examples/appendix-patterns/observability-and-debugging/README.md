@@ -32,7 +32,7 @@ kubectl --context mof-patterns logs -n patterns "$POD" -c heartbeat -f --since=2
 Force a restart, then read the terminated container's last run with `-p`:
 
 ```bash
-kubectl --context mof-patterns exec -n patterns "$POD" -c shipping-service -- kill 1
+kubectl --context mof-patterns exec -n patterns "$POD" -c shipping-service -- sh -c 'kill 1'
 sleep 3
 kubectl --context mof-patterns get pod -n patterns "$POD"       # RESTARTS now 1
 kubectl --context mof-patterns logs -n patterns "$POD" -c shipping-service --previous
