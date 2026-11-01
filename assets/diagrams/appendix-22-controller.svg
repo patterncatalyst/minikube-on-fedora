@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 860 400" font-family="'Red Hat Text', system-ui, sans-serif" role="img">
+<defs><marker id="a" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#555"/></marker><marker id="am" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b8650a"/></marker></defs>
+<rect x="30" y="200" width="800" height="150" rx="12" fill="#fafafa" stroke="#ddd"/>
+<text x="42" y="220" font-size="12" font-weight="700" fill="#888">Two reconcile loops in this chapter&#x27;s example</text>
+<rect x="40" y="40" width="190" height="90" rx="9" fill="#eef4fb" stroke="#2f6db5" stroke-width="2"/>
+<text x="135.0" y="83.0" font-size="13.5" font-weight="700" fill="#111111" text-anchor="middle">Watch</text>
+<text x="135.0" y="100.0" font-size="11.5" fill="#555555" text-anchor="middle">API server event stream</text>
+<rect x="330" y="30" width="220" height="110" rx="9" fill="#fff8ef" stroke="#e8870c" stroke-width="2"/>
+<text x="440.0" y="68.0" font-size="13.5" font-weight="700" fill="#111111" text-anchor="middle">Reconcile()</text>
+<text x="440.0" y="85.0" font-size="11.5" fill="#555555" text-anchor="middle">observe current state</text>
+<text x="440.0" y="100.0" font-size="11.5" fill="#555555" text-anchor="middle">diff vs desired</text>
+<text x="440.0" y="115.0" font-size="11.5" fill="#555555" text-anchor="middle">act: create, update, delete</text>
+<rect x="640" y="40" width="190" height="90" rx="9" fill="#ffffff" stroke="#111111" stroke-width="2"/>
+<text x="735.0" y="83.0" font-size="13.5" font-weight="700" fill="#111111" text-anchor="middle">Owned objects</text>
+<text x="735.0" y="100.0" font-size="11.5" fill="#555555" text-anchor="middle">created, updated, or deleted</text>
+<rect x="70" y="235" width="330" height="95" rx="9" fill="#ffffff" stroke="#999999" stroke-width="1.5"/>
+<text x="235.0" y="273.0" font-size="13.5" font-weight="700" fill="#111111" text-anchor="middle">Built-in: ReplicaSet controller</text>
+<text x="235.0" y="290.0" font-size="11.5" fill="#555555" text-anchor="middle">watches: Pods</text>
+<text x="235.0" y="305.0" font-size="11.5" fill="#555555" text-anchor="middle">acts: create/delete to match spec.replicas</text>
+<rect x="460" y="235" width="330" height="95" rx="9" fill="#ffffff" stroke="#999999" stroke-width="1.5"/>
+<text x="625.0" y="273.0" font-size="13.5" font-weight="700" fill="#111111" text-anchor="middle">Custom: ShippingPolicy controller</text>
+<text x="625.0" y="290.0" font-size="11.5" fill="#555555" text-anchor="middle">watches: Deployment + ConfigMap</text>
+<text x="625.0" y="305.0" font-size="11.5" fill="#555555" text-anchor="middle">acts: create/update to match spec</text>
+<path d="M230,85 L330,85" fill="none" stroke="#555" stroke-width="2" marker-end="url(#a)"/>
+<text x="286.0" y="79.0" font-size="11" fill="#ffffff" stroke="#ffffff" stroke-width="3" paint-order="stroke" text-anchor="middle">watch event fires</text>
+<text x="286.0" y="79.0" font-size="11" fill="#555" text-anchor="middle">watch event fires</text>
+<path d="M550,85 L640,85" fill="none" stroke="#b8650a" stroke-width="2" marker-end="url(#am)"/>
+<text x="601.0" y="79.0" font-size="11" fill="#ffffff" stroke="#ffffff" stroke-width="3" paint-order="stroke" text-anchor="middle">act</text>
+<text x="601.0" y="79.0" font-size="11" fill="#b8650a" text-anchor="middle">act</text>
+<path d="M440,140 L440,200" fill="none" stroke="#555" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#a)"/>
+<text x="446.0" y="164.0" font-size="11" fill="#ffffff" stroke="#ffffff" stroke-width="3" paint-order="stroke" text-anchor="middle">same shape, instantiated twice</text>
+<text x="446.0" y="164.0" font-size="11" fill="#555" text-anchor="middle">same shape, instantiated twice</text>
+<text x="430" y="15" font-size="11" fill="#888" text-anchor="middle" font-weight="700">Level-triggered: diff against current desired state, never the event that fired</text>
+</svg>

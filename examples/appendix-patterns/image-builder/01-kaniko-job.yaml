@@ -1,0 +1,43 @@
+# Kaniko builds shipping-service's own Containerfile entirely inside a Pod:
+# no Docker daemon, no privileged container, no host-side build step at all.
+# The build context is this very repository's main branch (git context with
+# a sub-path), so the Job needs nothing mounted from the host — unlike
+# build-service.sh, which builds on the host with Docker Engine first and
+# loads the result in afterward.
+#
+# --destination pushes to the minikube registry addon's in-cluster Service
+# name. A Pod (this one) reaches the registry through normal cluster
+# networking, so it uses the Service's cluster-DNS name, not localhost; the
+# Deployment in 02-deployment.yaml that later *pulls* this same image uses
+# localhost:5000 instead, because that pull happens via the node's own
+# containerd, which shares the node's network namespace with the
+# registry-proxy DaemonSet the addon installs on every node. Same registry,
+# two addresses, because a Pod's network namespace and a node's are not the
+# same thing — the point this chapter's README draws out explicitly.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: shipping-service-kaniko-build
+  namespace: patterns
+spec:
+  backoffLimit: 1
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: kaniko
+          image: gcr.io/kaniko-project/executor:v1.24.0
+          args:
+            - --context=git://github.com/patterncatalyst/minikube-on-fedora.git#refs/heads/main
+            - --context-sub-path=examples/17-capstone/services/shipping-service
+            - --dockerfile=Containerfile
+            - --destination=registry.kube-system.svc.cluster.local/shipping-service:kaniko
+            - --insecure
+            - --insecure-pull
+            - --skip-tls-verify
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+            limits:
+              memory: 1Gi

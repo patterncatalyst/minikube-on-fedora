@@ -1,0 +1,70 @@
+# shipping-service running the image Kaniko built in-cluster, pulled back
+# from the minikube registry addon. localhost:5000 (not registry:5000 or the
+# Service's cluster-DNS name) because the kubelet pulls images via the
+# node's own containerd, and the registry addon's per-node registry-proxy
+# DaemonSet listens on that node's loopback at port 5000 for exactly this.
+# imagePullPolicy: Always, a deliberate contrast with every other chapter in
+# this appendix (imagePullPolicy: Never): there IS a registry behind this
+# image, so there's something for the kubelet to actually pull and verify.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shipping-service
+  namespace: patterns
+  labels:
+    app.kubernetes.io/name: shipping-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: shipping-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: shipping-service
+    spec:
+      containers:
+        - name: shipping-service
+          image: localhost:5000/shipping-service:kaniko
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: SERVICE_SCHEMA
+              value: shipping
+            - name: PG_HOST
+              value: patterns-postgres.patterns.svc.cluster.local
+            - name: PG_USER
+              valueFrom:
+                secretKeyRef:
+                  name: patterns-postgres-app
+                  key: username
+            - name: PG_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: patterns-postgres-app
+                  key: password
+            - name: PG_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: patterns-postgres-app
+                  key: dbname
+          resources:
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              memory: 512Mi
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            failureThreshold: 30
+            periodSeconds: 2
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5

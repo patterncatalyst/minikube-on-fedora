@@ -1,0 +1,30 @@
+# Reference manifest, not applied in this chapter's own run (see README.md):
+# the shape of a Kafka consumer-lag ScaledObject, identical to the one the
+# §17 capstone runs for real against notification-service
+# (examples/17-capstone/keda/notification-scaledobject.yaml). shipping-service
+# in this appendix is a REST-only skeleton with no Kafka consumer of its own,
+# so applying this against it would create a ScaledObject whose trigger can
+# never resolve a lag number — worth reading for the shape, not worth running
+# without a real consumer and a real Kafka cluster behind it (both of which
+# the capstone already has). This is the manifest you'd write the moment
+# shipping-service grew an asynchronous order-event consumer of its own.
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: shipping-service-scaler
+  namespace: patterns
+spec:
+  scaleTargetRef:
+    name: shipping-service          # the Deployment KEDA would scale
+  pollingInterval: 5                # check Kafka lag every 5s
+  cooldownPeriod: 30                # 30s with no lag → scale to 0
+  minReplicaCount: 0                # scale-to-zero
+  maxReplicaCount: 3
+  triggers:
+    - type: kafka
+      metadata:
+        bootstrapServers: patterns-kafka-kafka-bootstrap.patterns.svc.cluster.local:9092
+        consumerGroup: shipping-service
+        topic: order-placed
+        lagThreshold: "5"           # one replica per 5 messages of lag
+        offsetResetPolicy: earliest
