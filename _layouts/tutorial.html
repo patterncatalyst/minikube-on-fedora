@@ -6,11 +6,15 @@ layout: default
   Build sorted list of tutorial docs so we can derive prev/next.
   Pages in the `capstone` collection (sectionid: capstone) thread among
   themselves so the §17 data-mesh set has its own internal prev/next, separate
-  from the main docs/00..17 chain. Everything else threads through site.docs,
-  falling back to site.pages when docs/ isn't a Jekyll collection.
+  from the main docs/00..17 chain. The `appendix` collection (sectionid:
+  appendix) is the Kubernetes-patterns + CKAD set and threads among itself the
+  same way. Everything else threads through site.docs, falling back to
+  site.pages when docs/ isn't a Jekyll collection.
 {%- endcomment -%}
 {%- if page.sectionid == "capstone" -%}
   {%- assign tutorial_docs = site.capstone | sort: "order" -%}
+{%- elsif page.sectionid == "appendix" -%}
+  {%- assign tutorial_docs = site.appendix | sort: "order" -%}
 {%- else -%}
   {%- assign tutorial_docs = site.docs | sort: "order" -%}
   {%- if tutorial_docs.size == 0 -%}
