@@ -1,0 +1,12 @@
+# Shared output volume for every run the CronJob kicks off.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: shipping-reports-data
+  namespace: patterns
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Mi

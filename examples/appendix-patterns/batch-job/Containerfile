@@ -1,0 +1,38 @@
+# shipping-report Containerfile — UBI 10 multi-stage build, Python 3.14, uv.
+#
+# Net-new runner (not a capstone service): a tiny CLI, no HTTP server, no
+# OpenTelemetry — scope matches what the BatchJob/PeriodicJob patterns
+# actually need. Built with uv per house standard; the BUILDER stage runs
+# as root to write /opt/venv, the RUNTIME stage drops to the UBI default
+# non-root user.
+
+# ─── Builder (runs as root; image discarded) ─────────────────────────────────
+FROM registry.access.redhat.com/ubi10/python-314-minimal:10.2-1791464217 AS builder
+
+USER 0
+WORKDIR /build
+
+RUN pip install --no-cache-dir uv==0.12.24
+
+COPY pyproject.toml ./
+COPY app ./app
+
+RUN uv venv /opt/venv \
+    && uv pip install --python /opt/venv/bin/python .
+
+# ─── Runtime (non-root) ───────────────────────────────────────────────────────
+FROM registry.access.redhat.com/ubi10/python-314-minimal:10.2-1791464217 AS runtime
+
+WORKDIR /opt/app-root/src
+
+COPY --from=builder --chown=1001:0 /opt/venv /opt/venv
+COPY --chown=1001:0 app/ ./app/
+
+ENV PATH="/opt/venv/bin:$PATH" \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1
+
+USER 1001:0
+
+ENTRYPOINT ["python", "-m", "app.cli"]
+CMD ["report"]
