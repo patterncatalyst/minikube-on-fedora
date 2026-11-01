@@ -1,0 +1,12 @@
+# A disposable namespace, separate from patterns, so enforcing a Pod Security
+# Standard here never affects any other chapter's examples still running in
+# the shared namespace. enforce hard-rejects anything violating baseline;
+# audit and warn surface (without blocking) anything short of restricted.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: patterns-pss-demo
+  labels:
+    pod-security.kubernetes.io/enforce: baseline
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted

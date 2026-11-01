@@ -1,0 +1,22 @@
+# An unrelated workload in the patterns namespace, carrying a label that
+# matches neither inventory-service's nor graphql-gateway's allow rules. Used
+# for every negative check in this chapter: it should be denied against both
+# inventory-service and payment-service once their default-deny policies are
+# in place, and it stays denied even after allow-gateway-to-inventory exists,
+# since its label was never named by that rule's podSelector.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: netseg-test-client
+  namespace: patterns
+  labels:
+    app.kubernetes.io/name: netseg-test-client
+spec:
+  containers:
+    - name: curl
+      image: docker.io/curlimages/curl:8.11.0
+      command: ["sleep", "infinity"]
+      resources:
+        requests:
+          cpu: 50m
+          memory: 32Mi

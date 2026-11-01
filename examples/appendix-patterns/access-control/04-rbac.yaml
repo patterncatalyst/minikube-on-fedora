@@ -1,0 +1,32 @@
+# Least privilege for payment-service: get only (not list or watch, which
+# resourceNames cannot restrict), scoped to exactly the ConfigMap and Secret
+# this service owns. other-team-config and other-team-secret are never named,
+# so no rule here matches a request for either.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: payment-service-reader
+  namespace: patterns
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: ["payment-config"]
+    verbs: ["get"]
+  - apiGroups: [""]
+    resources: ["secrets"]
+    resourceNames: ["patterns-postgres-app"]
+    verbs: ["get"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: payment-service-reader-binding
+  namespace: patterns
+subjects:
+  - kind: ServiceAccount
+    name: payment-service
+    namespace: patterns
+roleRef:
+  kind: Role
+  name: payment-service-reader
+  apiGroup: rbac.authorization.k8s.io

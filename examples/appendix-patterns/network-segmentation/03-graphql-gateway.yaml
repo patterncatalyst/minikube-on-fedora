@@ -1,0 +1,72 @@
+# graphql-gateway: the legitimate caller in this example. It's stateless (no
+# Postgres, no blocking startup dependency), and its own resolver code really
+# does dial inventory-service over gRPC at INVENTORY_GRPC_ADDR, which is why
+# the allow rule this chapter writes protects a call the gateway's code
+# actually makes rather than a synthetic stand-in. ORDER_REST_URL is left at
+# its default (order-service isn't deployed in this lighter mof-patterns
+# profile — it requires the full Kafka/Apicurio spine from the capstone,
+# which this example doesn't stand up); the gateway's own /health and
+# /healthz don't depend on either downstream call succeeding.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: graphql-gateway
+  namespace: patterns
+  labels:
+    app.kubernetes.io/name: graphql-gateway
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: graphql-gateway
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: graphql-gateway
+    spec:
+      containers:
+        - name: graphql-gateway
+          image: graphql-gateway:v1
+          imagePullPolicy: Never
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: INVENTORY_GRPC_ADDR
+              value: "inventory-service:50051"
+          resources:
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              memory: 512Mi
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            failureThreshold: 30
+            periodSeconds: 2
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: graphql-gateway
+  namespace: patterns
+spec:
+  selector:
+    app.kubernetes.io/name: graphql-gateway
+  ports:
+    - port: 80
+      targetPort: 8080

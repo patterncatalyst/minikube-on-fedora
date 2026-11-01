@@ -1,0 +1,20 @@
+# A decoy ConfigMap and a decoy Secret, both left out of payment-service-reader's
+# resourceNames entirely. They exist purely so the chapter's kubectl auth can-i
+# checks have something concrete to deny against, proving the Role's scoping
+# is real and not just an absence of a positive grant.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: other-team-config
+  namespace: patterns
+data:
+  note: not readable by payment-service's Role
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: other-team-secret
+  namespace: patterns
+type: Opaque
+stringData:
+  note: not readable by payment-service's Role

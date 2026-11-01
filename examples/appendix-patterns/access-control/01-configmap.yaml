@@ -1,0 +1,11 @@
+# payment-service's own, non-secret configuration. This is the one ConfigMap
+# the Access Control example's Role names by resourceNames: the ServiceAccount
+# bound to payment-service can read this key, and nothing else in the
+# namespace by the same mechanism.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: payment-config
+  namespace: patterns
+data:
+  service_schema: payments
