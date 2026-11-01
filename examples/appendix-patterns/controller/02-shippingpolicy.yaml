@@ -1,0 +1,15 @@
+# A ShippingPolicy for the custom-controller half of this chapter. Applying
+# this (with the operator from ../operator/install.yaml already running)
+# produces a controller-demo Deployment and ConfigMap, reconciled the same
+# observe-diff-act way the built-in ReplicaSet controller reconciles
+# 01-deployment.yaml's Pods, just one layer up: this controller's "Pods" are
+# a Deployment and a ConfigMap, not containers.
+apiVersion: shipping.patterncatalyst.io/v1alpha1
+kind: ShippingPolicy
+metadata:
+  name: controller-demo
+  namespace: patterns
+spec:
+  carrier: ground
+  maxTransitDays: 5
+  replicas: 2

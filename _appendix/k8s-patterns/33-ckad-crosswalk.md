@@ -56,10 +56,10 @@ published chapter's own exam-lens callout.
 | 19 | [Configuration Resource]({{ '/appendix/k8s-patterns/19-configuration-resource/' | relative_url }}) | Configuration | Environment, Configuration & Security (25%) | Bulk-expose a ConfigMap or Secret with envFrom and mount the same resource as a volume; reason about which consumption mode updates live |
 | 20 | [Configuration Template]({{ '/appendix/k8s-patterns/20-configuration-template/' | relative_url }}) | Configuration | Environment, Configuration & Security (25%) | Use an init container to prepare a shared volume for the main container, including config rendered from a ConfigMap-backed template |
 | 21 | [Immutable Configuration]({{ '/appendix/k8s-patterns/21-immutable-configuration/' | relative_url }}) | Configuration | Environment, Configuration & Security (25%) | Create an immutable ConfigMap, explain why an in-place edit is rejected, and roll a configuration change through a Deployment update |
-| 22 | Controller | Advanced | Environment, Configuration & Security (25%) **[verify]** | Understand a custom controller's watch-and-reconcile loop extending the Kubernetes control plane |
-| 23 | Operator | Advanced | Environment, Configuration & Security (25%) **[verify]** | Understand a CRD-based Operator packaging an application's own operational knowledge as a Kubernetes API |
-| 24 | Elastic Scale | Advanced | Application Deployment (20%) **[verify]** | Understand HorizontalPodAutoscaler and VerticalPodAutoscaler for elastic scaling, including event-driven scale-to-zero |
-| 25 | Image Builder | Advanced | Application Design and Build (20%) | Build and reference a container image produced in-cluster |
+| 22 | [Controller]({{ '/appendix/k8s-patterns/22-controller/' | relative_url }}) | Advanced | Environment, Configuration & Security (25%) **[verify]** | Understand a custom controller's watch-and-reconcile loop extending the Kubernetes control plane |
+| 23 | [Elastic Scale]({{ '/appendix/k8s-patterns/23-elastic-scale/' | relative_url }}) | Advanced | Application Deployment (20%) **[verify]** | Understand HorizontalPodAutoscaler and VerticalPodAutoscaler for elastic scaling, including event-driven scale-to-zero |
+| 24 | [Image Builder]({{ '/appendix/k8s-patterns/24-image-builder/' | relative_url }}) | Advanced | Application Design and Build (20%) | Build and reference a container image produced in-cluster |
+| 25 | [Operator]({{ '/appendix/k8s-patterns/25-operator/' | relative_url }}) | Advanced | Environment, Configuration & Security (25%) **[verify]** | Understand a CRD-based Operator packaging an application's own operational knowledge as a Kubernetes API |
 | 26 | Access Control | Security | Environment, Configuration & Security (25%) | Create a ServiceAccount, Role, and RoleBinding scoping access to specific resources and verbs |
 | 27 | Network Segmentation | Security | Services and Networking (20%) | Restrict pod-to-pod traffic with a NetworkPolicy |
 | 28 | Process Containment | Security | Environment, Configuration & Security (25%) | Configure a SecurityContext and understand Pod Security Standards enforcement |
@@ -74,10 +74,10 @@ Counting the table above by its `CKAD domain` column:
 
 | Domain | Weight | Chapters |
 |---|---|---|
-| Application Design and Build | 20% | 11 (04, 05, 06, 07, 09, 10, 11, 12, 14, 15, 25) |
-| Application Deployment | 20% | 4 (02, 13, 24, 31) |
+| Application Design and Build | 20% | 11 (04, 05, 06, 07, 09, 10, 11, 12, 14, 15, 24) |
+| Application Deployment | 20% | 4 (02, 13, 23, 31) |
 | Application Observability and Maintenance | 15% | 3 (03, 08, 30) |
-| Environment, Configuration and Security | 25% | 12 (01, 17, 18, 19, 20, 21, 22, 23, 26, 28, 29, 32) |
+| Environment, Configuration and Security | 25% | 12 (01, 17, 18, 19, 20, 21, 22, 25, 26, 28, 29, 32) |
 | Services and Networking | 20% | 2 (16, 27) |
 
 Every domain has direct coverage; the distribution isn't even, and that's

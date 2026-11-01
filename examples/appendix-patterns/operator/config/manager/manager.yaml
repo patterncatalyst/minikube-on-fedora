@@ -1,0 +1,62 @@
+# manager.yaml — the operator's own Deployment. Runs shipping-policy-operator
+# as a single replica in the patterns namespace, non-root, with its
+# filesystem read-only, watching ShippingPolicy objects via the
+# shipping-policy-operator ServiceAccount (config/rbac).
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shipping-policy-operator
+  namespace: patterns
+  labels:
+    app.kubernetes.io/name: shipping-policy-operator
+    app.kubernetes.io/part-of: k8s-patterns-appendix
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: shipping-policy-operator
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: shipping-policy-operator
+    spec:
+      serviceAccountName: shipping-policy-operator
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: manager
+          image: shipping-policy-operator:v1
+          imagePullPolicy: Never
+          command:
+            - /manager
+          args:
+            - --health-probe-bind-address=:8081
+          ports:
+            - name: healthz
+              containerPort: 8081
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: healthz
+            initialDelaySeconds: 10
+            periodSeconds: 15
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: healthz
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              memory: 128Mi

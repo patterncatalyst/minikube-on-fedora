@@ -1,0 +1,25 @@
+# VerticalPodAutoscaler, Recommendation-only (updateMode: "Off"): VPA watches
+# shipping-service's actual CPU/memory usage over time and computes a
+# recommended request/limit, but never evicts a Pod or rewrites the
+# Deployment itself in this mode. That matters alongside the HPA above:
+# running VPA in "Auto" mode on the same resource (CPU) an HPA is already
+# scaling on is the one combination the two autoscalers can't safely share,
+# since VPA changing the per-Pod CPU request would also change what HPA's
+# utilization percentage is measured against, out from under it. "Off" mode
+# sidesteps the conflict entirely: it only ever recommends, an operator (or a
+# later, separate change) decides whether to act on that recommendation.
+#
+# Needs the VPA components installed separately; they are not part of
+# setup-patterns-profile.sh or any minikube addon. See README.md.
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: shipping-service
+  namespace: patterns
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: shipping-service
+  updatePolicy:
+    updateMode: "Off"

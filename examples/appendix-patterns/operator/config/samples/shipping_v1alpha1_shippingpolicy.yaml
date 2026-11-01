@@ -1,0 +1,15 @@
+# A sample ShippingPolicy for ground-carrier fulfillment. Applying this in
+# the patterns namespace (with the operator running) produces a
+# ground-standard Deployment of shipping-service at 3 replicas, prioritized
+# the same way chapter 01 (Predictable Demands) prioritizes a plain
+# Deployment, plus a ground-standard ConfigMap carrying the policy itself.
+apiVersion: shipping.patterncatalyst.io/v1alpha1
+kind: ShippingPolicy
+metadata:
+  name: ground-standard
+  namespace: patterns
+spec:
+  carrier: ground
+  maxTransitDays: 5
+  replicas: 3
+  priorityClassName: patterns-high-priority
