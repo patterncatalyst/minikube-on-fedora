@@ -1,0 +1,22 @@
+# A stand-in Pod for shipping-service: placement is the point here, not
+# application behavior, so a minimal UBI image is enough (Ibryam & Huß make
+# the same call for their Automated Placement example). Apply this before
+# labeling any node and it stays Pending: no node carries zone=warehouse-a yet.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: shipping-warehouse
+  namespace: patterns
+  labels:
+    app.kubernetes.io/name: shipping-service-placeholder
+spec:
+  nodeSelector:
+    zone: warehouse-a
+  containers:
+    - name: placeholder
+      image: registry.access.redhat.com/ubi10/ubi-minimal:latest
+      command: ["sleep", "infinity"]
+      resources:
+        requests:
+          cpu: 50m
+          memory: 32Mi

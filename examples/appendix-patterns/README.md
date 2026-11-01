@@ -36,11 +36,28 @@ examples/appendix-patterns/
   scripts/
     lib/env.sh                 # PROFILE=mof-patterns, NS=patterns, context pinning
     setup-patterns-profile.sh  # create/replace the profile
+    build-service.sh           # build+load one capstone service image onto mof-patterns
   <pattern>/                   # one directory per pattern chapter
     README.md                  # how to run this pattern's example
     *.yaml                     # the manifests, worked against a shipping service
   operator/                    # Go operator + Shipping CRD (Controller/Operator chapters)
 ```
+
+## Building a service image
+
+Four of the Foundational examples run a real shipping service. There's no
+registry: `build-service.sh` builds the service's Containerfile with Docker
+Engine and loads the image straight into the `mof-patterns` profile's
+containerd store, the same `imagePullPolicy: Never` approach the §17 capstone
+uses.
+
+```bash
+./scripts/build-service.sh shipping-service v1
+./scripts/build-service.sh inventory-service v1
+```
+
+The capstone's service source under `examples/17-capstone/services/` is read,
+never modified.
 
 Each `<pattern>/` directory is referenced from its chapter's
 `## Verification: examples/appendix-patterns/<pattern>/` section. Most examples

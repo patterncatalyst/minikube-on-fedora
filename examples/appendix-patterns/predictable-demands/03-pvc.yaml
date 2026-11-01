@@ -1,0 +1,16 @@
+# The second hard requirement: a PersistentVolumeClaim that 04-deployment.yaml
+# mounts. No storageClassName is set, so it binds against minikube's default
+# "standard" class (the storage-provisioner addon, enabled by default).
+# Deploy the Pod before this PVC exists and it stays Pending with a
+# "persistentvolumeclaim not found" scheduling event.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: shipping-data
+  namespace: patterns
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 64Mi

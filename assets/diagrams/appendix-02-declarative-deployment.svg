@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 380" font-family="'Red Hat Text', system-ui, sans-serif" role="img">
+<defs><marker id="a" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#555"/></marker><marker id="am" viewBox="0 0 10 10" refX="8.5" refY="5" markerWidth="9" markerHeight="9" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#b8650a"/></marker></defs>
+<rect x="20" y="40" width="420" height="260" rx="12" fill="#fafafa" stroke="#ddd"/>
+<text x="32" y="60" font-size="12" font-weight="700" fill="#888">RollingUpdate</text>
+<rect x="460" y="40" width="420" height="260" rx="12" fill="#fafafa" stroke="#ddd"/>
+<text x="472" y="60" font-size="12" font-weight="700" fill="#888">Recreate</text>
+<rect x="50" y="80" width="150" height="50" rx="9" fill="#ffffff" stroke="#111111" stroke-width="2"/>
+<text x="125.0" y="110.5" font-size="13.5" font-weight="700" fill="#111111" text-anchor="middle">v1</text>
+<rect x="50" y="150" width="150" height="50" rx="9" fill="#ffffff" stroke="#111111" stroke-width="2"/>
+<text x="125.0" y="180.5" font-size="13.5" font-weight="700" fill="#111111" text-anchor="middle">v1</text>
+<rect x="50" y="220" width="150" height="50" rx="9" fill="#ffffff" stroke="#999999" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="125.0" y="243.0" font-size="13.5" font-weight="700" fill="#111111" text-anchor="middle">v1</text>
+<text x="125.0" y="260.0" font-size="11.5" fill="#555555" text-anchor="middle">terminating</text>
+<rect x="250" y="115" width="150" height="50" rx="9" fill="#fff8ef" stroke="#e8870c" stroke-width="2"/>
+<text x="325.0" y="138.0" font-size="13.5" font-weight="700" fill="#111111" text-anchor="middle">v2</text>
+<text x="325.0" y="155.0" font-size="11.5" fill="#555555" text-anchor="middle">surge</text>
+<rect x="490" y="80" width="150" height="50" rx="9" fill="#ffffff" stroke="#999999" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="565.0" y="103.0" font-size="13.5" font-weight="700" fill="#111111" text-anchor="middle">v1</text>
+<text x="565.0" y="120.0" font-size="11.5" fill="#555555" text-anchor="middle">terminated</text>
+<rect x="490" y="150" width="150" height="50" rx="9" fill="#ffffff" stroke="#999999" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="565.0" y="173.0" font-size="13.5" font-weight="700" fill="#111111" text-anchor="middle">v1</text>
+<text x="565.0" y="190.0" font-size="11.5" fill="#555555" text-anchor="middle">terminated</text>
+<rect x="490" y="220" width="150" height="50" rx="9" fill="#ffffff" stroke="#999999" stroke-width="1.5" stroke-dasharray="6 4"/>
+<text x="565.0" y="243.0" font-size="13.5" font-weight="700" fill="#111111" text-anchor="middle">v1</text>
+<text x="565.0" y="260.0" font-size="11.5" fill="#555555" text-anchor="middle">terminated</text>
+<rect x="690" y="150" width="150" height="50" rx="9" fill="#fff8ef" stroke="#e8870c" stroke-width="2"/>
+<text x="765.0" y="173.0" font-size="13.5" font-weight="700" fill="#111111" text-anchor="middle">v2</text>
+<text x="765.0" y="190.0" font-size="11.5" fill="#555555" text-anchor="middle">starting</text>
+<text x="240" y="325" font-size="11" fill="#888" text-anchor="middle" font-weight="700">capacity never drops below 3</text>
+<text x="680" y="325" font-size="11" fill="#888" text-anchor="middle" font-weight="700">a gap with zero Pods serving</text>
+</svg>
