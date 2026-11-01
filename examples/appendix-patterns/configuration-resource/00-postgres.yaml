@@ -1,0 +1,85 @@
+# A minimal, disposable Postgres for the appendix examples. This is NOT the
+# CloudNativePG-managed cluster the §17 capstone runs: no operator, no
+# persistent storage, no replication.
+#
+# The Secret keys here are named to match payment-service's own Settings
+# fields (pg_user, pg_password, pg_database) rather than the generic
+# username/password/dbname used elsewhere in the appendix. That's deliberate:
+# this chapter's point is bulk-exposing a whole Secret with envFrom, which
+# only works cleanly when the Secret's keys already line up with the field
+# names the application reads. The postgres container itself still needs
+# POSTGRES_USER/POSTGRES_PASSWORD/POSTGRES_DB, so those three are still wired
+# individually below.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: payment-pg-credentials
+  namespace: patterns
+type: Opaque
+stringData:
+  pg_user: capstone_app
+  pg_password: changeme
+  pg_database: capstone
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: patterns-postgres
+  namespace: patterns
+  labels:
+    app.kubernetes.io/name: patterns-postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: patterns-postgres
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: patterns-postgres
+    spec:
+      containers:
+        - name: postgres
+          image: docker.io/library/postgres:17-alpine
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              valueFrom:
+                secretKeyRef:
+                  name: payment-pg-credentials
+                  key: pg_user
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: payment-pg-credentials
+                  key: pg_password
+            - name: POSTGRES_DB
+              valueFrom:
+                secretKeyRef:
+                  name: payment-pg-credentials
+                  key: pg_database
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "capstone_app"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              memory: 256Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: patterns-postgres
+  namespace: patterns
+spec:
+  selector:
+    app.kubernetes.io/name: patterns-postgres
+  ports:
+    - port: 5432
+      targetPort: 5432

@@ -1,0 +1,20 @@
+# payment-config does double duty. Three keys (service_schema, pg_host,
+# pg_port) match payment-service's Settings field names exactly, so
+# envFrom in 02-deployment.yaml bulk-exposes them as env vars with no
+# per-key wiring. The fourth key, payment-service.conf, is not a valid
+# environment variable name (it contains a dot), so envFrom silently skips it,
+# which is why 02-deployment.yaml also mounts this same ConfigMap as a
+# volume, so that key reaches the container as a file instead.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: payment-config
+  namespace: patterns
+data:
+  service_schema: payments
+  pg_host: patterns-postgres.patterns.svc.cluster.local
+  pg_port: "5432"
+  payment-service.conf: |
+    [payment-service]
+    schema=payments
+    note=delivered as a file for tooling that expects a config path, not an env var

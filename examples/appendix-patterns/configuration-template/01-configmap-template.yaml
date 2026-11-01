@@ -1,0 +1,16 @@
+# The template itself: a tiny config file format inventory-service doesn't
+# natively speak (it reads flat env vars), standing in for the structured
+# config files (XML, YAML, ini) that env vars can't express well. Two tokens,
+# __ENV_LABEL__ and __LOG_LEVEL__, are substituted by the init container
+# before the main container ever starts.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: inventory-template
+  namespace: patterns
+data:
+  app.conf.tmpl: |
+    [inventory-service]
+    environment=__ENV_LABEL__
+    log_level=__LOG_LEVEL__
+    rendered_by=init-container
