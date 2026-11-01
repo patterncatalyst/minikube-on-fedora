@@ -1,0 +1,23 @@
+# Caps the patterns namespace's TOTAL consumption, across every pod combined.
+# cpu/memory headroom is generous on purpose, so the one dimension that bites
+# is `pods`: the disposable Postgres plus two shipping-service replicas land
+# exactly at the cap of 3, and a third replica is rejected before the
+# scheduler ever sees it.
+#
+# Declaring requests.cpu/limits.cpu here also means every new pod in this
+# namespace MUST carry a cpu request and limit — shipping-service's manifest
+# deliberately omits a cpu limit (Predictable Demands' reasoning still
+# applies), so that limit comes from the LimitRange's default below, applied
+# before this quota's admission check runs.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: patterns-quota
+  namespace: patterns
+spec:
+  hard:
+    pods: "3"
+    requests.cpu: "1"
+    requests.memory: "1Gi"
+    limits.cpu: "2"
+    limits.memory: "2Gi"

@@ -1,0 +1,26 @@
+# Fixed name rather than the usual release-chart fullname pattern, so the
+# install/upgrade/rollback commands in the chapter don't have to recompute a
+# generated name — and so this release's objects never collide with the
+# Kustomize deployment's, which use the "shipping-kustomize" name instead.
+nameOverride: shipping-helm
+
+replicaCount: 1
+
+image:
+  repository: shipping-service
+  tag: v1
+  pullPolicy: Never       # built and loaded directly, like every appendix example
+
+schema: shipping
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 192Mi
+  limits:
+    memory: 512Mi
+
+postgres:
+  host: patterns-postgres.patterns.svc.cluster.local
+  port: 5432
+  secretName: patterns-postgres-app

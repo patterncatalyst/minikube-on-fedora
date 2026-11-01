@@ -1,0 +1,23 @@
+# The per-container complement to the ResourceQuota above: a default any
+# container that omits requests/limits inherits, and a min/max band any
+# EXPLICIT value (default or author-supplied) must stay inside.
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: patterns-limits
+  namespace: patterns
+spec:
+  limits:
+    - type: Container
+      defaultRequest:
+        cpu: 50m
+        memory: 128Mi
+      default:
+        cpu: 200m
+        memory: 256Mi
+      min:
+        cpu: 25m
+        memory: 64Mi
+      max:
+        cpu: 500m
+        memory: 512Mi

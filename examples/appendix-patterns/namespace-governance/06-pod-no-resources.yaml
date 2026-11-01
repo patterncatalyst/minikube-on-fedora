@@ -1,0 +1,17 @@
+# A stand-in pod with NO resources block at all — governance is the point
+# here, not application behavior, so a minimal UBI image is enough (the same
+# call Automated Placement makes for its placeholder pods). Apply this after
+# the LimitRange and inspect the resources kubectl get pod reports back: the
+# defaultRequest and default values from 03-limitrange.yaml, not nothing.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: inventory-defaults-check
+  namespace: patterns
+  labels:
+    app.kubernetes.io/name: inventory-service-placeholder
+spec:
+  containers:
+    - name: placeholder
+      image: registry.access.redhat.com/ubi10/ubi-minimal:latest
+      command: ["sleep", "infinity"]

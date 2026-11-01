@@ -1,0 +1,8 @@
+# dev overlay: a separate schema name so dev and prod never collide in the
+# shared disposable Postgres instance.
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: shipping-kustomize-config
+data:
+  schema: shipping_dev
