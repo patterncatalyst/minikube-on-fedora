@@ -1,0 +1,64 @@
+# A plain (non-indexed) Job: 3 completions, all 3 running in parallel. Each
+# Pod produces its own full report (PARTITION_COUNT=1 covers every row) and
+# tags its filename with its own Pod name via the Downward API, so three
+# concurrent writers to the same PVC never collide on a filename.
+apiVersion: batch/v1
+kind: Job
+metadata:
+  generateName: shipping-report-plain-
+  namespace: patterns
+  labels:
+    app.kubernetes.io/name: shipping-report-plain
+spec:
+  completions: 3
+  parallelism: 3
+  backoffLimit: 2
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: shipping-report-plain
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: shipping-report
+          image: shipping-report:v1
+          imagePullPolicy: Never
+          args: ["report"]
+          env:
+            - name: PG_HOST
+              value: patterns-postgres.patterns.svc.cluster.local
+            - name: PG_USER
+              valueFrom:
+                secretKeyRef:
+                  name: patterns-postgres-app
+                  key: username
+            - name: PG_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: patterns-postgres-app
+                  key: password
+            - name: PG_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: patterns-postgres-app
+                  key: dbname
+            - name: PARTITION_COUNT
+              value: "1"
+            - name: REPORT_TAG
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          volumeMounts:
+            - name: reports
+              mountPath: /var/lib/shipping-reports
+          resources:
+            requests:
+              cpu: 50m
+              memory: 96Mi
+            limits:
+              memory: 192Mi
+      volumes:
+        - name: reports
+          persistentVolumeClaim:
+            claimName: shipping-reports-data

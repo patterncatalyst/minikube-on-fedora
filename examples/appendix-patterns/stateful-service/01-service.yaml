@@ -1,0 +1,17 @@
+# A headless Service (clusterIP: None): no load-balanced virtual IP, only
+# DNS A records for each backing Pod. This is what gives a StatefulSet's
+# Pods individually addressable, stable names — shipment-archive-0,
+# shipment-archive-1, shipment-archive-2 — instead of one anonymous
+# ClusterIP in front of interchangeable backends.
+apiVersion: v1
+kind: Service
+metadata:
+  name: shipment-archive
+  namespace: patterns
+spec:
+  clusterIP: None
+  selector:
+    app.kubernetes.io/name: shipment-archive
+  ports:
+    - name: postgres
+      port: 5432

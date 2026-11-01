@@ -1,0 +1,14 @@
+# Shared output volume for every Job in this example. Bound against the
+# mof-patterns profile's default storage class (the storage-provisioner
+# addon), same as Predictable Demands' shipping-data PVC.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: shipping-reports-data
+  namespace: patterns
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Mi

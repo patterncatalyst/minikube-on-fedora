@@ -1,0 +1,28 @@
+# Path-based routing through one entry point: no rewrite-target annotation,
+# so ingress-nginx forwards the matched path unchanged, which is why both
+# rules below point at paths that genuinely exist on their backend —
+# /graphql on graphql-gateway, /health on order-service.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: patterns-gateway
+  namespace: patterns
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /graphql
+            pathType: Prefix
+            backend:
+              service:
+                name: graphql-gateway
+                port:
+                  number: 80
+          - path: /health
+            pathType: Exact
+            backend:
+              service:
+                name: order-service
+                port:
+                  number: 80

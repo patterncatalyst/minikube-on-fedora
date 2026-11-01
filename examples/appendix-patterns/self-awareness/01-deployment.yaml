@@ -1,0 +1,140 @@
+# shipping-service with the Self Awareness pattern applied: Downward API
+# fields injected as environment variables, plus a downwardAPI volume that
+# mounts the Pod's own labels, annotations, and resource limits as files —
+# nothing shipping-service's own code has to ask the API server for.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: shipping-service
+  namespace: patterns
+  labels:
+    app.kubernetes.io/name: shipping-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: shipping-service
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: shipping-service
+        app.kubernetes.io/part-of: fulfillment
+      annotations:
+        patterns.example.com/owner: fulfillment-team
+    spec:
+      containers:
+        - name: shipping-service
+          image: shipping-service:v1
+          imagePullPolicy: Never
+          ports:
+            - name: http
+              containerPort: 8080
+          env:
+            - name: SERVICE_SCHEMA
+              value: shipping
+            - name: PG_HOST
+              value: patterns-postgres.patterns.svc.cluster.local
+            - name: PG_USER
+              valueFrom:
+                secretKeyRef:
+                  name: patterns-postgres-app
+                  key: username
+            - name: PG_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: patterns-postgres-app
+                  key: password
+            - name: PG_DATABASE
+              valueFrom:
+                secretKeyRef:
+                  name: patterns-postgres-app
+                  key: dbname
+            # Downward API: fields of this Pod's own spec/status, injected
+            # as plain environment variables, resolved once at Pod start.
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: POD_NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: POD_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.podIP
+            - name: NODE_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: spec.nodeName
+            # Resource field refs read the container's own declared
+            # requests/limits back out, so the process can see the same
+            # numbers the scheduler used without parsing its own manifest.
+            - name: CPU_REQUEST
+              valueFrom:
+                resourceFieldRef:
+                  containerName: shipping-service
+                  resource: requests.cpu
+            - name: MEMORY_LIMIT
+              valueFrom:
+                resourceFieldRef:
+                  containerName: shipping-service
+                  resource: limits.memory
+          # Both requests and both limits are declared explicitly here (unlike
+          # the Predictable Demands example) specifically so the Downward API
+          # fields below reflect numbers this manifest actually set, not a
+          # fallback the kubelet substitutes when a limit is missing.
+          resources:
+            requests:
+              cpu: 100m
+              memory: 192Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            failureThreshold: 30
+            periodSeconds: 2
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          volumeMounts:
+            - name: podinfo
+              mountPath: /etc/podinfo
+              readOnly: true
+      volumes:
+        # Downward API volume: labels and annotations change independently
+        # of a Pod restart (an annotation patch doesn't recreate anything),
+        # so they're exposed as files the kubelet updates in place rather
+        # than environment variables, which are fixed at container start.
+        - name: podinfo
+          downwardAPI:
+            items:
+              - path: labels
+                fieldRef:
+                  fieldPath: metadata.labels
+              - path: annotations
+                fieldRef:
+                  fieldPath: metadata.annotations
+              - path: cpu_limit
+                resourceFieldRef:
+                  containerName: shipping-service
+                  resource: limits.cpu
+                  divisor: 1m
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: shipping-service
+  namespace: patterns
+spec:
+  selector:
+    app.kubernetes.io/name: shipping-service
+  ports:
+    - port: 80
+      targetPort: 8080

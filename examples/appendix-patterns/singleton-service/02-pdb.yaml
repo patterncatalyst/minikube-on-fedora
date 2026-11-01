@@ -1,0 +1,16 @@
+# Protects order-service's one replica from voluntary disruption: the
+# Eviction API (node drain, the descheduler, a cluster autoscaler scaling a
+# node down) must leave at least 1 Pod available, which for a single-replica
+# Deployment means it must leave the only Pod alone. maxUnavailable: 0 on
+# the same selector would express the identical constraint; minAvailable is
+# used here because it reads more directly as "this one Pod must survive."
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: order-service-pdb
+  namespace: patterns
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: order-service
