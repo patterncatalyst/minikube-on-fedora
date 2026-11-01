@@ -53,7 +53,13 @@ kubectl --context mof-patterns scale deployment/shipping-service -n patterns --r
 
 ### LimitRange: defaults for a pod that specifies nothing
 
+`patterns-quota`'s `pods: "3"` cap is deliberately sized so Postgres plus
+two shipping-service replicas fill it exactly (the previous section relied
+on that to reject a third replica), which leaves zero room for the two
+stand-in pods below. Free one slot first:
+
 ```bash
+kubectl --context mof-patterns scale deployment/shipping-service -n patterns --replicas=1
 kubectl --context mof-patterns apply -n patterns -f namespace-governance/06-pod-no-resources.yaml
 kubectl --context mof-patterns get pod inventory-defaults-check -n patterns \
   -o jsonpath='{.spec.containers[0].resources}{"\n"}'
@@ -74,7 +80,11 @@ This fails immediately, with no pod created:
 `maximum cpu usage per Container is 500m, but limit is 600m`. Lower
 `06-pod-no-resources.yaml`'s stand-in to within the band and it would be
 admitted; the LimitRange enforces the ceiling the same way it supplies the
-floor.
+floor. Restore the replica count:
+
+```bash
+kubectl --context mof-patterns scale deployment/shipping-service -n patterns --replicas=2
+```
 
 ## Cleanup
 
