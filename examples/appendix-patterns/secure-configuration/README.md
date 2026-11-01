@@ -43,7 +43,9 @@ POD=$(kubectl --context mof-patterns get pod -n patterns -l app.kubernetes.io/na
 kubectl --context mof-patterns exec -n patterns "$POD" -- env | grep -E '^PG_(USER|PASSWORD|DATABASE)='
 
 kubectl --context mof-patterns exec -n patterns "$POD" -- ls -l /etc/inventory/credentials/
-# -r-------- for username, password, dbname
+# -r--r----- for username, password, dbname (0440: owner+group, matching
+# this container's gid — not 0400, which a non-root container could never
+# read, since a projected volume's files are always owned by root)
 
 kubectl --context mof-patterns exec -n patterns "$POD" -- cat /etc/inventory/credentials/password
 # changeme
