@@ -1,4 +1,4 @@
-# manager.yaml — the operator's own Deployment. Runs shipping-policy-operator
+# manager.yaml: the operator's own Deployment. Runs shipping-policy-operator
 # as a single replica in the patterns namespace, non-root, with its
 # filesystem read-only, watching ShippingPolicy objects via the
 # shipping-policy-operator ServiceAccount (config/rbac).

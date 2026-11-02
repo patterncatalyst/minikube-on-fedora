@@ -1,10 +1,10 @@
 # Reference manifest, not applied in this chapter's own run (see README.md):
 # the shape of a Kafka consumer-lag ScaledObject, identical to the one the
-# §17 capstone runs for real against notification-service
+# capstone runs against notification-service
 # (examples/17-capstone/keda/notification-scaledobject.yaml). shipping-service
 # in this appendix is a REST-only skeleton with no Kafka consumer of its own,
 # so applying this against it would create a ScaledObject whose trigger can
-# never resolve a lag number — worth reading for the shape, not worth running
+# never resolve a lag number; worth reading for the shape, not worth running
 # without a real consumer and a real Kafka cluster behind it (both of which
 # the capstone already has). This is the manifest you'd write the moment
 # shipping-service grew an asynchronous order-event consumer of its own.

@@ -1,5 +1,5 @@
 # A minimal, disposable Postgres for this example. This is NOT the
-# CloudNativePG-managed cluster the §17 capstone runs — no operator, no
+# CloudNativePG-managed cluster the capstone runs: no operator, no
 # persistent storage, no replication. shipping-report owns its own
 # shipment_events demo table here; nothing in this file touches the
 # capstone's actual shipping schema.

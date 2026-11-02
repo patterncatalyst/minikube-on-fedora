@@ -53,7 +53,7 @@ ISTIO_DIR="${ISTIO_DIR:-${HOME}/.local/share/istio-current}"
 
 # Check the istio profile exists; if not, there's nothing to clean up
 if ! minikube profile list 2>/dev/null | grep -q "${PROFILE_NAME}"; then
-    info "no minikube profile named '${PROFILE_NAME}' found — nothing to clean"
+    info "no minikube profile named '${PROFILE_NAME}' found: nothing to clean"
     exit 0
 fi
 

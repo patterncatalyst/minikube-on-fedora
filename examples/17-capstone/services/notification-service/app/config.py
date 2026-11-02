@@ -25,7 +25,7 @@ class Settings(BaseSettings):
 
     # Apicurio schema registry (r25b). The consumer decodes Avro by fetching
     # the writer schema from this registry using the id embedded in each
-    # message — it needs no local copy of the schema.
+    # message; it needs no local copy of the schema.
     apicurio_url: str = "http://apicurio:8080"
 
     @property

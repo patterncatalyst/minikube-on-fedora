@@ -1,5 +1,5 @@
 # shipping-service at two replicas, with the same requests/limits and
-# PriorityClass from Predictable Demands. No cpu limit is set here either —
+# PriorityClass from Predictable Demands. No cpu limit is set here either;
 # the ResourceQuota's limits.cpu dimension means one has to land somehow, and
 # the LimitRange's default supplies exactly that at admission time.
 apiVersion: apps/v1

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
-# smoke-keda-http.sh — demonstrate AND verify HTTP request autoscaling of the
-# graphql-gateway via the KEDA HTTP add-on (r26b, CAP-025).
+# smoke-keda-http.sh: demonstrate AND verify HTTP request autoscaling of the
+# graphql-gateway via the KEDA HTTP add-on.
 #
 # The other half of "elastic data products": a synchronous service should run
 # only when there's demand. This proves the lifecycle:
@@ -37,7 +37,7 @@ cleanup() {
 }
 trap cleanup EXIT
 dump() {
-    step "DIAGNOSTIC DUMP (failure — resources left in place)"
+    step "DIAGNOSTIC DUMP (failure: resources left in place)"
     kubectl get httpscaledobject,deployment,pods -n "$NS" -l "$SEL" 2>&1
     kubectl get pods -n keda 2>&1 | grep -i interceptor
     kubectl describe httpscaledobject graphql-gateway-http -n "$NS" 2>&1 | tail -20
@@ -57,26 +57,26 @@ is_scaledup() { [[ "$(count_pods)" -gt 0 ]]; }
 
 # ─── Pre-flight ──────────────────────────────────────────────────────────────
 step "Pre-flight checks"
-minikube status -p "$PROFILE" >/dev/null 2>&1 || fail "profile '$PROFILE' not running — ./scripts/setup-capstone-profile.sh"
+minikube status -p "$PROFILE" >/dev/null 2>&1 || fail "profile '$PROFILE' not running: ./scripts/setup-capstone-profile.sh"
 for t in kubectl curl; do command -v "$t" >/dev/null || fail "$t not in PATH"; done
 kubectl get svc "$PROXY_SVC" -n keda >/dev/null 2>&1 \
-    || fail "KEDA HTTP add-on not installed (no $PROXY_SVC in keda ns) — run scripts/setup-keda.sh"
+    || fail "KEDA HTTP add-on not installed (no $PROXY_SVC in keda ns): run scripts/setup-keda.sh"
 kubectl get deployment graphql-gateway -n "$NS" >/dev/null 2>&1 \
-    || fail "graphql-gateway not deployed — helm upgrade --install graphql-gateway charts/capstone/charts/graphql-gateway -n $NS"
+    || fail "graphql-gateway not deployed: helm upgrade --install graphql-gateway charts/capstone/charts/graphql-gateway -n $NS"
 
 step "Applying the HTTPScaledObject"
 kubectl apply -f "$KEDA_DIR/gateway-httpscaledobject.yaml" >/dev/null \
     || fail "failed to apply the HTTPScaledObject"
-printf '    ✓ applied — KEDA HTTP add-on now fronts graphql-gateway\n'
+printf '    ✓ applied: KEDA HTTP add-on now fronts graphql-gateway\n'
 
 # ─── 1. Scale to zero (no traffic) ───────────────────────────────────────────
 step "Waiting for scale-to-zero (~30s scaledownPeriod once idle; instant if already at 0, longer if the gateway was just (re)deployed)"
 # scaledownPeriod (30s) governs the HTTP add-on's scale-to-zero once in-flight
-# concurrency is genuinely 0. On a re-run where the gateway is already at zero
+# concurrency is 0. On a re-run where the gateway is already at zero
 # this returns immediately. Budget stays generous to cover a just-deployed pod
 # settling for the first time.
 wait_until "0 replicas" 600 is_zero \
-    || fail "graphql-gateway did not scale to zero — is the HTTPScaledObject Ready, and is anything holding a connection to the interceptor?"
+    || fail "graphql-gateway did not scale to zero: is the HTTPScaledObject Ready, and is anything holding a connection to the interceptor?"
 printf '    ✓ scaled to ZERO (no traffic, costing nothing)\n'
 
 # ─── 2. Wake from zero through the interceptor ───────────────────────────────
@@ -95,7 +95,7 @@ done
 step "Firing a cold-start request through the interceptor (Host: $HOST)"
 # With interceptor.readinessTimeout set to 180s (setup-keda.sh), the
 # interceptor BUFFERS this request, signals KEDA to scale graphql-gateway from
-# zero, and HOLDS the connection until a replica is Ready — then forwards it and
+# zero, and HOLDS the connection until a replica is Ready: then forwards it and
 # returns the gateway's response. A 200 is the wake-from-zero proof; the elapsed
 # time is the cold-start cost. A single held request also gives KEDA the stable
 # pending-request pressure it needs to activate promptly (a short readiness
@@ -134,7 +134,7 @@ printf '    ✓ stayed up under load (peak %s replica(s))\n' "$MAXSEEN"
 # ballpark as the Kafka ScaledObject's cooldownPeriod: 30.
 
 step "Stopping traffic; waiting for scale back to ZERO (~30s once idle)"
-# We latch on KEDA's decision — the Deployment's desired replicas reaching 0 —
+# We latch on KEDA's decision: the Deployment's desired replicas reaching 0
 # rather than waiting for the last pod to finish terminating, so graceful
 # shutdown lag doesn't read as a failure. With traffic stopped this is
 # typically ~30s; the budget stays generous as a ceiling.
@@ -148,7 +148,7 @@ ELAPSED=$(( $(date +%s) - START ))
 if [[ -n "$SAW_ZERO" ]]; then
     printf '    ✓ scaled back to ZERO (KEDA set desired replicas to 0 after ~%ss)\n' "$ELAPSED"
 else
-    printf '    ⚠ still >0 after %ss (desired=%s now) — NOT a failure.\n' "$ELAPSED" "$(desired)"
+    printf '    ⚠ still >0 after %ss (desired=%s now): NOT a failure.\n' "$ELAPSED" "$(desired)"
     printf '      Usually means something still holds a connection to the interceptor\n'
     printf '      (a browser tab, another client) keeping concurrency >0. Watch it:\n'
     printf '        kubectl get deploy graphql-gateway -n %s -w\n' "$NS"
@@ -156,5 +156,5 @@ fi
 
 step "SUCCESS"
 printf 'graphql-gateway is an elastic data product: 0 when idle, woke from zero\n'
-printf 'on the first request and scaled to %s under load, back to 0 when quiet —\n' "$MAXSEEN"
+printf 'on the first request and scaled to %s under load, back to 0 when quiet :\n' "$MAXSEEN"
 printf 'driven by HTTP request concurrency via the KEDA HTTP add-on.\n'

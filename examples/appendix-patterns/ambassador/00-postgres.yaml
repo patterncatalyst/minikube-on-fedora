@@ -1,6 +1,6 @@
-# A minimal, disposable Postgres for the appendix examples. This is NOT the
-# CloudNativePG-managed cluster the §17 capstone runs — no operator, no
-# persistent storage, no replication. Its credentials deliberately match
+# A minimal, disposable Postgres for the appendix examples. This is not the
+# CloudNativePG-managed cluster the capstone runs: no operator, no
+# persistent storage, no replication. Its credentials match
 # shipping-service's own compiled-in defaults (see 01-deployment.yaml) so the
 # ambassador example can leave the app's environment empty.
 apiVersion: v1

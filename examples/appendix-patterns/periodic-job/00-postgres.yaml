@@ -1,5 +1,5 @@
 # A minimal, disposable Postgres for this example. This is NOT the
-# CloudNativePG-managed cluster the §17 capstone runs — no operator, no
+# CloudNativePG-managed cluster the capstone runs: no operator, no
 # persistent storage, no replication. Identical to batch-job/00-postgres.yaml;
 # each example directory is self-contained and torn down independently.
 apiVersion: v1

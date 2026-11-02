@@ -81,11 +81,11 @@ kubectl --context mof-patterns auth can-i --list \
 ```bash
 kubectl --context mof-patterns auth can-i list pods \
   --as=system:serviceaccount:patterns:ops-readonly -n patterns
-# yes — the built-in "view" ClusterRole, bound by a namespaced RoleBinding
+# yes: the built-in "view" ClusterRole, bound by a namespaced RoleBinding
 
 kubectl --context mof-patterns auth can-i list pods \
   --as=system:serviceaccount:patterns:ops-readonly -n default
-# no — same ClusterRole, but the RoleBinding only reaches the patterns namespace
+# no: same ClusterRole, but the RoleBinding only reaches the patterns namespace
 ```
 
 ## Confirm the service is serving

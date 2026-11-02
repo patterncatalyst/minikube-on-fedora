@@ -1,6 +1,6 @@
 # node-collector: a per-node log/metrics collector running beside the
 # shipping services. No real observability backend behind it (that's out of
-# scope for this pattern) — it mounts the node's own /var/log read-only and
+# scope for this pattern); it mounts the node's own /var/log read-only and
 # logs a per-node summary line every 15s, which is enough to show a DaemonSet
 # running exactly once per node and reading node-local state no single Pod
 # could see.
@@ -26,7 +26,7 @@ spec:
     spec:
       # DaemonSets run on every schedulable node by default, but a tainted
       # control-plane node still repels them like any other Pod unless they
-      # carry a matching toleration — infrastructure daemons are exactly the
+      # carry a matching toleration; infrastructure daemons are exactly the
       # workload that usually needs one.
       tolerations:
         - key: node-role.kubernetes.io/control-plane

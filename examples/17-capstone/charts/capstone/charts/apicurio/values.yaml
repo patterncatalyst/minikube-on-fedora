@@ -1,5 +1,5 @@
-# Apicurio Registry 3 — schema registry.
-# Dev-scale: in-memory storage — the DEFAULT for the 3.x image when no storage
+# Apicurio Registry 3: schema registry.
+# Dev-scale: in-memory storage, the default for the 3.x image when no storage
 # env is set (data is not persisted across restarts; the producer re-registers
 # on startup, so this is harmless for the demo). Production sets a real backend
 # (SQL on CloudNativePG, or kafkasql) via APICURIO_STORAGE_KIND + datasource env.

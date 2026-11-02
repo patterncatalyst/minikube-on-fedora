@@ -44,7 +44,7 @@ kubectl --context mof-patterns get pods -n patterns -l app.kubernetes.io/name=sh
 
 The ReplicaSet controller keeps retrying and keeps failing with `pods
 "shipping-service-..." is forbidden: exceeded quota: patterns-quota,
-requested: pods=1, used: pods=3, limited: pods=3` — only two Pods ever exist.
+requested: pods=1, used: pods=3, limited: pods=3`: only two Pods ever exist.
 Scale back down:
 
 ```bash
@@ -53,7 +53,7 @@ kubectl --context mof-patterns scale deployment/shipping-service -n patterns --r
 
 ### LimitRange: defaults for a pod that specifies nothing
 
-`patterns-quota`'s `pods: "3"` cap is deliberately sized so Postgres plus
+`patterns-quota`'s `pods: "3"` cap is sized so Postgres plus
 two shipping-service replicas fill it exactly (the previous section relied
 on that to reject a third replica), which leaves zero room for the two
 stand-in pods below. Free one slot first:

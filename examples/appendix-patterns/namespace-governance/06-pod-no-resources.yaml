@@ -1,4 +1,4 @@
-# A stand-in pod with NO resources block at all — governance is the point
+# A stand-in pod with no resources block at all; governance is the point
 # here, not application behavior, so a minimal UBI image is enough (the same
 # call Automated Placement makes for its placeholder pods). Apply this after
 # the LimitRange and inspect the resources kubectl get pod reports back: the

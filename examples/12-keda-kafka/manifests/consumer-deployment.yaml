@@ -1,6 +1,6 @@
 # examples/12-keda-kafka/manifests/consumer-deployment.yaml
 #
-# Python Kafka consumer Deployment. Starts at replicas: 0 — the
+# Python Kafka consumer Deployment. Starts at replicas: 0; the
 # moment the ScaledObject is applied, KEDA owns the replica count.
 ---
 apiVersion: apps/v1
@@ -41,7 +41,7 @@ spec:
             limits:
               cpu: "200m"
               memory: "128Mi"
-          # SIGTERM grace period — KEDA scales down by sending SIGTERM,
+          # SIGTERM grace period: KEDA scales down by sending SIGTERM,
           # then waiting this many seconds, then SIGKILL. Our consumer
           # handles SIGTERM and exits immediately, so 10s is plenty.
       terminationGracePeriodSeconds: 10

@@ -1,22 +1,22 @@
-# Postgres subchart values — the CloudNativePG Cluster CR configuration.
+# Postgres subchart values: the CloudNativePG Cluster CR configuration.
 # The operator (installed separately) reconciles this into actual Postgres
 # pods, services, and secrets.
 
 cluster:
   name: capstone-postgres
   instances: 1                # single-instance dev cluster (NOT production-shaped)
-  imageName: "ghcr.io/cloudnative-pg/postgresql:18.6-standard-trixie"   # pinned (CAP-051): the CNPG standard image, newest 18.x
+  imageName: "ghcr.io/cloudnative-pg/postgresql:18.6-standard-trixie"   # pinned: the CNPG standard image, newest 18.x
   storage:
-    size: 5Gi                 # r21 skeleton; bump for sustained multi-service use
+    size: 5Gi                 # starter size; bump for sustained multi-service use
   # The application database the operator bootstraps. Each service uses its
-  # own SCHEMA within this database (CAP-003), not its own database.
+  # own SCHEMA within this database, not its own database.
   database: capstone
   owner: capstone_app
   # Resource requests/limits for the Postgres pod itself.
-  # CAP-038: 512Mi was too tight — Postgres + the CNPG instance-manager + startup
+  # 512Mi was too tight: Postgres + the CNPG instance-manager + startup
   # crash-recovery (WAL replay) OOM-killed at that ceiling, especially after an
-  # unclean restart. A database is not a tiny FastAPI service (the CAP-026
-  # service calibration does not apply here); give it real headroom.
+  # unclean restart. A database is not a tiny FastAPI service (the per-service
+  # memory calibration does not apply here); give it real headroom.
   resources:
     requests:
       cpu: 200m

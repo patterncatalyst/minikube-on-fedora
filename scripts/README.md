@@ -7,7 +7,7 @@ Developer-facing scripts. Three patterns live here.
 Each runnable example under `examples/` should have a corresponding
 `test-<name>.sh` that builds it, runs it, and validates it responds.
 
-Use `test-template.sh` as a starting point — copy to a new name,
+Use `test-template.sh` as a starting point: copy to a new name,
 edit the TODO values at the top, done. The template builds and runs
 with Docker Engine (`docker build`, `docker run`) and publishes its
 port on loopback only: `-p 127.0.0.1:$HOST_PORT:$CONTAINER_PORT`.
@@ -15,27 +15,27 @@ port on loopback only: `-p 127.0.0.1:$HOST_PORT:$CONTAINER_PORT`.
 The shared helper at `lib/_helpers.sh` provides:
 
 - Color output (`step`, `pass`, `fail`, `info`)
-- `repo_root` — finds the repo root regardless of CWD
-- `cleanup_container <name>` — idempotent `docker rm -f`
-- `wait_for_http <url> [timeout]` — polls until 200 or timeout
-- `require_docker_engine` — fails with the exact fix unless the Docker
+- `repo_root`: finds the repo root regardless of CWD
+- `cleanup_container <name>`: idempotent `docker rm -f`
+- `wait_for_http <url> [timeout]`: polls until 200 or timeout
+- `require_docker_engine`: fails with the exact fix unless the Docker
   Engine is reachable on `unix:///var/run/docker.sock` with the
   `default` context, `DOCKER_HOST` unset, and `podman-docker` absent
-- `KUBE_VERSION`, `CORE_PORTS`, `ISTIO_PORTS`, `DRIVER_CHECK_PORTS` —
+- `KUBE_VERSION`, `CORE_PORTS`, `ISTIO_PORTS`, `DRIVER_CHECK_PORTS`:
   the pinned Kubernetes version and the published-NodePort maps
   (`127.0.0.1:<host>:<nodePort>`)
-- `ensure_profile <name> <ports> <cpus> <mem_mb>` — creates a profile
+- `ensure_profile <name> <ports> <cpus> <mem_mb>`: creates a profile
   with `--driver=docker --container-runtime=containerd` and
   `--ports=…` (after checking the host ports are free), starts a
   stopped one, and verifies every mapping on an existing one
-- `require_published_port <profile> <nodePort> <hostPort>` — fails
+- `require_published_port <profile> <nodePort> <hostPort>`: fails
   with the delete-and-recreate command when `docker port` does not
-  show the mapping; it prints the command and never runs it
-- `build_and_load <image> <context-dir> <profile>` — `docker build -f
+  show the mapping. It prints the command and never runs it
+- `build_and_load <image> <context-dir> <profile>`: `docker build -f
   <dir>/Containerfile`, then `minikube -p <profile> image load`
-- `pin_context <ctx>` — shadows `kubectl`, `helm`, `istioctl` with
+- `pin_context <ctx>`: shadows `kubectl`, `helm`, `istioctl` with
   functions that always pass `--context` / `--kube-context`
-- `require_free_nodeport <nodePort>` — fails with "delete <ns>/<name>
+- `require_free_nodeport <nodePort>`: fails with "delete <ns>/<name>
   first" when another Service holds the nodePort
 
 Conventions for new test scripts:
@@ -55,7 +55,7 @@ A single script that runs every per-example test and reports a
 final summary. Should be added once you have at least two
 per-example tests.
 
-Recommended pattern (not included in skeleton — write once you
+Recommended pattern (not included in skeleton; write once you
 know your test names):
 
 ```bash
@@ -79,14 +79,14 @@ done
 # ... print summary ...
 ```
 
-The aggregator should NOT fail-fast — let every test run, then
+The aggregator should not fail-fast: let every test run, then
 report. This is more useful after a refactor when you want to see
 all problems at once.
 
 ## Audit scripts
 
 `audit-fedora-prereqs.sh` captures the Fedora 44 environment
-state this tutorial assumes — hardware, Docker Engine (`docker-ce`
+state this tutorial assumes: hardware, Docker Engine (`docker-ce`
 packages, daemon state, context, socket, `docker` group), minikube
 profiles, currently-installed tools, what's available in `dnf`
 repos, and kernel inotify limits. It warns when `moby-engine` or
@@ -119,9 +119,9 @@ for unpinned `latest` references and `stable.txt` lookups. It prints <!-- policy
 ./scripts/editorial-audit.sh --strict   # exits 1 on any policy or pin finding
 ```
 
-`--strict` runs in CI before the Jekyll build. To keep a deliberate
-mention (for example a lesson about why a runtime was dropped),
-wrap it in `<!-- policy-exempt:start -->` … `<!-- policy-exempt:end -->`
+`--strict` runs in CI before the Jekyll build. To keep a mention
+the audit would otherwise flag (for example a lesson about why a
+runtime was dropped), wrap it in `<!-- policy-exempt:start -->` … `<!-- policy-exempt:end -->`
 in Markdown, or end the line with `# policy-exempt` (shell, YAML) or
 `<!-- policy-exempt -->` (Markdown).
 

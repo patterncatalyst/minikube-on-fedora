@@ -1,4 +1,4 @@
-# install.yaml — flattened output of `kustomize build config/default`.
+# install.yaml: flattened output of `kustomize build config/default`.
 # Regenerate after any change under config/: kustomize build config/default > install.yaml
 # Applies the ShippingPolicy CRD, the operator's RBAC, and its Deployment in one shot:
 #   kubectl --context mof-patterns apply -f install.yaml

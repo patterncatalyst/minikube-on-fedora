@@ -1,9 +1,9 @@
-# notification-scaledobject.yaml — KEDA Kafka consumer-lag autoscaling for
-# notification-service (r26b, CAP-025).
+# notification-scaledobject.yaml: KEDA Kafka consumer-lag autoscaling for
+# notification-service.
 #
 # notification-service is an event consumer: it reads the `order-placed` topic
 # (consumer group `notification-service`) and persists a notification per order.
-# This makes it an "elastic data product" — KEDA polls the group's lag and runs
+# This makes it an "elastic data product": KEDA polls the group's lag and runs
 # exactly as many consumers as the backlog warrants, down to ZERO when the topic
 # is quiet. The §12 Kafka pattern, now applied to a capstone data product.
 #
@@ -15,7 +15,7 @@
 # A subsequent `helm upgrade` of notification-service may transiently reset
 # replicas to the chart's value; KEDA reconciles it back within a polling
 # interval. (Refactoring the chart to omit `replicas` for KEDA-managed workloads
-# is a later cleanup, out of r26b scope.)
+# is a later cleanup, out of scope here.)
 apiVersion: keda.sh/v1alpha1
 kind: ScaledObject
 metadata:

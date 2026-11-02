@@ -1,7 +1,7 @@
 """SQLAlchemy models for order-service.
 
 The Order table lives in the service's own schema (`orders`), enforcing
-the per-service data ownership boundary (CAP-003). order-service is the
+the per-service data ownership boundary. order-service is the
 only service that writes this schema.
 """
 

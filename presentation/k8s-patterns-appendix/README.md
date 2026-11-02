@@ -1,4 +1,4 @@
-# Kubernetes Patterns & CKAD — companion deck
+# Kubernetes Patterns & CKAD companion deck
 
 A Red Hat-branded 16:9 deck that works all 32 Kubernetes patterns from the
 [Kubernetes patterns & CKAD appendix](../../_appendix/k8s-patterns/) one at a

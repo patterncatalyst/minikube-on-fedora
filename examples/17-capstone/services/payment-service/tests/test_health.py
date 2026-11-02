@@ -1,4 +1,4 @@
-"""Liveness endpoint test for payment-service — no DB required.
+"""Liveness endpoint test for payment-service: no DB required.
 
 Readiness (/healthz) is exercised in-cluster by the smoke test, since it
 needs a real Postgres. This unit test just confirms the app wires up and

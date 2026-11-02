@@ -2,7 +2,7 @@
 #
 # examples/11-istio/demo.sh
 #
-# §11 happy path. The longest demo in the tutorial — 5-10 minutes
+# §11 happy path. The longest demo in the tutorial: 5-10 minutes
 # for a full run. Phases are idempotent so re-runs work even if a
 # prior attempt died midway.
 #
@@ -28,7 +28,7 @@
 #       expect roughly 8-12 of 20
 #   11. Cleanup all Bookinfo + nginx resources on exit
 #
-# This does NOT install the addons (Kiali, Prometheus, etc.) —
+# This does NOT install the addons (Kiali, Prometheus, etc.)
 # they take 5+ minutes to come up. See §11 prose for instructions.
 # Every kubectl / istioctl call is pinned to the `istio` context, so the
 # caller's current kubectl context is never changed.
@@ -113,7 +113,7 @@ pass "istio profile reachable; kubectl context pinned to ${PROFILE_NAME}"
 
 # istioctl in PATH
 if ! command -v istioctl >/dev/null 2>&1; then
-    info "istioctl not in PATH — run scripts/setup-istio.sh first"
+    info "istioctl not in PATH: run scripts/setup-istio.sh first"
     fail "istioctl missing"
 fi
 # The istioctl binary and ~/.local/share/istio-current are shared with other
@@ -144,7 +144,7 @@ step "ensuring ${IMAGE_TAG} is in the istio profile's image cache"
 if ! minikube image ls -p "${PROFILE_NAME}" 2>/dev/null | grep -q "${IMAGE_TAG}"; then
     info "image not present on ${PROFILE_NAME}; building from §6's Containerfile"
     if [[ ! -f "${SECTION6_DIR}/Containerfile" ]]; then
-        fail "${SECTION6_DIR}/Containerfile not found — examples/06 missing?"
+        fail "${SECTION6_DIR}/Containerfile not found: examples/06 missing?"
     fi
     build_and_load "${IMAGE_TAG}" "${SECTION6_DIR}" "${PROFILE_NAME}" \
         || fail "build_and_load ${IMAGE_TAG} failed"
@@ -183,7 +183,7 @@ require_published_port "${PROFILE_NAME}" 30880 "${INGRESS_PORT}"
 # The MutatingWebhookConfiguration that performs sidecar injection
 # registers separately from istiod's Pod readiness. `kubectl wait
 # Available` returns as soon as istiod's Pod is ready (gRPC port
-# open) — but the caBundle on the webhook config gets populated
+# open): but the caBundle on the webhook config gets populated
 # asynchronously a few seconds later. Deploying a workload during
 # that gap produces a Pod with no sidecar injected; the API server
 # silently skips the webhook because its caBundle is empty.
@@ -252,7 +252,7 @@ check_sidecar_injected() {
     # restartPolicy=Always, not as a main container. So checking only
     # .status.containerStatuses[] misses it. Look at the Pod spec,
     # which is authoritative regardless of native-vs-classic sidecar
-    # mode — both .spec.containers[] and .spec.initContainers[].
+    # mode: both .spec.containers[] and .spec.initContainers[].
     NGINX_CONTAINERS=$(kubectl get pod "${NGINX_POD}" \
         -o jsonpath='{.spec.containers[*].name} {.spec.initContainers[*].name}' \
         2>/dev/null)
@@ -270,9 +270,9 @@ step "deploying nginx-with-sidecar"
 deploy_nginx_with_sidecar
 
 if check_sidecar_injected; then
-    pass "nginx-istio Pod has istio-proxy injected (mesh injection working — native sidecar mode in Istio 1.29+/K8s 1.28+)"
+    pass "nginx-istio Pod has istio-proxy injected (mesh injection working: native sidecar mode in Istio 1.29+/K8s 1.28+)"
 else
-    info "first deploy did not inject sidecar — Pod containers: ${NGINX_CONTAINERS}"
+    info "first deploy did not inject sidecar: Pod containers: ${NGINX_CONTAINERS}"
     info "dumping diagnostics, then retrying once after a brief pause"
     dump_injection_diagnostics
     info "retrying nginx deployment (10s pause)"
@@ -281,14 +281,14 @@ else
     if check_sidecar_injected; then
         pass "nginx-istio Pod has istio-proxy injected on retry (mesh injection working)"
     else
-        info "still no sidecar on retry — Pod containers: ${NGINX_CONTAINERS}"
+        info "still no sidecar on retry: Pod containers: ${NGINX_CONTAINERS}"
         dump_injection_diagnostics
         fail "sidecar injection failed twice; webhook is broken"
     fi
 fi
 
 # ── Phase 6: Deploy Bookinfo ────────────────────────────────────────────────
-step "deploying Bookinfo (4 microservices, 6 Pods) — first run ~2-3 minutes"
+step "deploying Bookinfo (4 microservices, 6 Pods): first run ~2-3 minutes"
 # Clean up first (idempotent)
 kubectl delete -f "${BOOKINFO_DIR}/platform/kube/bookinfo.yaml" \
     --ignore-not-found=true >/dev/null 2>&1 || true
@@ -392,10 +392,10 @@ for h in "${!V1_HASHES[@]}"; do
     info "  ${V1_HASHES[$h]} responses → ${h:0:12}..."
 done
 if [[ "${V1_DISTINCT}" -gt 3 ]]; then
-    info "too many distinct hashes for v1 pinning — routing rule may not have applied"
+    info "too many distinct hashes for v1 pinning: routing rule may not have applied"
     fail "v1 pinning check failed (${V1_DISTINCT} distinct hashes; expected ≤3)"
 fi
-pass "${V1_DISTINCT} distinct hash(es) across 10 samples — reviews pinned to v1"
+pass "${V1_DISTINCT} distinct hash(es) across 10 samples: reviews pinned to v1"
 
 # ── Phase 10: 50/50 split between v1 and v3 ─────────────────────────────────
 step "applying virtual-service-reviews-50-v3 (50/50 between v1 and v3)"
@@ -423,18 +423,18 @@ for h in "${!SPLIT_HASHES[@]}"; do
 done
 if [[ "${SPLIT_DISTINCT}" -lt 2 ]]; then
     info "50/50 split should produce at least 2 distinct response patterns"
-    info "got only ${SPLIT_DISTINCT} — split may not have taken effect"
+    info "got only ${SPLIT_DISTINCT}: split may not have taken effect"
     fail "split check failed: only ${SPLIT_DISTINCT} distinct hash(es) across 20 samples"
 fi
-pass "${SPLIT_DISTINCT} distinct response patterns across 20 samples — split is working"
+pass "${SPLIT_DISTINCT} distinct response patterns across 20 samples: split is working"
 
 # ── Done ────────────────────────────────────────────────────────────────────
-step "SUCCESS — Istio install + sidecar injection + Bookinfo routing all verified"
+step "SUCCESS: Istio install + sidecar injection + Bookinfo routing all verified"
 echo
 echo "  Cluster: minikube profile '${PROFILE_NAME}' (separate from §6-§9)"
 echo "  Access:  127.0.0.1:${INGRESS_PORT} -> nodePort 30880 (ingressgateway-host)"
 echo "  Sidecar: nginx-istio Pod has istio-proxy injected"
-echo "           (native sidecar mode — KEP-753, Istio 1.29+/K8s 1.28+)"
+echo "           (native sidecar mode: KEP-753, Istio 1.29+/K8s 1.28+)"
 echo "  Bookinfo: 4 services × 6 Pods, all sidecar-injected"
 echo "  Routing: v1-pin verified (${V1_DISTINCT} distinct hash/10)"
 echo "           split verified (${SPLIT_DISTINCT} distinct patterns/20)"
@@ -445,7 +445,7 @@ echo "  ./cleanup.sh --remove-istio and §11 prose."
 echo
 echo "  To explore further:"
 echo "    - kubectl --context ${PROFILE_NAME} apply -f ${BOOKINFO_DIR}/networking/virtual-service-ratings-test-delay.yaml"
-echo "      (fault injection — 7s delay on ratings)"
+echo "      (fault injection: 7s delay on ratings)"
 echo "    - kubectl --context ${PROFILE_NAME} apply -f ${ISTIO_DIR}/samples/addons"
 echo "      kubectl --context ${PROFILE_NAME} apply -f ${HOST_ACCESS_DIR}/"
 echo "      (Kiali, Prometheus, Grafana, Jaeger; ~5 min to come up)"

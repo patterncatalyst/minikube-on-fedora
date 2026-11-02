@@ -1,7 +1,7 @@
-# review-service Containerfile — UBI 10 multi-stage build, Python 3.14 (CAP-005, CAP-050).
+# review-service Containerfile: UBI 10 multi-stage build, Python 3.14.
 #
 # The BUILDER stage runs as root so it can write /opt/venv (the UBI default
-# user 1001 cannot — /opt is root-owned). The builder image is discarded, so
+# user 1001 cannot; /opt is root-owned). The builder image is discarded, so
 # there's no security cost. The RUNTIME stage enforces the non-root user
 # (1001:0) and only reads/executes the copied venv. (CAP-005 r21b amendment.)
 #

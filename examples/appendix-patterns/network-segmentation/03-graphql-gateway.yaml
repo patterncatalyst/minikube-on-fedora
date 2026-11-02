@@ -4,7 +4,7 @@
 # the allow rule this chapter writes protects a call the gateway's code
 # actually makes rather than a synthetic stand-in. ORDER_REST_URL is left at
 # its default (order-service isn't deployed in this lighter mof-patterns
-# profile — it requires the full Kafka/Apicurio spine from the capstone,
+# profile; it requires the full Kafka/Apicurio spine from the capstone,
 # which this example doesn't stand up); the gateway's own /health and
 # /healthz don't depend on either downstream call succeeding.
 apiVersion: apps/v1

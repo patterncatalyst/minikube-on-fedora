@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# teardown.sh — stop the capstone minikube profile (and optionally delete it).
+# teardown.sh: stop the capstone minikube profile (and optionally delete it).
 #
 # Usage:
 #   ./teardown.sh                     # stop only (preserves state)

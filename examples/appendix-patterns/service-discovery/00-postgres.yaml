@@ -1,5 +1,5 @@
-# A minimal, disposable Postgres for this example — not the CloudNativePG-
-# managed cluster the §17 capstone runs. order-service and inventory-service
+# A minimal, disposable Postgres for this example, not the CloudNativePG-
+# managed cluster the capstone runs. order-service and inventory-service
 # both connect to it; graphql-gateway owns no data and doesn't.
 apiVersion: v1
 kind: Secret

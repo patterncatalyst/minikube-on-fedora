@@ -1,4 +1,4 @@
-# Containerfile — shipping-policy-operator, multi-stage: a Go builder stage
+# shipping-policy-operator Containerfile, multi-stage: a Go builder stage
 # produces one static binary, a ubi10/ubi-micro runtime stage carries nothing
 # else. No shell, no package manager, no CGO, in the final image.
 #

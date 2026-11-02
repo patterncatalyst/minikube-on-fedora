@@ -1,7 +1,7 @@
 # inventory-service, consuming inventory-db-credentials two ways at once: as
 # env vars (PG_USER/PG_PASSWORD/PG_DATABASE, the ordinary path) and as a
 # 0400-mode mounted file at /etc/inventory/credentials (the narrower-exposure
-# path this chapter's prose covers). Deliberately redundant, to make both
+# path this chapter's prose covers). Redundant by design, to make both
 # consumption modes inspectable on the same running Pod.
 apiVersion: apps/v1
 kind: Deployment

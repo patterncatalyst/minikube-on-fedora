@@ -405,11 +405,11 @@
       "locked": false,
       "fontSize": 12,
       "fontFamily": 2,
-      "text": "Platform \u2014 computational enforcement",
+      "text": "Platform: computational enforcement",
       "textAlign": "middle",
       "verticalAlign": "top",
       "containerId": null,
-      "originalText": "Platform \u2014 computational enforcement",
+      "originalText": "Platform: computational enforcement",
       "lineHeight": 1.25
     },
     {
@@ -940,11 +940,11 @@
       "locked": false,
       "fontSize": 12,
       "fontFamily": 2,
-      "text": "Equilibrium between centralization and decentralization \u2014 rules are computational, not paperwork.",
+      "text": "Equilibrium between centralization and decentralization: rules are computational, not paperwork.",
       "textAlign": "middle",
       "verticalAlign": "top",
       "containerId": null,
-      "originalText": "Equilibrium between centralization and decentralization \u2014 rules are computational, not paperwork.",
+      "originalText": "Equilibrium between centralization and decentralization: rules are computational, not paperwork.",
       "lineHeight": 1.25
     }
   ],

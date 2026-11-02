@@ -20,7 +20,7 @@ installs `istioctl` to `~/.local/bin/`, and creates the
 `~/.local/share/istio-current` symlink the demo references for
 the Bookinfo manifests.
 
-The demo also expects a minikube profile called `istio` —
+The demo also expects a minikube profile called `istio`:
 **separate from the `minikube` profile** §6-§9 use. If it
 doesn't exist, the demo creates it. The recommended sizing:
 
@@ -58,7 +58,7 @@ Eleven §11 claims:
 7. `istioctl analyze` returns clean (no config errors)
 8. `virtual-service-all-v1.yaml` pins 100% of reviews traffic
    to v1 (the demo confirms by counting v2/v3 indicators in 10
-   responses — should be 0)
+   responses: should be 0)
 9. `virtual-service-reviews-50-v3.yaml` produces roughly 50/50
    between v1 and v3 (sampled across 20 requests)
 10. Per-profile minikube image cache is independent from the
@@ -111,7 +111,7 @@ minutes for the §6 Containerfile to build (`docker build`, then
 ```
 
 The exact split count varies (it's a random sample of 20
-requests). The demo treats 4-16 of 20 as a soft pass — anything
+requests). The demo treats 4-16 of 20 as a soft pass: anything
 more skewed than that prints a warning but doesn't fail, since
 routing rule propagation can lag a few seconds.
 
@@ -161,7 +161,7 @@ The demo's `trap cleanup EXIT` handler:
 
 **Istio itself stays installed** on the istio profile, along with
 the `ingressgateway-host` companion Service. The demo
-doesn't `istioctl uninstall` on every exit — that would mean
+doesn't `istioctl uninstall` on every exit, that would mean
 every re-run waits 30-60 seconds for the control plane to come
 back up. To fully remove Istio:
 
@@ -184,12 +184,12 @@ minikube delete -p istio     # delete, free disk
 
 ## When this fails
 
-1. **`scripts/setup-istio.sh` not run** — the demo will tell you
+1. **`scripts/setup-istio.sh` not run**: the demo will tell you
    if istioctl isn't in PATH or if the Bookinfo samples aren't
    present at `~/.local/share/istio-current/samples/bookinfo/`.
    Run setup-istio.sh and try again
 
-2. **istio profile out of resources** — Istio + Bookinfo + sidecars
+2. **istio profile out of resources**: Istio + Bookinfo + sidecars
    easily peak at 4-5 GB. If the profile was created with less
    than `--memory=6g`, Pods will go OOMKilled or stay Pending.
    Fix: delete and recreate the profile
@@ -200,15 +200,15 @@ minikube delete -p istio     # delete, free disk
            --kubernetes-version=v1.36.5 --cpus=4 --memory=6144 \
            --ports=127.0.0.1:8080:30880,127.0.0.1:20001:30201,127.0.0.1:3000:30300,127.0.0.1:19090:30990,127.0.0.1:16686:31686
 
-3. **Bookinfo Pods stuck pulling images** — the `docker.io/istio/*`
+3. **Bookinfo Pods stuck pulling images**: the `docker.io/istio/*`
    images are larger than our nginx-custom image. Check
    `kubectl describe pod` for image-pull errors
 
-4. **`istioctl analyze` reports errors** — usually a Gateway or
+4. **`istioctl analyze` reports errors**: usually a Gateway or
    VirtualService misconfiguration. The demo's failure dump
    includes the full analyze output
 
-5. **v3-hit count is way off** — could mean the routing rule
+5. **v3-hit count is way off**: could mean the routing rule
    didn't propagate to the sidecars (rare; usually resolves
    within 10s of apply), OR the Bookinfo manifest filename
    moved in a newer Istio release. The demo falls back to
@@ -216,21 +216,21 @@ minikube delete -p istio     # delete, free disk
    50/50 file is missing
 
 6. **Port 8080, 20001, 3000, 19090 or 16686 already in use on the
-   host** — `ensure_profile` lists the conflicting host port and
+   host**: `ensure_profile` lists the conflicting host port and
    stops before creating the profile. Free the port (a stray
    local server is the usual cause) and re-run
 
-7. **Demo says the profile does not publish a nodePort** — the
+7. **Demo says the profile does not publish a nodePort**: the
    `istio` profile was created without `--ports`. Published ports
    cannot be added to an existing profile; run the printed
    `minikube delete` / `minikube start` command
 
-8. **`curl 127.0.0.1:8080` fails but the gateway is Ready** — the
+8. **`curl 127.0.0.1:8080` fails but the gateway is Ready**: the
    companion selector matched no Pod. The demo prints the
    Service's endpoints and the gateway Service's real selector;
    fix `host-access/ingressgateway-host.yaml` to match
 
-9. **`READY 1/2` instead of `2/2`** on Bookinfo Pods — sidecar
+9. **`READY 1/2` instead of `2/2`** on Bookinfo Pods: sidecar
    injection didn't happen. Verify the namespace label:
    `kubectl get namespace default -L istio-injection`
 
@@ -238,18 +238,18 @@ For any of these, paste the failing output back.
 
 ## Going further on your own
 
-The demo deliberately stops short of:
+The demo stops short of:
 
-- **Fault injection** — try
+- **Fault injection**: try
   `kubectl --context istio apply -f ~/.local/share/istio-current/samples/bookinfo/networking/virtual-service-ratings-test-delay.yaml`
   for a 7-second delay on ratings
-- **Observability addons** — `kubectl --context istio apply -f
+- **Observability addons**: `kubectl --context istio apply -f
   ~/.local/share/istio-current/samples/addons/` installs Kiali,
   Prometheus, Grafana, Jaeger (5+ min), then
   `kubectl --context istio apply -f host-access/` adds their
   NodePort companions. Kiali is then at
   `http://127.0.0.1:20001/kiali`
-- **Production profiles** — the demo profile is for tutorials;
+- **Production profiles**: the demo profile is for tutorials;
   real deployments use a slimmer profile or a custom
   IstioOperator
 

@@ -45,7 +45,7 @@ spec:
       containers:
       - name: nginx
         image: nginx-custom:v1
-        # Same image as §6/§7 — generic nginx; content comes from
+        # Same image as §6/§7: generic nginx; content comes from
         # the volume mount below, not the image
         imagePullPolicy: Never
         ports:

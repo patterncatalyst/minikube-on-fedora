@@ -130,11 +130,11 @@
       "locked": false,
       "fontSize": 13,
       "fontFamily": 2,
-      "text": "Runtime path \u2014 Avro event serialization (hot, online)",
+      "text": "Runtime path: Avro event serialization (hot, online)",
       "textAlign": "left",
       "verticalAlign": "top",
       "containerId": null,
-      "originalText": "Runtime path \u2014 Avro event serialization (hot, online)",
+      "originalText": "Runtime path: Avro event serialization (hot, online)",
       "lineHeight": 1.25
     },
     {
@@ -931,11 +931,11 @@
       "locked": false,
       "fontSize": 13,
       "fontFamily": 2,
-      "text": "Discovery path \u2014 publish contracts, ingest into the catalog (offline)",
+      "text": "Discovery path: publish contracts, ingest into the catalog (offline)",
       "textAlign": "left",
       "verticalAlign": "top",
       "containerId": null,
-      "originalText": "Discovery path \u2014 publish contracts, ingest into the catalog (offline)",
+      "originalText": "Discovery path: publish contracts, ingest into the catalog (offline)",
       "lineHeight": 1.25
     },
     {
@@ -966,11 +966,11 @@
       "locked": false,
       "fontSize": 11,
       "fontFamily": 2,
-      "text": "nothing fails at runtime if absent; this exists to be discovered \u2014 by people, CI, and OpenMetadata",
+      "text": "nothing fails at runtime if absent; this exists to be discovered by people, CI, and OpenMetadata",
       "textAlign": "left",
       "verticalAlign": "top",
       "containerId": null,
-      "originalText": "nothing fails at runtime if absent; this exists to be discovered \u2014 by people, CI, and OpenMetadata",
+      "originalText": "nothing fails at runtime if absent; this exists to be discovered by people, CI, and OpenMetadata",
       "lineHeight": 1.25
     },
     {

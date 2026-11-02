@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""reviews_lineage.py — declare (or remove) the reviews data product's lineage.
+"""reviews_lineage.py: declare (or remove) the reviews data product's lineage.
 
-Phase A part 2. The review-service data product references products by `sku` —
-the identifier the inventory domain owns — so we connect them in OpenMetadata
-with a single directed edge:
+The review-service data product references products by `sku`, the identifier
+the inventory domain owns, so we connect them in OpenMetadata with a single
+directed edge:
 
     capstone-postgres.capstone.inventory.stock   (Table, inventory-service)
         │  referenced by
@@ -20,7 +20,7 @@ either in the ingestion image or host-side against the published server (127.0.0
 
 Usage:  OM_HOST=... OM_JWT=... ./reviews_lineage.py up|down
 
-VERIFY-POINTS (OpenMetadata 2.0.5 API shapes — same caveats as lineage.py):
+VERIFY-POINTS (OpenMetadata 2.0.5 API shapes, same caveats as lineage.py):
   * Entity-by-FQN: GET /api/v1/tables/name/{fqn} returns the entity with `id`.
   * Add edge: PUT /api/v1/lineage with
       {"edge": {"fromEntity": {"id","type"}, "toEntity": {"id","type"}}}.
@@ -77,7 +77,7 @@ def delete_edge(from_id: str, to_id: str) -> None:
     try:
         urllib.request.urlopen(req, timeout=30).read()
     except urllib.error.HTTPError as exc:
-        if exc.code in (404, 400):  # already gone — fine for an idempotent down
+        if exc.code in (404, 400):  # already gone; fine for an idempotent down
             return
         raise
 

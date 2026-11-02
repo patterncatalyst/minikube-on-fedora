@@ -1,6 +1,6 @@
 # inventory-service: the gRPC target this chapter protects. Its gRPC server
 # (port 50051) is the one path graphql-gateway's resolver code actually calls;
-# its REST port (8080) is left unused by this example on purpose, so the
+# its REST port (8080) is left unused by this example by design, so the
 # allow-rule in 05-allow-gateway-to-inventory.yaml only needs to open one port.
 apiVersion: apps/v1
 kind: Deployment

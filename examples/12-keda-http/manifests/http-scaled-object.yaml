@@ -1,7 +1,7 @@
 # examples/12-keda-http/manifests/http-scaled-object.yaml
 #
 # KEDA HTTP add-on's HTTPScaledObject CRD. Distinct from the regular
-# ScaledObject — uses the HTTP add-on's interceptor + scaler, not the
+# ScaledObject: uses the HTTP add-on's interceptor + scaler, not the
 # core KEDA controller. In add-on 0.16 this API is deprecated in favour
 # of InterceptorRoute; it still works and is kept for its simpler shape.
 ---

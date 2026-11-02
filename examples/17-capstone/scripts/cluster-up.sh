@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
-# cluster-up.sh — bring the capstone cluster up cleanly, and heal the two
-# failure modes that bit us hard during r29c:
+# cluster-up.sh: bring the capstone cluster up cleanly, and heal the two
+# failure modes seen during bring-up:
 #
 #   1. A wedged control plane. After a long uptime with many redeploys, etcd can
 #      crashloop in place on "bind: address already in use" (:2380), taking the
@@ -48,7 +48,7 @@ if minikube status -p "$PROFILE" >/dev/null 2>&1; then
 else
     printf '    starting (this also clears a stopped/wedged node)...\n'
     minikube start -p "$PROFILE" >/dev/null 2>&1 \
-        || fail "minikube start failed — run ./scripts/setup-capstone-profile.sh for first-time provisioning"
+        || fail "minikube start failed: run ./scripts/setup-capstone-profile.sh for first-time provisioning"
     for _e in ${CAPSTONE_PORTS//,/ }; do
         require_published_port "$PROFILE" "$(cut -d: -f3 <<<"$_e")" "$(cut -d: -f2 <<<"$_e")"
     done
@@ -58,7 +58,7 @@ fi
 # ─── 2. Control-plane health, with auto-cycle on a wedge ─────────────────────
 cp_healthy() {
     kubectl get --raw='/readyz' >/dev/null 2>&1 || return 1
-    # etcd specifically — the wedge we hit. Ready=true on the etcd static pod.
+    # etcd specifically: the wedge we hit. Ready=true on the etcd static pod.
     kubectl get pods -n kube-system -l component=etcd \
         -o jsonpath='{.items[0].status.containerStatuses[0].ready}' 2>/dev/null \
         | grep -q true
@@ -76,13 +76,13 @@ step "Checking control-plane health"
 if wait_cp 60; then
     ok "control plane healthy (API server + etcd)"
 else
-    warn "control plane not healthy after 60s — likely a wedged etcd. Cycling the node..."
+    warn "control plane not healthy after 60s: likely a wedged etcd. Cycling the node..."
     minikube stop -p "$PROFILE"  >/dev/null 2>&1 || fail "minikube stop failed"
     minikube start -p "$PROFILE" >/dev/null 2>&1 || fail "minikube start failed"
     if wait_cp 180; then
         ok "control plane recovered after node cycle"
     else
-        fail "control plane still unhealthy after a cycle — inspect: kubectl get pods -n kube-system; kubectl logs -n kube-system etcd-$PROFILE --previous"
+        fail "control plane still unhealthy after a cycle: inspect: kubectl get pods -n kube-system; kubectl logs -n kube-system etcd-$PROFILE --previous"
     fi
 fi
 
@@ -101,9 +101,9 @@ for svc in "${SERVICES[@]}"; do
 done
 
 if [[ ${#missing[@]} -eq 0 ]]; then
-    ok "all ${#SERVICES[@]} images present (:${TAG}) — nothing to rebuild"
+    ok "all ${#SERVICES[@]} images present (:${TAG}): nothing to rebuild"
 else
-    warn "missing: ${missing[*]} — rebuilding (only these)"
+    warn "missing: ${missing[*]}: rebuilding (only these)"
     for svc in "${missing[@]}"; do
         printf '\n    --- rebuilding %s ---\n' "$svc"
         "${SCRIPT_DIR}/build-image.sh" "services/${svc}" "$svc" "$TAG" \

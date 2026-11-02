@@ -1,10 +1,10 @@
 """SQLAlchemy declarative base for payment-service.
 
-r22 skeleton: no tables yet. The service's schema (`payments`) is created
+Skeleton: no tables yet. The service's schema (`payments`) is created
 at startup (see db.init_schema), ready for domain tables in a later
 iteration. When this service's domain model lands, add table classes here
 bound to `settings.service_schema` to keep the per-service ownership boundary
-(CAP-003) explicit, e.g.:
+explicit, e.g.:
 
     class Widget(Base):
         __tablename__ = "widgets"

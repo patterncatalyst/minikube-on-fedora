@@ -1,9 +1,9 @@
 """SQLAlchemy models for review-service.
 
 The Review table lives in the service's own schema (`reviews`), enforcing
-the per-service data ownership boundary (CAP-003). review-service is the only
-service that writes this schema. Reviews reference a product `sku` — the same
-identifier the inventory/product domain owns — which is the basis for the
+the per-service data ownership boundary. review-service is the only
+service that writes this schema. Reviews reference a product `sku`, the same
+    identifier the inventory/product domain owns, which is the basis for the
 cross-product lineage edge we declare in OpenMetadata (reviews -> products).
 """
 

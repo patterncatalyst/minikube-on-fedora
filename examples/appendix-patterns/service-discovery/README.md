@@ -77,9 +77,9 @@ curl -s "http://${INGRESS_IP}/health"; echo
 ```
 
 One address, two backends: `/graphql` reaches `graphql-gateway`'s own
-GraphiQL endpoint, `/health` reaches `order-service`'s liveness endpoint —
+GraphiQL endpoint, `/health` reaches `order-service`'s liveness endpoint,
 no rewrite is configured, so each `path` here points at something that
-genuinely exists on that backend rather than relying on ingress-nginx to
+exists on that backend rather than relying on ingress-nginx to
 rewrite the path into something that does.
 
 ## Cleanup

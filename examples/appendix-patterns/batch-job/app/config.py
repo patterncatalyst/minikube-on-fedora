@@ -13,7 +13,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="", case_sensitive=False)
 
-    # Postgres connection — the appendix's disposable patterns-postgres.
+    # Postgres connection: the appendix's disposable patterns-postgres.
     pg_host: str = "patterns-postgres.patterns.svc.cluster.local"
     pg_port: int = 5432
     pg_user: str = "capstone_app"

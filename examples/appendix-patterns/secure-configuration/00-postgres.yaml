@@ -1,8 +1,8 @@
-# A minimal, disposable Postgres for the appendix examples. This is NOT the
-# CloudNativePG-managed cluster the §17 capstone runs: no operator, no
+# A minimal, disposable Postgres for the appendix examples. This is not the
+# CloudNativePG-managed cluster the capstone runs: no operator, no
 # persistent storage, no replication. It only recognizes one role
 # (capstone_app), which is why 01-secret.yaml's inventory-specific Secret
-# carries the same values as this one rather than a genuinely distinct role —
+# carries the same values as this one rather than a distinct role;
 # see that file's comment for why the pattern still holds regardless.
 apiVersion: v1
 kind: Secret

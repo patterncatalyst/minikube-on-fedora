@@ -1,14 +1,14 @@
-"""shipping-report CLI — the BatchJob/PeriodicJob runner's entrypoint.
+"""shipping-report CLI: the BatchJob/PeriodicJob runner's entrypoint.
 
 Two subcommands:
 
-  seed    — create the schema/table and insert demo shipment rows once.
-  report  — read this partition's rows and write a CSV to the PVC mount.
+  seed      create the schema/table and insert demo shipment rows once.
+  report    read this partition's rows and write a CSV to the PVC mount.
 
 `report` defaults its partition index from JOB_COMPLETION_INDEX so an
 Indexed Job's Pod template can call it with no arguments at all; a plain
 (non-indexed) Job or a CronJob run leaves JOB_COMPLETION_INDEX at 0 and
-partition_count at 1, which selects every row — the correct behavior for
+partition_count at 1, which selects every row, the correct behavior for
 a single-Pod run.
 """
 

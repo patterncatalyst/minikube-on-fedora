@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
-# smoke-om-lineage.sh — verify the OpenMetadata catalog was populated and the
-# cross-product lineage declared (r27b).
+# smoke-om-lineage.sh: verify the OpenMetadata catalog was populated and the
+# cross-product lineage declared.
 #
-# Does NOT run ingestion — that's scripts/ingest-openmetadata.sh. This proves
+# Does NOT run ingestion: that's scripts/ingest-openmetadata.sh. This proves
 # the result, over the server API on the published NodePort 127.0.0.1:8585 (the
 # smoke-openmetadata.sh pattern):
 #   * the Database Service  capstone-postgres  exists
@@ -13,7 +13,7 @@
 #       - topic  capstone-kafka.order-placed
 #       - table  capstone-postgres.capstone.notifications.notifications
 #   * lineage on the topic has an upstream (orders) AND a downstream
-#     (notifications) edge — i.e. orders -> order-placed -> notifications
+#     (notifications) edge: i.e. orders -> order-placed -> notifications
 #
 # On failure it leaves resources in place and dumps diagnostics. Idempotent.
 # Run from examples/17-capstone/:
@@ -44,7 +44,7 @@ TOKEN=""
 step() { printf '\n==> %s\n' "$1"; }
 
 dump_diagnostics() {
-    step "DIAGNOSTIC DUMP (failure — resources left in place)"
+    step "DIAGNOSTIC DUMP (failure: resources left in place)"
     printf '\n--- ingestion jobs ---\n'
     kubectl get jobs -n "$NS" -l app.kubernetes.io/component=openmetadata-ingestion 2>&1
     printf '\n--- recent logs per ingestion job ---\n'
@@ -69,18 +69,18 @@ om_get() {
 # ─── Pre-flight ──────────────────────────────────────────────────────────────
 
 step "Pre-flight checks"
-minikube status -p "$PROFILE" >/dev/null 2>&1 || fail "profile '$PROFILE' not running — ./scripts/setup-capstone-profile.sh"
+minikube status -p "$PROFILE" >/dev/null 2>&1 || fail "profile '$PROFILE' not running: ./scripts/setup-capstone-profile.sh"
 command -v kubectl >/dev/null || fail "kubectl not in PATH"
 command -v curl >/dev/null || fail "curl not in PATH"
 command -v python3 >/dev/null || fail "python3 not in PATH"
 kubectl get deployment openmetadata -n "$NS" >/dev/null 2>&1 \
-    || fail "openmetadata not deployed — run scripts/setup-openmetadata.sh first"
+    || fail "openmetadata not deployed: run scripts/setup-openmetadata.sh first"
 
 # ─── Published NodePort + admin token ────────────────────────────────────────
 
 step "Reaching the server on 127.0.0.1:${LOCAL_PORT} (published NodePort) and obtaining an admin token"
 require_published_port "$PROFILE" "$NODE_PORT_OPENMETADATA" "$HOST_PORT_OPENMETADATA"
-wait_for_http "${OM}/api/v1/system/version" 120 || fail "no response from ${OM} — is the server serving?"
+wait_for_http "${OM}/api/v1/system/version" 120 || fail "no response from ${OM}: is the server serving?"
 TOKEN="$(OM_HOST="$OM" python3 "$GET_TOKEN" 2>/dev/null || echo '')"
 [[ -n "$TOKEN" ]] || fail "could not obtain an admin token (is the server serving? check auth provider)"
 printf '    ✓ authenticated\n'
@@ -89,10 +89,10 @@ printf '    ✓ authenticated\n'
 
 step "Confirming the ingested services exist"
 om_get "/api/v1/services/databaseServices/name/capstone-postgres" >/dev/null \
-    || fail "Database Service 'capstone-postgres' not found — did om-ingest-postgres run?"
+    || fail "Database Service 'capstone-postgres' not found: did om-ingest-postgres run?"
 printf '    ✓ database service capstone-postgres\n'
 om_get "/api/v1/services/messagingServices/name/capstone-kafka" >/dev/null \
-    || fail "Messaging Service 'capstone-kafka' not found — did om-ingest-kafka run?"
+    || fail "Messaging Service 'capstone-kafka' not found: did om-ingest-kafka run?"
 printf '    ✓ messaging service capstone-kafka\n'
 
 # ─── Spine entities ──────────────────────────────────────────────────────────
@@ -126,7 +126,7 @@ print(len(d.get("upstreamEdges", []) or []), len(d.get("downstreamEdges", []) or
 printf '    upstream edges: %s   downstream edges: %s\n' "${UP:-0}" "${DOWN:-0}"
 [[ "${UP:-0}" -ge 1 ]] || fail "no upstream edge into order-placed (orders -> order-placed missing)"
 [[ "${DOWN:-0}" -ge 1 ]] || fail "no downstream edge from order-placed (order-placed -> notifications missing)"
-printf '    ✓ both edges present — the cross-product spine is wired\n'
+printf '    ✓ both edges present: the cross-product spine is wired\n'
 
 # ─── Done ────────────────────────────────────────────────────────────────────
 

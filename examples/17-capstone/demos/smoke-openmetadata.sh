@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 #
-# smoke-openmetadata.sh — verify the OpenMetadata catalog is deployed and
-# healthy (r27).
+# smoke-openmetadata.sh: verify the OpenMetadata catalog is deployed and
+# healthy.
 #
-# Unlike the per-service smokes, this does NOT install OpenMetadata — that's a
+# Unlike the per-service smokes, this does NOT install OpenMetadata: that's a
 # platform install done once by scripts/setup-openmetadata.sh (mirroring the
 # operator setups). This smoke assumes that ran, and proves the result:
 #   * the openmetadata Deployment is rolled out
 #   * the server answers its version API (proves it booted AND reached its
-#     Postgres backend — OpenMetadata won't serve without a working DB)
+#     Postgres backend: OpenMetadata won't serve without a working DB)
 #   * the version it reports is the pinned 2.0.5
 #   * the dedicated `openmetadata` database really exists in capstone-postgres
 #     and was populated by the server's migrations (sanity that Postgres reuse,
@@ -34,7 +34,7 @@ SUCCESS=0
 step() { printf '\n==> %s\n' "$1"; }
 
 dump_diagnostics() {
-    step "DIAGNOSTIC DUMP (failure — resources left in place for inspection)"
+    step "DIAGNOSTIC DUMP (failure: resources left in place for inspection)"
     printf '\n--- pods (capstone) ---\n'
     kubectl get pods -n "$NS" -o wide 2>&1
     local pod
@@ -63,10 +63,10 @@ fail() {
 # ─── Pre-flight ──────────────────────────────────────────────────────────────
 
 step "Pre-flight checks"
-minikube status -p "$PROFILE" >/dev/null 2>&1 || fail "profile '$PROFILE' not running — ./scripts/setup-capstone-profile.sh"
+minikube status -p "$PROFILE" >/dev/null 2>&1 || fail "profile '$PROFILE' not running: ./scripts/setup-capstone-profile.sh"
 command -v kubectl >/dev/null || fail "kubectl not in PATH"
 kubectl get deployment openmetadata -n "$NS" >/dev/null 2>&1 \
-    || fail "openmetadata Deployment not found — run scripts/setup-openmetadata.sh first"
+    || fail "openmetadata Deployment not found: run scripts/setup-openmetadata.sh first"
 
 # ─── Rollout ─────────────────────────────────────────────────────────────────
 
@@ -80,11 +80,11 @@ printf '    ✓ deployment available\n'
 step "Querying the server version API (proves it booted and reached Postgres)"
 require_published_port "$PROFILE" "$NODE_PORT_OPENMETADATA" "$HOST_PORT_OPENMETADATA"
 wait_for_http "http://127.0.0.1:${LOCAL_PORT}/api/v1/system/version" 120 \
-    || fail "no response from 127.0.0.1:${LOCAL_PORT} (the openmetadata-host NodePort) — is the server serving?"
+    || fail "no response from 127.0.0.1:${LOCAL_PORT} (the openmetadata-host NodePort): is the server serving?"
 
 VERSION_JSON="$(curl -fsS "http://127.0.0.1:${LOCAL_PORT}/api/v1/system/version" 2>/dev/null || echo '')"
 [[ -n "$VERSION_JSON" ]] \
-    || fail "no response from /api/v1/system/version (server up but not serving — check DB connectivity in the server logs)"
+    || fail "no response from /api/v1/system/version (server up but not serving: check DB connectivity in the server logs)"
 printf '    server reported: %s\n' "$VERSION_JSON"
 
 echo "$VERSION_JSON" | grep -q "$EXPECTED_VERSION" \
@@ -107,7 +107,7 @@ TABLE_COUNT="$(kubectl exec -n "$NS" "$PG_PRIMARY" -c postgres -- \
     2>/dev/null || echo "0")"
 printf '    public tables in %s: %s\n' "$OM_DB" "$TABLE_COUNT"
 [[ "${TABLE_COUNT:-0}" -gt 0 ]] \
-    || fail "openmetadata database has no tables — migrations did not run against Postgres"
+    || fail "openmetadata database has no tables: migrations did not run against Postgres"
 printf '    ✓ Postgres-backed (openmetadata db populated with %s tables)\n' "$TABLE_COUNT"
 
 # ─── Done ────────────────────────────────────────────────────────────────────
@@ -117,4 +117,4 @@ step "SUCCESS"
 printf 'OpenMetadata %s is deployed, Postgres-backed, and serving its API.\n' "$EXPECTED_VERSION"
 printf 'Open the UI with:\n'
 printf '  http://127.0.0.1:%s   (credentials: see openmetadata/om-app-values.yaml)\n' "$LOCAL_PORT"
-printf '\nNext (r27b): register Postgres + Kafka, ingest, and declare lineage.\n'
+printf '\nNext: register Postgres + Kafka, ingest, and declare lineage.\n'

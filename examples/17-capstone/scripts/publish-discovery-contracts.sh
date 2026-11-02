@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
-# publish-discovery-contracts.sh — publish the mesh's *discovery* contracts to
+# publish-discovery-contracts.sh: publish the mesh's *discovery* contracts to
 # Apicurio, alongside the Avro *runtime* contract that order-service already
 # registers. These are the discovery artifacts OpenMetadata will later ingest
-# (CAP-018): they're published for discovery, not on any runtime path.
+#: they're published for discovery, not on any runtime path.
 #
 # Publishes three artifacts via Apicurio's native v3 API
 # (POST /apis/registry/v3/groups/{group}/artifacts):
@@ -67,21 +67,21 @@ def publish(artifact_id, artifact_type, content, content_type):
             print(f"    ✗ {artifact_id}: HTTP {e.code} {e.read().decode('utf-8','ignore')[:200]}", file=sys.stderr)
             raise
 
-# 1) OpenAPI — order-service's live spec (the REST discovery contract).
+# 1) OpenAPI: order-service's live spec (the REST discovery contract).
 print("==> OpenAPI (order-service /openapi.json)")
 openapi = fetch(f"{order_url}/openapi.json")
 publish("order-service-openapi", "OPENAPI", openapi, "application/json")
 
-# 2) Protobuf — the committed gRPC definition (no service needed).
+# 2) Protobuf: the committed gRPC definition (no service needed).
 print("==> Protobuf (inventory .proto)")
 with open(proto_path, encoding="utf-8") as f:
     proto = f.read()
 publish("inventory-grpc-proto", "PROTOBUF", proto, "text/plain")
 
-# 3) GraphQL SDL — the gateway's schema (the GraphQL discovery contract).
+# 3) GraphQL SDL: the gateway's schema (the GraphQL discovery contract).
 print("==> GraphQL SDL (gateway /sdl)")
 sdl = fetch(f"{gateway_url}/sdl", as_text=True)
 publish("graphql-gateway-sdl", "GRAPHQL", sdl, "text/plain")
 
-print("==> Done — discovery contracts published to Apicurio")
+print("==> Done: discovery contracts published to Apicurio")
 PY

@@ -10,7 +10,7 @@
 #   The pattern scales naturally to real workloads where the builder
 #   needs heavy tooling (a static-site generator, a compiler toolchain,
 #   asset bundlers) that you don't want in the runtime image. For our
-#   single-page example, the builder is minimal — but the structure is
+#   single-page example, the builder is minimal, but the structure is
 #   familiar from production.
 #
 # Why not just use registry.access.redhat.com/ubi10/nginx-126?
@@ -26,7 +26,7 @@ FROM registry.access.redhat.com/ubi10/ubi:10.2-1791444044 AS builder
 WORKDIR /build
 
 # In a real project, you'd RUN a static-site generator here (Hugo,
-# Jekyll, mkdocs, etc.) — its tools live in the builder stage and
+# Jekyll, mkdocs, etc.); its tools live in the builder stage and
 # never reach the runtime image. For this tutorial we just stage the
 # hand-written index.html so the COPY --from=builder in stage 2 has
 # something to take.
@@ -42,7 +42,7 @@ RUN microdnf install -y nginx && \
     rm -rf /var/cache/dnf /var/cache/yum
 
 # Replace the default nginx.conf with our minimal version. Reasoning
-# is in the head comment of the nginx.conf file — short version: the
+# is in the head comment of the nginx.conf file. Short version: the
 # default RHEL nginx.conf has a `user nginx;` directive (warns for
 # non-root), logs to files under /var/log/nginx (which kubectl logs
 # can't see), and uses /run for the pid file (root-only). Our config

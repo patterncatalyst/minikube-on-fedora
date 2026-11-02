@@ -87,7 +87,7 @@ func runWithEnvtest(m *testing.M) int {
 // TestEnvtest_ReconcileAgainstRealAPIServer applies a ShippingPolicy through
 // a real apiserver (so the generated CRD's own schema validates it), runs
 // one reconcile, and confirms the child Deployment and ConfigMap land with
-// the right shape — the same assertions as the fake-client test, now proven
+// the right shape: the same assertions as the fake-client test, now proven
 // against real API-level validation rather than an in-memory tracker.
 func TestEnvtest_ReconcileAgainstRealAPIServer(t *testing.T) {
 	if testClient == nil {

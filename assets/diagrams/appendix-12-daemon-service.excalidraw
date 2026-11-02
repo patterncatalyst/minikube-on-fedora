@@ -800,13 +800,13 @@
    "updated": 1,
    "link": null,
    "locked": false,
-   "text": "Exactly one node-collector Pod per node \u2014 the controller adds or removes a Pod the moment a node joins or leaves.",
+   "text": "Exactly one node-collector Pod per node; the controller adds or removes a Pod the moment a node joins or leaves.",
    "fontSize": 14,
    "fontFamily": 1,
    "textAlign": "left",
    "verticalAlign": "top",
    "containerId": null,
-   "originalText": "Exactly one node-collector Pod per node \u2014 the controller adds or removes a Pod the moment a node joins or leaves.",
+   "originalText": "Exactly one node-collector Pod per node; the controller adds or removes a Pod the moment a node joins or leaves.",
    "lineHeight": 1.25,
    "baseline": 14
   }

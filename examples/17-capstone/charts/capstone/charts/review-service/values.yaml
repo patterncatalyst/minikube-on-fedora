@@ -35,7 +35,7 @@ resources:
 
 # /health is liveness; /healthz is readiness (checks Postgres).
 probes:
-  # r28 calibration: a startupProbe gates liveness/readiness until the app has
+  # a startupProbe gates liveness/readiness until the app has
   # finished booting. Python services (imports + schema build + seed) can take
   # 10-30s; a 5s liveness initialDelay alone would kill them mid-boot.
   # 30 x 2s = 60s startup grace.

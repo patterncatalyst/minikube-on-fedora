@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
-# setup-keda.sh — install KEDA (core + HTTP add-on) into the mof-capstone cluster,
-# in preparation for the dual autoscalers (r26b, CAP-025):
+# setup-keda.sh: install KEDA (core + HTTP add-on) into the mof-capstone cluster,
+# in preparation for the dual autoscalers:
 #   * Kafka consumer-lag scaling for notification-service (core KEDA)
 #   * HTTP request scaling for graphql-gateway (the HTTP add-on)
 #
@@ -28,7 +28,7 @@ KEDA_VERSION="${KEDA_VERSION:-2.21.0}"
 KEDA_HTTP_VERSION="${KEDA_HTTP_VERSION:-0.16.0}"
 
 command -v kubectl >/dev/null 2>&1 || { printf 'ERROR: kubectl not in PATH.\n' >&2; exit 1; }
-command -v helm    >/dev/null 2>&1 || { printf 'ERROR: helm not in PATH — see §2.\n' >&2; exit 1; }
+command -v helm    >/dev/null 2>&1 || { printf 'ERROR: helm not in PATH: see §2.\n' >&2; exit 1; }
 
 # ─── 1. kedacore helm repo ───────────────────────────────────────────────────
 printf '==> Ensuring the kedacore helm repo is registered\n'

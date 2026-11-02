@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# setup-postgres-operator.sh — install the CloudNativePG operator into the
+# setup-postgres-operator.sh: install the CloudNativePG operator into the
 # mof-capstone cluster.
 #
 # IMPORTANT: installing an operator is a CLUSTER-WIDE action. It:
@@ -19,7 +19,7 @@
 # operators: separate from the application helm release, run once per
 # cluster.
 #
-# Idempotent — re-running upgrades the operator in place.
+# Idempotent: re-running upgrades the operator in place.
 #
 # Usage:
 #   ./setup-postgres-operator.sh

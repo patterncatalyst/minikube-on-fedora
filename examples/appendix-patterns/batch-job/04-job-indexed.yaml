@@ -1,7 +1,7 @@
 # An Indexed Job: 3 completions, 3 in parallel, completionMode: Indexed. The
 # kubelet injects JOB_COMPLETION_INDEX into every Pod automatically; each
 # Pod reads a disjoint slice of shipment_events (id modulo 3) and writes its
-# own report-<index>.csv — cooperative partitioning, not redundant copies.
+# own report-<index>.csv: cooperative partitioning, not redundant copies.
 apiVersion: batch/v1
 kind: Job
 metadata:

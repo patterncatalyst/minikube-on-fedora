@@ -1,25 +1,50 @@
 # Presentation assets
 
-This directory holds the presentation materials for the capstone: the existing
-**Data Mesh 101** deck (the conceptual intro) and, in time, a new
-implementation-focused deck that walks the §17 reference architecture and demos
-it step by step.
+This directory holds the companion decks for the project. All three share one
+Red Hat visual language so they read as a family.
 
 ```
 presentation/
-├── data-mesh-101/
-│   ├── The_Data_Mesh_Updated.pptx     ← source/reference deck (design source of truth)
-│   └── diagrams/                       ← 15 paired SVG + Excalidraw diagrams
-└── README.md                           ← this file
+├── data-mesh-101/          ← concept deck: the four principles, no live demo
+│   ├── The_Data_Mesh_Updated.pptx   ← design source of truth
+│   └── diagrams/                     ← 15 paired SVG + Excalidraw diagrams
+├── data-mesh-minikube/     ← implementation deck for the capstone, built and demoed on minikube
+│   ├── Data_Mesh_on_Minikube.pptx   ← ~59 slides, speaker notes on every slide
+│   ├── build-deck.js                 ← slide content + notes (parametric: edit + rebuild)
+│   ├── add-glossary.js               ← glossary slides
+│   ├── makediagrams.js / svglib.js   ← diagram generators (SVG + Excalidraw)
+│   ├── raster.js / raster2.js        ← SVG → PNG rasterizers for embedded diagrams
+│   └── dimg/ · dpng/                 ← generated diagrams and their rasterized PNGs
+├── k8s-patterns-appendix/  ← companion deck for the Kubernetes-patterns & CKAD appendix
+│   ├── kubernetes-patterns-and-ckad-r01.0.pptx   ← 164 slides
+│   ├── deck.js · deck-helpers.js     ← builder + house helpers
+│   └── data/                         ← one module per pattern family
+└── README.md               ← this file
 ```
 
-The 101 deck is concept-only (no live demo). The new deck (Phase D) reuses its
-visual language and tells the implementation story.
+- **data-mesh-101** is concept-only. Its `.pptx` is the design source of truth
+  the other decks match; it has no programmatic builder here.
+- **data-mesh-minikube** is the implementation companion to the 101 deck. It
+  walks the capstone reference architecture principle by principle and demos it
+  on a minikube profile. The OpenShift variant lives in its own separate project.
+- **k8s-patterns-appendix** works the 32 Kubernetes patterns from the appendix,
+  each mapped to its CKAD objective.
 
-## Design system (extracted from the 101 deck — match this in the new deck)
+## Building the decks
 
-This is a **Red Hat brand** deck. The new deck should reuse the same palette,
-type, and layout grammar so the two read as one family.
+```bash
+# data-mesh-minikube (needs pptxgenjs + sharp)
+cd data-mesh-minikube
+node raster.js && node makediagrams.js && node raster2.js && node build-deck.js
+
+# k8s-patterns-appendix (needs pptxgenjs)
+cd k8s-patterns-appendix
+npm install && node deck.js
+```
+
+## Design system
+
+A **Red Hat brand** palette, type, and layout grammar, shared across all decks.
 
 ### Palette
 
@@ -44,7 +69,7 @@ white with red used sparingly as the accent (eyebrow labels, key marks).
 - **Body:** Red Hat Text (and Red Hat Text Medium for emphasis)
 - The theme's `majorFont`/`minorFont` nominally say Calibri Light / Calibri, but
   every slide overrides to the Red Hat faces. If the build environment lacks the
-  Red Hat fonts, expect LibreOffice to substitute — keep Calibri/Calibri Light
+  Red Hat fonts, expect LibreOffice to substitute: keep Calibri/Calibri Light
   as the documented fallback so substitution degrades gracefully.
 
 ### Layout grammar
@@ -58,17 +83,15 @@ white with red used sparingly as the accent (eyebrow labels, key marks).
 - **Diagram slide:** white background; eyebrow + title; the diagram centered;
   a single muted caption line at the bottom restating the takeaway.
 - **Footer motif (every slide):** Red Hat logo bottom-right, page number
-  bottom-left. (This is an intentional brand element, not decorative chrome.)
+  bottom-left, a brand element on every slide.
 
-## Diagram inventory and where each belongs
+## Diagram index
 
-Each diagram is a paired `.svg` (for embedding/rendering) and `.excalidraw`
-(editable source), matching the tutorial's diagram convention. The mapping below
-is the working plan for Phase C (which sections reference which diagram) and
-Phase D (which slide uses which); refine as the sections are written.
+Each diagram is a paired `.svg` (for embedding) and `.excalidraw` (editable
+source), matching the tutorial's diagram convention.
 
-| Diagram | Conceptual home (Phase C section) | Deck use |
-|---------|-----------------------------------|----------|
+| Diagram | Concept | Deck use |
+|---------|---------|----------|
 | `data-mesh-overview` | What is a data mesh | "at a glance" |
 | `four-principles` | The four principles | principles overview |
 | `operational-vs-analytical` | Operational vs analytical data | the two planes |
@@ -78,24 +101,12 @@ Phase D (which slide uses which); refine as the sections are written.
 | `analytical-data-composition` | Data as a product | analytical composition |
 | `data-product-anatomy` | Data as a product | product anatomy |
 | `federated-governance-model` | Federated computational governance | governance |
-| `platform-planes` | Self-serve data platform | platform planes |
 | `logical-mesh-architecture` | Why this maps to Kubernetes | logical architecture |
 | `contract-flow` | Contracts, registry, catalog | runtime vs discovery path |
-| `contracts-registry-catalog` | Apicurio + OpenMetadata | contract → registry → catalog |
+| `contracts-registry-catalog` | Apicurio + OpenMetadata | contract to registry to catalog |
 | `ingestion-streaming-sourcing` | The async spine (Kafka) | ingestion/streaming |
-| `reference-data-mesh-architecture` | The capstone as reference architecture | centerpiece / Phase E |
+| `reference-data-mesh-architecture` | The capstone as reference architecture | centerpiece |
 
-When a Phase C section adopts a diagram, copy it into `assets/diagrams/` under
-the tutorial's `NN-name.svg` + `.excalidraw` convention (so the doc can embed it
-via the site's `relative_url` include, the same way §17 embeds its existing
-diagrams) and keep this directory as the curated presentation source.
-
-## Phase D plan (build later; ~1.5–3 h)
-
-The new deck demonstrates the implementation as a **reference architecture**:
-walk the content, explain it, and demo it step by step. It draws narrative from
-the Phase C sections, borrows framing from the 101 deck, and uses the diagrams
-above plus any additional diagrams uploaded alongside this deck. The user will
-provide additional diagrams (SVG + Excalidraw) when Phase D begins. Reuse the
-design system documented above so the implementation deck and the 101 deck are
-visually one family.
+To reuse a diagram in the tutorial site, copy its pair into `assets/diagrams/`
+under the `NN-name.svg` + `.excalidraw` convention, the same way the capstone
+chapter embeds its diagrams.

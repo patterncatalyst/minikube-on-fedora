@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     # API contract version (r26). Selects which contract this instance serves;
     # the value is reported by GET /version and gates the v2-only response
     # fields. v1 and v2 run the SAME image, differing only by this env var and
-    # their `version` pod label — the Istio canary shifts traffic between the
+    # their `version` pod label; the Istio canary shifts traffic between the
     # two subsets. In production v1/v2 would be distinct image tags from
     # distinct commits; the env toggle keeps the demo's focus on the traffic
     # split, not an image-build pipeline. The Istio mechanism is identical.

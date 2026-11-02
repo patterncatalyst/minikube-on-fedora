@@ -10,7 +10,7 @@ every negative check.
 
 ## The CNI prerequisite
 
-minikube's default CNI does not enforce `NetworkPolicy` at all — applying one
+minikube's default CNI does not enforce `NetworkPolicy` at all; applying one
 succeeds but changes nothing about real traffic. This example needs Calico,
 set at profile creation:
 
@@ -53,7 +53,7 @@ kubectl --context mof-patterns exec -n patterns netseg-test-client -- curl -sm 3
 ```
 
 All three succeed or at least connect (the last one gets a protocol error
-from the gRPC server, not a timeout — proof the TCP path is open). This is
+from the gRPC server, not a timeout: proof the TCP path is open). This is
 the baseline the rest of this example changes.
 
 ## Default-deny, scoped per workload
@@ -84,7 +84,7 @@ kubectl --context mof-patterns exec -n patterns netseg-test-client -- curl -sm 3
 kubectl --context mof-patterns apply -n patterns -f network-segmentation/05-allow-gateway-to-inventory.yaml
 ```
 
-The test client is still denied — its label was never named by the allow rule:
+The test client is still denied: its label was never named by the allow rule:
 
 ```bash
 kubectl --context mof-patterns exec -n patterns netseg-test-client -- curl -sm 3 http://inventory-service:50051
@@ -93,7 +93,7 @@ kubectl --context mof-patterns exec -n patterns netseg-test-client -- curl -sm 3
 
 A short-lived Pod labeled to match `graphql-gateway`'s selector proves the
 rule itself works. `NetworkPolicy` matches on labels, not on what's actually
-running inside the Pod, which is exactly what this proves — and because this
+running inside the Pod, which is exactly what this proves, and because this
 label is also `graphql-gateway`'s own Service selector, the probe is deleted
 immediately after the one check it exists for, rather than left running
 alongside the real Deployment's Pods:
@@ -106,7 +106,7 @@ kubectl --context mof-patterns run netseg-probe-gateway \
 kubectl --context mof-patterns wait --for=condition=Ready pod/netseg-probe-gateway -n patterns --timeout=30s
 
 kubectl --context mof-patterns exec -n patterns netseg-probe-gateway -- curl -sm 3 http://inventory-service:50051
-# connects (gRPC protocol error, not a timeout) — the allow rule's selector matched
+# connects (gRPC protocol error, not a timeout): the allow rule's selector matched
 
 kubectl --context mof-patterns delete pod netseg-probe-gateway -n patterns
 ```

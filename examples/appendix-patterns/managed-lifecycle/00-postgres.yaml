@@ -1,5 +1,5 @@
 # Same disposable dev Postgres as the other appendix examples (not the
-# CloudNativePG-managed cluster the §17 capstone runs).
+# CloudNativePG-managed cluster the capstone runs).
 apiVersion: v1
 kind: Secret
 metadata:

@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""lineage.py — declare the cross-product lineage spine in OpenMetadata.
+"""lineage.py: declare the cross-product lineage spine in OpenMetadata.
 
-DECISION D (CAP-023): lineage is declared explicitly via the first-class
-lineage REST API (PUT /api/v1/lineage), not inferred. OpenMetadata derives
-lineage automatically only from query logs / dbt, which the capstone doesn't
-have; and a Table→Topic→Table chain crosses entity types, which the API
-handles cleanly. This runs as the THIRD ingestion Job, after the Postgres and
-Kafka Jobs, because the three entities must already exist to be linked.
+Lineage is declared explicitly via the first-class lineage REST API
+(PUT /api/v1/lineage), not inferred. OpenMetadata derives lineage
+automatically only from query logs or dbt, which the capstone doesn't have;
+and a Table→Topic→Table chain crosses entity types, which the API handles
+cleanly. This runs as the third ingestion Job, after the Postgres and Kafka
+Jobs, because the three entities must already exist to be linked.
 
 The spine (one directed edge per producer/consumer relationship):
 

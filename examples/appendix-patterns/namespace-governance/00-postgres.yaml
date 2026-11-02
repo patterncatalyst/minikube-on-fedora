@@ -1,5 +1,5 @@
 # A minimal, disposable Postgres for the appendix examples. Not the
-# CloudNativePG-managed cluster the §17 capstone runs — no operator, no
+# CloudNativePG-managed cluster the capstone runs: no operator, no
 # persistent storage, no replication.
 apiVersion: v1
 kind: Secret

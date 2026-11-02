@@ -12,7 +12,7 @@ spec:
   - port: 80
     targetPort: 8080
     # Pinned for predictability. Omit nodePort to let Kubernetes
-    # pick one from 30000-32767. 30808 chosen for memorability —
+    # pick one from 30000-32767. 30808 chosen for memorability;
     # ":8080 on every node, prefixed 30".
     nodePort: 30808
     protocol: TCP

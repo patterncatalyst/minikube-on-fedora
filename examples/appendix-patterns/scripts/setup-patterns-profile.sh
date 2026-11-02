@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# setup-patterns-profile.sh — create (or replace) the mof-patterns minikube
+# setup-patterns-profile.sh: create (or replace) the mof-patterns minikube
 # profile that the Kubernetes-patterns appendix examples run on.
 #
-# This profile is intentionally separate from §3's `minikube` profile and §17's
+# This profile is separate from §3's `minikube` profile and the capstone's
 # `mof-capstone`. It is sized for the heaviest appendix needs (Istio + KEDA +
 # metrics-server running together), lighter than the full capstone mesh.
 #

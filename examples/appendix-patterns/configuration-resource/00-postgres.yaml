@@ -1,5 +1,5 @@
-# A minimal, disposable Postgres for the appendix examples. This is NOT the
-# CloudNativePG-managed cluster the §17 capstone runs: no operator, no
+# A minimal, disposable Postgres for the appendix examples. This is not the
+# CloudNativePG-managed cluster the capstone runs: no operator, no
 # persistent storage, no replication.
 #
 # The Secret keys here are named to match payment-service's own Settings

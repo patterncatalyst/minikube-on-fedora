@@ -1,4 +1,4 @@
-"""gRPC server for inventory-service — implements InventoryService.CheckStock.
+"""gRPC server for inventory-service: implements InventoryService.CheckStock.
 
 The generated stubs live in the service's `gen/` tree (committed by
 scripts/gen-protos.sh, option b). We add that tree to sys.path so the
@@ -6,7 +6,7 @@ package `capstone.inventory.v1` is importable both in the container
 (/opt/app-root/src/gen) and locally (services/inventory-service/gen).
 
 The server runs in the same asyncio event loop as the FastAPI app, started
-and stopped by the app's lifespan (see app/main.py) — one process, one
+and stopped by the app's lifespan (see app/main.py): one process, one
 container, two ports (HTTP for REST/health, gRPC for CheckStock).
 """
 

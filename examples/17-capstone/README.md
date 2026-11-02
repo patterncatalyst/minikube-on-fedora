@@ -1,6 +1,6 @@
-# §17 Capstone — Data mesh on minikube
+# Capstone: data mesh on minikube
 
-The full implementation of the §17 capstone: seven Python/FastAPI
+The full implementation of the capstone: seven Python/FastAPI
 services exposing REST, gRPC, GraphQL, and Kafka interfaces,
 deployed via helm to a dedicated `mof-capstone` minikube profile, with full
 observability, metadata cataloging, and orchestration.
@@ -17,42 +17,23 @@ The capstone continues as two standalone projects:
 [datamesh-reference-arch-quarkus](https://github.com/patterncatalyst/datamesh-reference-arch-quarkus)
 (the same mesh on Quarkus and Camel).
 
-## Status
-
-**r20 (current):** skeleton — directory structure, helm chart
-scaffolding, profile setup. Nothing deployable yet beyond the
-profile itself.
-
-Implementation lands incrementally:
-
-- r21: order-service (the prototype every other service follows)
-- r22: inventory, payment, shipping, notification services
-- r23: gRPC layer (proto definitions, codegen, wiring)
-- r24: GraphQL layer + federated gateway
-- r25: Kafka integration
-- r26: KEDA + Istio wiring
-- r27: observability + OpenMetadata
-- r28: Prefect orchestration
-- r29: tests + Postman collection + walkthrough prose
-- r30: editorial pass + verification
-
 ## Directory layout
 
 ```
 examples/17-capstone/
 ├── README.md                  ← this file
 ├── charts/capstone/           ← helm umbrella chart
-│   ├── Chart.yaml             ← (r20) chart definition, no deps yet
-│   └── values.yaml            ← (r20) feature flags + sizing for every component
+│   ├── Chart.yaml             ← chart definition
+│   └── values.yaml            ← feature flags + sizing for every component
 ├── scripts/
-│   ├── setup-capstone-profile.sh    ← (r20) start the mof-capstone minikube profile
+│   ├── setup-capstone-profile.sh    ← start the mof-capstone minikube profile
 │   ├── build-image.sh               ← docker build + minikube image load
-│   └── teardown.sh                  ← (r20) stop or delete the profile
+│   └── teardown.sh                  ← stop or delete the profile
 ├── host-access/               ← companion NodePort Services for third-party UIs
-├── proto/                     ← (r23) protobuf definitions for gRPC services
-├── postman/                   ← (r29) Postman collection for live demos
-├── demos/                     ← (r25+) demo scripts: rest, grpc, graphql, kafka, orchestration
-└── services/                  ← (r21+) source for the 5 services + GraphQL gateway
+├── proto/                     ← protobuf definitions for gRPC services
+├── postman/                   ← Postman collection for live demos
+├── demos/                     ← demo scripts: rest, grpc, graphql, kafka, orchestration
+└── services/                  ← source for the 5 services + GraphQL gateway
     ├── order-service/
     ├── inventory-service/
     ├── payment-service/
@@ -61,10 +42,7 @@ examples/17-capstone/
     └── graphql-gateway/
 ```
 
-Empty directories are placeholders; contents arrive in the
-iterations listed above.
-
-## Quick-start (r20 — profile only)
+## Quick-start (profile only)
 
 ```bash
 ./scripts/setup-capstone-profile.sh
@@ -77,7 +55,7 @@ This creates a `mof-capstone` minikube profile sized at 24 GB RAM /
 profile on the same host; the Kubernetes namespace is still
 `capstone`. Other minikube profiles should be stopped first
 (`minikube stop -p minikube`, `minikube stop -p istio`) to free
-their RAM allocation — the script warns if it detects any other
+their RAM allocation; the script warns if it detects any other
 running profiles.
 
 The script publishes every host-facing port when it creates the

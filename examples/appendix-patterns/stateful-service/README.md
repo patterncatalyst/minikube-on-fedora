@@ -4,8 +4,8 @@ Runnable example for the [Stateful Service chapter](https://patterncatalyst.gith
 
 `shipment-archive`: three independent, non-replicating `postgres:17-alpine`
 instances run as a `StatefulSet`, each with its own `PersistentVolumeClaim`
-and a stable, individually addressable DNS name. Not the §17 capstone's
-CloudNativePG-managed Postgres — a disposable stand-in used only to practice
+and a stable, individually addressable DNS name. Not the capstone's
+CloudNativePG-managed Postgres, a disposable stand-in used only to practice
 the pattern.
 
 ## Run it
@@ -52,7 +52,7 @@ The replacement Pod comes back with the **same name** (`shipment-archive-0`,
 not a new random suffix) and the **same PersistentVolumeClaim**
 (`archive-data-shipment-archive-0`), so the row written before deletion is
 still there. Compare this to Stateless Service, where deleting a Pod
-produces a brand-new identity with nothing carried forward — the entire
+produces a brand-new identity with nothing carried forward: the entire
 distinction between the two patterns, demonstrated as directly as
 Kubernetes can show it.
 
@@ -63,8 +63,8 @@ kubectl --context mof-patterns delete statefulset shipment-archive -n patterns
 kubectl --context mof-patterns get pvc -n patterns -l app.kubernetes.io/name=shipment-archive
 ```
 
-All three PVCs remain bound after the StatefulSet (and its Pods) are gone —
-`volumeClaimTemplates` is deliberately conservative: recreating the
+All three PVCs remain bound after the StatefulSet (and its Pods) are gone:
+`volumeClaimTemplates` is conservative: recreating the
 StatefulSet reattaches each ordinal to its existing claim rather than
 starting from empty storage, exactly the behavior a database tier needs.
 

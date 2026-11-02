@@ -3,7 +3,7 @@
 Async SQLAlchemy 2.0 engine + session factory, plus a startup helper that
 ensures the service's schema exists before creating any tables.
 
-CAP-004: create-if-not-exists via metadata.create_all. Schema *evolution*
+Create-if-not-exists via metadata.create_all. Schema *evolution*
 (Alembic) is deferred to a later iteration.
 """
 
@@ -46,7 +46,7 @@ async def check_db() -> bool:
 async def seed_if_empty() -> None:
     """Seed a few demo reviews if the table is empty.
 
-    The SKUs intentionally match product identifiers the inventory/product
+    The SKUs match the product identifiers the inventory/product
     domain owns (e.g. SKU-ABC-42), so the catalog and lineage demo has data
     that visibly relates reviews to products. Idempotent: only seeds when the
     table has no rows, so re-deploys don't duplicate.

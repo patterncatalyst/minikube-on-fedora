@@ -37,7 +37,7 @@ kubectl --context mof-patterns exec -n patterns "$POD" -- sh -c 'touch /opt/app-
 # touch: /opt/app-root/src/test-file: Read-only file system
 
 kubectl --context mof-patterns exec -n patterns "$POD" -- sh -c 'touch /tmp/test-file && echo ok'
-# ok — the one writable exception this hardening leaves in place
+# ok: the one writable exception this hardening leaves in place
 ```
 
 Confirm the service is still serving normally:

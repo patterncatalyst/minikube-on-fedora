@@ -1,6 +1,6 @@
 # graphql-gateway
 
-A §17 capstone data product (read layer). Stateless — owns no data; it
+A capstone data product (read layer). Stateless: owns no data; it
 federates reads across services by calling them:
 
 - `order(id)` → order-service over **REST**
@@ -9,7 +9,7 @@ federates reads across services by calling them:
 GraphQL stitches both into one response shaped by the client's query. This
 is federation by **gateway orchestration**; true subgraph federation (each
 service exposing its own subgraph, composed into a supergraph) is the
-production-scale pattern — see the §17 prose (CAP-016).
+production-scale pattern.
 
 ## Build + deploy
 

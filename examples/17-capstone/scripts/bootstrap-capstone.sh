@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
-# bootstrap-capstone.sh — stand up the ENTIRE §17 capstone from a fresh node, in
+# bootstrap-capstone.sh: stand up the ENTIRE capstone from a fresh node, in
 # the correct order, with a health gate between each tier. This is the one-command
-# bring-up that did not exist before (the README froze at r20 and the real order
-# was scattered across setup-* scripts, smokes, and helm installs) — which is why
+# bring-up that did not exist before (the real order
+# was scattered across setup-* scripts, smokes, and helm installs): which is why
 # every recovery had been manual archaeology.
 #
 # Use it after `minikube delete -p mof-capstone` (a clean rebuild), or any time you
@@ -21,7 +21,7 @@
 # services; third-party Services (ingress gateway, KEDA interceptor, Kiali,
 # Prometheus, Grafana, Tempo, OpenMetadata, Postgres) get a companion NodePort
 # Service from host-access/*.yaml, applied right after the component is installed.
-# The ingestion Jobs opt out of the mesh (r34).
+# The ingestion Jobs opt out of the mesh.
 #
 # Run from examples/17-capstone/:  ./scripts/bootstrap-capstone.sh
 
@@ -143,11 +143,11 @@ step "Seeding one order (gives the catalog data to ingest)"
 curl -s -o /dev/null --max-time 8 -X POST "http://127.0.0.1:${HOST_PORT_ORDER}/orders" \
     -H 'Content-Type: application/json' \
     --data '{"customer_id":"cust-1001","item_sku":"SKU-ABC-42","quantity":1,"amount":19.99}' \
-    && ok "seed order placed" || printf '    (seed skipped — place one later via smoke-order.sh)\n'
+    && ok "seed order placed" || printf '    (seed skipped: place one later via smoke-order.sh)\n'
 
 # ── Tier 9: Kiali (mesh topology console for the walkthrough's act 5) ───────
 # Kiali is additive and lives in istio-system; depends on Istio + observability
-# (it points at the existing Prometheus/Grafana/Tempo, single-stack — CAP-042).
+# (it points at the existing Prometheus/Grafana/Tempo, single-stack).
 step "9/10 Kiali (mesh-topology console for the walkthrough)"
 ./scripts/setup-kiali.sh || fail "kiali setup failed"
 apply_host_access kiali-host.yaml
@@ -155,8 +155,8 @@ ok "kiali installed (wired to the capstone observability stack)"
 
 # ── Tier 10: catalog ingestion (populate OpenMetadata + declare lineage) ────
 # Three one-off Jobs: catalog the Postgres schemas as Tables, catalog the Kafka
-# topics, then PUT the cross-product lineage edges. Idempotent — re-running is
-# safe and reflects whatever data exists at run time (CAP-022/CAP-023).
+# topics, then PUT the cross-product lineage edges. Idempotent: re-running is
+# safe and reflects whatever data exists at run time.
 step "10/10 OpenMetadata ingestion + lineage"
 ./scripts/ingest-openmetadata.sh || fail "openmetadata ingestion failed"
 ok "catalog populated and lineage declared"
@@ -165,13 +165,13 @@ ok "catalog populated and lineage declared"
 step "Cluster status"
 bash ./scripts/cluster-status.sh || true
 
-step "Bring-up complete — the cluster is walkthrough-ready."
+step "Bring-up complete: the cluster is walkthrough-ready."
 cat <<EOF
     # The five-act presenter walkthrough (the deck's "What you can see it do"):
     ./demos/walkthrough.sh
 
     # Other things you can do from here:
     ./demos/smoke-discovery.sh             # publish OpenAPI/proto/SDL to Apicurio
-    ./demos/demo-canary.sh up 90 10        # the v1->v2 contract canary (Phase B)
-    ./demos/demo-add-data-product.sh up    # Phase A — add/back-out a data product
+    ./demos/demo-canary.sh up 90 10        # the v1->v2 contract canary
+    ./demos/demo-add-data-product.sh up    # add and remove a data product
 EOF

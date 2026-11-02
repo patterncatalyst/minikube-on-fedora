@@ -1,7 +1,7 @@
 # Single-node KRaft Kafka cluster for the capstone async spine.
 # Dev-scale: one dual-role node, ephemeral storage, replication factor 1.
 # Production would use separate broker/controller pools, persistent storage,
-# replication factor 3, and min.insync.replicas 2 (noted in §17 prose).
+# replication factor 3, and min.insync.replicas 2 (noted in capstone prose).
 
 clusterName: capstone-kafka
 # Apache Kafka version (Strimzi 1.2.0 supports 4.2.0, 4.2.1, 4.3.0, 4.3.1).

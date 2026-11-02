@@ -24,7 +24,7 @@ spec:
       containers:
       - name: nginx
         image: nginx-custom:v1
-        # Same image as §6/§7/§8/§9. NOT cross-profile cached —
+        # Same image as §6/§7/§8/§9. Not cross-profile cached;
         # demo.sh rebuilds it on the istio profile if missing.
         imagePullPolicy: Never
         ports:

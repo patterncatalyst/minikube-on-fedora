@@ -6,16 +6,16 @@ adjustments (each one a documented async/Alembic pitfall):
 1. **Async bridge.** Alembic's default env.py is sync-only; we build an
    AsyncEngine and run the migration body via `connection.run_sync(...)`.
 2. **URL from settings, not the .ini.** We never call
-   `config.set_main_option("sqlalchemy.url", ...)` — that routes the URL
+   `config.set_main_option("sqlalchemy.url", ...)`, which routes the URL
    through configparser, which treats `%` as interpolation and would corrupt a
    CloudNativePG password containing one. We build the engine directly from
    `settings.database_url`.
 3. **Per-service version table.** This is one Postgres database with a schema
-   per service (CAP-003). If every service kept its `alembic_version` in
+   per service. If every service kept its `alembic_version` in
    `public`, they'd collide. We put it in this service's own schema via
    `version_table_schema`, so each service has an isolated migration history.
    Because the version table lives in the schema, the schema must exist before
-   Alembic stamps it — so we `CREATE SCHEMA IF NOT EXISTS` first and commit.
+   Alembic stamps it, so we `CREATE SCHEMA IF NOT EXISTS` first and commit.
 
 Importing `app.models` is what populates `Base.metadata` (forgetting this is
 the classic "empty autogenerate" trap).

@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 #
-# ingest-openmetadata.sh — populate the OpenMetadata catalog from the capstone's
-# data sources and declare the cross-product lineage (r27b, CAP-023).
+# ingest-openmetadata.sh: populate the OpenMetadata catalog from the capstone's
+# data sources and declare the cross-product lineage.
 #
 # Runs three one-off Kubernetes Jobs, in order:
-#   1. om-ingest-postgres — catalog the capstone Postgres schemas as Tables
+#   1. om-ingest-postgres: catalog the capstone Postgres schemas as Tables
 #      (Database Service "capstone-postgres")
-#   2. om-ingest-kafka    — catalog the Strimzi topics as Topics
+#   2. om-ingest-kafka   : catalog the Strimzi topics as Topics
 #      (Messaging Service "capstone-kafka"); bare, no schema registry
-#   3. om-declare-lineage — PUT the two edges that connect them:
+#   3. om-declare-lineage: PUT the two edges that connect them:
 #         orders -> order-placed -> notifications
 #
 # Like setup-openmetadata.sh, this is a run-on-demand operation, separate from

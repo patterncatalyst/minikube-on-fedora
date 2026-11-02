@@ -2,7 +2,7 @@
 # built-in controllers (the Deployment controller, and the ReplicaSet
 # controller it drives) are the "simple built-in controller" half of this
 # chapter: two replicas, watched continuously, replaced the moment one goes
-# away — no code in this repository does any of that work.
+# away; no code in this repository does any of that work.
 apiVersion: apps/v1
 kind: Deployment
 metadata:

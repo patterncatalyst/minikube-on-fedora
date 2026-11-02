@@ -4,7 +4,7 @@ Async SQLAlchemy 2.0 engine + session factory, plus startup helpers that
 ensure the service's schema exists, create its tables, and seed a little
 demo stock so the gRPC CheckStock call has something to answer.
 
-CAP-004: create-if-not-exists via metadata.create_all. Schema *evolution*
+Create-if-not-exists via metadata.create_all. Schema *evolution*
 (Alembic) is deferred to a later iteration.
 """
 

@@ -1,7 +1,7 @@
 # payment-service: the fully isolated service in this example. Nothing in the
 # current capstone codebase calls it over the network yet, which makes it the
 # cleanest case for "no legitimate caller exists, so no allow rule exists
-# either" — see 06-deny-all-payment.yaml, which has no exception at all.
+# either"; see 06-deny-all-payment.yaml, which has no exception at all.
 apiVersion: apps/v1
 kind: Deployment
 metadata:

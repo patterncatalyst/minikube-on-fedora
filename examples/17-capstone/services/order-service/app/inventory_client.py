@@ -7,7 +7,7 @@ service's committed `gen/` tree (option b); we add it to sys.path so
 This is the order flow's one synchronous cross-service dependency: before an
 order is persisted, order-service asks inventory-service whether the SKU is
 available. gRPC fits here because it's a tight request/response between two
-internal services (CAP-012 — "which constraint matters for this interaction").
+internal services (which constraint matters for this interaction).
 """
 
 from __future__ import annotations
@@ -45,7 +45,7 @@ async def check_stock(sku: str, quantity: int, *, timeout: float = 3.0) -> int:
     """Return quantity_on_hand if available; raise otherwise.
 
     Raises StockUnavailable if the SKU lacks the requested quantity, or
-    InventoryUnreachable if the gRPC call itself fails (fail closed — we do
+    InventoryUnreachable if the gRPC call itself fails (fail closed: we do
     not place an order we couldn't validate).
     """
     try:

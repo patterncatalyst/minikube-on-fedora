@@ -64,7 +64,7 @@ if [[ "${REMOVE_OPERATORS}" != "true" ]]; then
 fi
 
 # ── Tier 2: operators ───────────────────────────────────────────────────────
-# Note: this also affects §12 Kafka demo if you run it later — it
+# Note: this also affects §12 Kafka demo if you run it later: it
 # depends on KEDA too. If you want to keep KEDA core but remove only
 # the HTTP add-on:
 #   helm uninstall keda-add-ons-http -n keda

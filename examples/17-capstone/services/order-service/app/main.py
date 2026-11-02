@@ -1,15 +1,15 @@
-"""order-service — the §17 capstone's first data product.
+"""order-service: the capstone's first data product.
 
-r21: REST + Postgres. r23: gRPC stock check against inventory before
-persisting. r25: publishes an `order.placed` event to Kafka after persisting,
-starting the async spine. GraphQL reads are served by the gateway (r24).
+REST + Postgres, a gRPC stock check against inventory before persisting, and an
+`order.placed` event published to Kafka after persisting, which starts the async
+spine. GraphQL reads are served by the gateway.
 
 Endpoints:
-  GET  /health      — liveness (process is up)
-  GET  /healthz     — readiness (can reach Postgres)
-  POST /orders      — place an order (checks inventory, persists, emits event)
-  GET  /orders      — list orders
-  GET  /orders/{id} — fetch one order
+  GET  /health      liveness (process is up)
+  GET  /healthz     readiness (can reach Postgres)
+  POST /orders      place an order (checks inventory, persists, emits event)
+  GET  /orders      list orders
+  GET  /orders/{id} fetch one order
 """
 
 from __future__ import annotations
@@ -49,7 +49,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="order-service",
     version="0.3.0",
-    description="Order data product for the §17 capstone data mesh.",
+    description="Order data product for the capstone data mesh.",
     lifespan=lifespan,
 )
 
@@ -61,11 +61,11 @@ async def health() -> dict[str, str]:
 
 @app.get("/version", tags=["ops"])
 async def version() -> dict[str, str]:
-    # The canary signal (r26). v1 and v2 run the same image with different
+    # The canary signal. v1 and v2 run the same image with different
     # API_VERSION; the Istio VirtualService splits traffic between the two
     # subsets, and this side-effect-free endpoint is how a caller (and the
     # smoke) tells which version served the request. v2 advertises the
-    # additive contract change: a `currency` field on order responses — a
+    # additive contract change: a `currency` field on order responses, a
     # backward-compatible evolution, exactly the kind you canary.
     body = {"service": settings.service_name, "api_version": settings.api_version}
     if settings.api_version == "v2":
@@ -111,13 +111,13 @@ async def place_order(payload: OrderCreate) -> Order:
         await session.commit()
         await session.refresh(order)
 
-    # r25: emit the event after the order is durably persisted. A publish
-    # failure must not fail the order (it's already committed) — we log it.
+    # Emit the event after the order is durably persisted. A publish
+    # failure must not fail the order (it's already committed), so we log it.
     # The dual-write gap this leaves is addressed by the outbox pattern in
-    # production (see app/events.py and §17).
+    # production (see app/events.py).
     try:
         await publish_order_placed(order)
-    except Exception as exc:  # noqa: BLE001 — best-effort emit
+    except Exception as exc:  # noqa: BLE001 best-effort emit
         logger.warning("failed to publish order.placed for %s: %s", order.id, exc)
 
     return order

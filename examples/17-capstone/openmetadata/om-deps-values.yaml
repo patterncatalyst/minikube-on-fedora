@@ -1,23 +1,23 @@
-# om-deps-values.yaml — trimmed OpenMetadata *dependencies* for the capstone.
+# om-deps-values.yaml: trimmed OpenMetadata *dependencies* for the capstone.
 #
 # This is an OVERRIDE file, merged by Helm onto the upstream
 # open-metadata/openmetadata-dependencies chart defaults (chart 2.0.5). We
 # only change what the lean single-node demo needs; everything else stays at
 # the chart default.
 #
-# Decisions (CAP-022):
+# Decisions:
 #   * MySQL  -> DISABLED. OpenMetadata's backend is the capstone CloudNativePG
 #     Postgres instead (a dedicated `openmetadata` database in the existing
 #     `capstone-postgres` cluster). See setup-openmetadata.sh.
 #   * Airflow -> DISABLED. Ingestion runs as one-off Kubernetes Jobs
-#     (`metadata ingest -c <yaml>`), not via an orchestrator (r27b wires the
+#     (`metadata ingest -c <yaml>`), not via an orchestrator (a one-off Job wires the
 #     first ingestion). This drops the entire Airflow tier (api-server,
-#     scheduler, dag-processor, triggerer, statsd) — the single biggest
+#     scheduler, dag-processor, triggerer, statsd): the single biggest
 #     footprint saving.
 #   * OpenSearch -> single-node. The chart default already sets singleNode:
 #     true with a 1 GiB heap and the security plugin disabled. In single-node
 #     (development) mode OpenSearch does NOT enforce the vm.max_map_count
-#     bootstrap check — it's a non-fatal warning — so NO host-kernel change is
+#     bootstrap check: it's a non-fatal warning, so no host-kernel change is
 #     needed on the minikube node. We only trim the persistent volume from the
 #     30 GiB default to 10 GiB for the demo.
 

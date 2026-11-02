@@ -1,17 +1,17 @@
 #!/usr/bin/env python3
 """
-order-processor — a tiny Kafka consumer that simulates work by sleeping
+order-processor: a tiny Kafka consumer that simulates work by sleeping
 for WORK_SLEEP_S seconds per message. Designed to be scaled by KEDA
 based on consumer lag.
 
 Environment variables (all optional, defaults work in-cluster against
 the Strimzi cluster from examples/12-keda-kafka/manifests/):
 
-    KAFKA_BROKER   — bootstrap-servers string. Default:
+    KAFKA_BROKER     bootstrap-servers string. Default:
                      my-kafka-kafka-bootstrap.kafka:9092
-    KAFKA_TOPIC    — topic to consume. Default: orders
-    KAFKA_GROUP    — consumer group. Default: order-processor-group
-    WORK_SLEEP_S   — fake processing time per message. Default: 0.5
+    KAFKA_TOPIC      topic to consume. Default: orders
+    KAFKA_GROUP      consumer group. Default: order-processor-group
+    WORK_SLEEP_S     fake processing time per message. Default: 0.5
 
 The graceful SIGTERM handler is the important part. When KEDA scales
 this Deployment down (typically when topic lag drops to zero and stays

@@ -101,11 +101,11 @@
       "locked": false,
       "fontSize": 14,
       "fontFamily": 2,
-      "text": "Before \u2014 centralized",
+      "text": "Before: centralized",
       "textAlign": "middle",
       "verticalAlign": "top",
       "containerId": null,
-      "originalText": "Before \u2014 centralized",
+      "originalText": "Before: centralized",
       "lineHeight": 1.25
     },
     {
@@ -921,11 +921,11 @@
       "locked": false,
       "fontSize": 14,
       "fontFamily": 2,
-      "text": "After \u2014 a mesh of data products",
+      "text": "After: a mesh of data products",
       "textAlign": "middle",
       "verticalAlign": "top",
       "containerId": null,
-      "originalText": "After \u2014 a mesh of data products",
+      "originalText": "After: a mesh of data products",
       "lineHeight": 1.25
     },
     {

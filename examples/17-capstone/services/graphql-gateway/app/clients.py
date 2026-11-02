@@ -4,11 +4,10 @@ The gateway federates by *calling* the services it composes:
   - order-service over REST (httpx)
   - inventory-service over gRPC (the committed capstone.inventory.v1 stubs)
 
-The gRPC stubs live in the gateway's committed `gen/` tree (option b,
-CAP-013); we add it to sys.path so `capstone.inventory.v1` imports in the
-container and locally.
+The gRPC stubs live in the gateway's committed `gen/` tree; we add it to
+sys.path so `capstone.inventory.v1` imports in the container and locally.
 
-This is exactly where the protocol comparison (CAP-012) becomes concrete:
+This is where the protocol comparison becomes concrete:
 one resolver path uses REST, another uses gRPC, and GraphQL stitches both
 into a single response shaped by the client's query.
 """

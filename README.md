@@ -94,16 +94,16 @@ at `/examples/NN-name/` on the site.
 
 ## Getting started
 
-New to the repo? Start with **[`onboarding/`](onboarding/)** — it
-has the orientation docs for working on this project:
+New to the repo? Start with **[`onboarding/`](onboarding/)**, the
+orientation docs for working on this project:
 
-- **[`onboarding/GETTING-STARTED.md`](onboarding/GETTING-STARTED.md)**
-  — initial setup; how to run the site and the examples locally
-- **[`onboarding/LESSONS-LEARNED.md`](onboarding/LESSONS-LEARNED.md)**
-  — empirical guidance from building this tutorial; pitfalls,
+- **[`onboarding/GETTING-STARTED.md`](onboarding/GETTING-STARTED.md)**:
+  initial setup, and how to run the site and the examples locally
+- **[`onboarding/LESSONS-LEARNED.md`](onboarding/LESSONS-LEARNED.md)**:
+  empirical guidance from building this tutorial. Pitfalls,
   conventions, what works
-- **[`onboarding/STARTING-WITH-CLAUDE.md`](onboarding/STARTING-WITH-CLAUDE.md)**
-  — how the human-AI collaboration was structured; useful if
+- **[`onboarding/STARTING-WITH-CLAUDE.md`](onboarding/STARTING-WITH-CLAUDE.md)**:
+  how the human-AI collaboration was structured, useful if
   you're continuing or replicating the working pattern
 
 ## Running the site locally
@@ -142,7 +142,7 @@ To run every example and tally results:
 ./scripts/test-all-examples.sh
 ```
 
-The aggregator does not fail-fast — it runs every example even
+The aggregator does not fail-fast. It runs every example even
 if earlier ones fail, then reports pass/fail per script at the
 end.
 
@@ -166,15 +166,14 @@ Two audit scripts maintain ongoing quality on documentation:
 ./scripts/editorial-audit.sh          # advisory greps for known problem patterns
 ```
 
-The first exits non-zero if any link is broken (useful in CI);
-the second is advisory only — it surfaces "we" voice, stale
+The first exits non-zero if any link is broken (useful in CI).
+The second is advisory only: it surfaces "we" voice, stale
 TODOs, kramdown-collision patterns, `{% raw %}`-wrapped URLs,
 and duplicate shell flags within a single command.
 
 ## Verification status
 
-Honest accounting of what's been tested vs. what's claimed
-lives in
+What's been tested against what's claimed is recorded in
 [`_plans/reconciliation-plan.md`](_plans/reconciliation-plan.md).
 Default status for any new claim is `unverified`; promotion to
 `verified` requires a real test run by a human on Fedora 44.
@@ -186,11 +185,12 @@ The r29 runtime migration (Docker Engine, docker driver, published
 NodePorts) rows are pending live verification and stay `unverified`
 until then.
 
-What shipped vs. what was originally planned — including the
-five major divergences (non-Fedora/RHEL platforms dropped, UBI instead of
-Hummingbird, vendor-neutral relaxed for §13, "we" voice not
-strictly avoided, container runtime not version-pinned) — is documented in
-[`_plans/prd-reconciliation.md`](_plans/prd-reconciliation.md).
+What shipped against what was originally planned is documented in
+[`_plans/prd-reconciliation.md`](_plans/prd-reconciliation.md),
+including the five major divergences: non-Fedora/RHEL platforms dropped,
+UBI instead of Hummingbird, vendor-neutral relaxed for the alternatives
+chapter, "we" voice not strictly avoided, and container runtime not
+version-pinned.
 
 ## Contributing
 
@@ -208,12 +208,12 @@ zsh paste safety, etc.).
 
 This project is dual-licensed to separate the code from the writing:
 
-- **Code** — everything under `examples/`, plus build and helper scripts and
-  inline code snippets — is licensed under the **Apache License 2.0**
+- **Code** (everything under `examples/`, plus build and helper scripts and
+  inline code snippets) is licensed under the **Apache License 2.0**
   ([`LICENSE`](LICENSE)).
-- **Content** — the tutorial and book prose (chapters under `_docs/`),
+- **Content** (the tutorial and book prose under `_docs/`,
   diagrams and images under `assets/`, and the slide decks under
-  `presentation/` — is licensed under **Creative Commons Attribution 4.0
+  `presentation/`) is licensed under **Creative Commons Attribution 4.0
   International (CC BY 4.0)** ([`LICENSE-docs.md`](LICENSE-docs.md)).
 
 Copyright 2026 PatternCatalyst (Robert Sedor).

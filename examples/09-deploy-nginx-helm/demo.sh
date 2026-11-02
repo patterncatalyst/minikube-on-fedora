@@ -36,7 +36,7 @@ CPUS=6
 MEMORY_MB=16384
 WAIT_DEPLOY_SECONDS=180
 
-# Install/upgrade titles — used for the curl assertions
+# Install/upgrade titles: used for the curl assertions
 TITLE_INSTALL="First install via helm"
 TITLE_UPGRADE="Upgraded title via helm"
 
@@ -45,7 +45,7 @@ cleanup() {
     # Skip until pin_context has run, so an early failure never touches
     # whatever cluster happens to be current.
     [[ -n "${PINNED_CONTEXT}" ]] || return 0
-    # Uninstall whether or not we got past install — idempotent
+    # Uninstall whether or not we got past install: idempotent
     helm uninstall "${RELEASE_NAME}" >/dev/null 2>&1 || true
 }
 trap cleanup EXIT
@@ -61,7 +61,7 @@ pass "cluster reachable (context ${PROFILE})"
 # ── Pre-flight: helm available ──────────────────────────────────────────────
 step "pre-flight: helm binary present"
 if ! command -v helm >/dev/null 2>&1; then
-    fail "helm not in PATH — see §2 for installation"
+    fail "helm not in PATH: see §2 for installation"
 fi
 HELM_VERSION=$(helm version --short)
 info "helm version: ${HELM_VERSION}"
@@ -72,7 +72,7 @@ step "pre-flight: ${IMAGE_TAG} image in cluster cache"
 if ! minikube -p "${PROFILE}" image ls 2>/dev/null | grep -q "${IMAGE_TAG}"; then
     info "image not present; building from §6's Containerfile"
     if [[ ! -f "${SECTION6_DIR}/Containerfile" ]]; then
-        fail "${SECTION6_DIR}/Containerfile not found — examples/06 missing?"
+        fail "${SECTION6_DIR}/Containerfile not found: examples/06 missing?"
     fi
     if ! build_and_load "${IMAGE_TAG}" "${SECTION6_DIR}" "${PROFILE}"; then
         fail "image build/load failed (see output above)"
@@ -197,7 +197,7 @@ case "${RESP}" in
     *)
         info "response (first 300 chars):"
         echo "${RESP:0:300}" | sed 's/^/    /'
-        fail "served HTML did not contain upgraded title — rollout may not have completed"
+        fail "served HTML did not contain upgraded title: rollout may not have completed"
         ;;
 esac
 
@@ -215,11 +215,11 @@ step "running 'helm uninstall ${RELEASE_NAME}'"
 helm uninstall "${RELEASE_NAME}" | sed 's/^/    /'
 pass "release uninstalled"
 
-# ── Verify no leftover resources (poll — helm uninstall is async) ───────────
+# ── Verify no leftover resources (poll: helm uninstall is async) ───────────
 step "verifying no chart resources remain (label app.kubernetes.io/instance=${RELEASE_NAME})"
 # helm uninstall returns once the release record is deleted and delete
 # operations are submitted to the API server. Actual Pod termination is
-# async — kubelet runs the preStop hook (none in our case) and waits up to
+# async: kubelet runs the preStop hook (none in our case) and waits up to
 # terminationGracePeriodSeconds (default 30s) before force-killing. A
 # check immediately after uninstall can see Pods still in Terminating
 # state. Poll for up to 30s.
@@ -238,14 +238,14 @@ if [[ "${LEFTOVERS}" -ne 0 ]]; then
     kubectl get all,configmap -l "app.kubernetes.io/instance=${RELEASE_NAME}" | sed 's/^/    /'
     fail "found ${LEFTOVERS} leftover resources after uninstall"
 fi
-pass "no leftover resources — helm uninstall cleaned everything"
+pass "no leftover resources: helm uninstall cleaned everything"
 
 # ── Done ────────────────────────────────────────────────────────────────────
-step "SUCCESS — helm install + upgrade + history + uninstall all green"
+step "SUCCESS: helm install + upgrade + history + uninstall all green"
 echo
 echo "  Same image as §6/§7/§8 (nginx-custom:v1) deployed via a helm"
 echo "  chart with templated ConfigMap content. The chart parameterizes"
-echo "  replica count, service port, and HTML content — install once,"
+echo "  replica count, service port, and HTML content: install once,"
 echo "  upgrade with different values, see the new content served,"
 echo "  uninstall removes everything."
 echo

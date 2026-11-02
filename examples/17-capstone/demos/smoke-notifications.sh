@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 #
-# smoke-notifications.sh — verify notification-service's real `notifications`
+# smoke-notifications.sh: verify notification-service's real `notifications`
 # table: the Alembic migration runs (init container), consumed events are
 # persisted, and they SURVIVE A RESTART (the durability the in-memory list
 # never had).
 #
 # Proves:
-#   (1) migration ran — notification rollout only succeeds if the `migrate`
+#   (1) migration ran: notification rollout only succeeds if the `migrate`
 #       init container (`alembic upgrade head`) exited 0
-#   (2) persistence  — place an order, see it in /received (DB-backed)
-#   (3) durability   — restart notification, the event is STILL in /received
+#   (2) persistence : place an order, see it in /received (DB-backed)
+#   (3) durability  : restart notification, the event is STILL in /received
 #       (it's in Postgres, not memory)
 #
 # Flow: ensure Strimzi+Kafka+Apicurio+Postgres → build+load inventory/order/
@@ -53,10 +53,10 @@ assert_local_image() {  # deployment-name
     local d="$1" img pol
     img="$(kubectl get deployment "$d" -n "$NS" -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null)"
     pol="$(kubectl get deployment "$d" -n "$NS" -o jsonpath='{.spec.template.spec.containers[0].imagePullPolicy}' 2>/dev/null)"
-    [[ "$img" == "${d}:v1" ]] || fail "${d} image is '${img}' — must be the bare '${d}:v1'"
-    [[ "$pol" == "Never" ]] || fail "${d} imagePullPolicy is '${pol}' — must be Never"
+    [[ "$img" == "${d}:v1" ]] || fail "${d} image is '${img}': must be the bare '${d}:v1'"
+    [[ "$pol" == "Never" ]] || fail "${d} imagePullPolicy is '${pol}': must be Never"
     minikube -p "$PROFILE" image ls 2>/dev/null | grep -qE "(^|/)${d}:v1\$" \
-        || fail "${d}:v1 not in 'minikube -p ${PROFILE} image ls' — ./scripts/build-image.sh services/${d} ${d} v1"
+        || fail "${d}:v1 not in 'minikube -p ${PROFILE} image ls': ./scripts/build-image.sh services/${d} ${d} v1"
     printf '    ✓ %s → %s (pullPolicy Never, present in the node)\n' "$d" "$img"
 }
 minikube status -p "$PROFILE" >/dev/null 2>&1 || fail "profile '$PROFILE' not running"
@@ -95,7 +95,7 @@ for svc in "${DEPLOY[@]}"; do
     kubectl rollout status "deployment/${svc}" -n "$NS" --timeout=150s || fail "${svc} rollout failed"
     assert_local_image "$svc"
 done
-printf '    ✓ notification-service rolled out — its `migrate` init container (alembic upgrade head) succeeded\n'
+printf '    ✓ notification-service rolled out: its `migrate` init container (alembic upgrade head) succeeded\n'
 
 # ── confirm the table exists (migration really created it) ────────────────────
 step "Verifying the notifications table exists in Postgres"
@@ -139,9 +139,9 @@ for i in $(seq 1 15); do
     if check_received "$ORDER_ID"; then printf '    ✓ event still present after restart (~%ds)\n' "$((i*2))"; survived=1; break; fi
     sleep 2
 done
-(( survived )) || fail "event missing after restart — persistence is not working"
+(( survived )) || fail "event missing after restart: persistence is not working"
 
-printf '\n✓ SUCCESS — Alembic migration ran in an init container; notifications persist to Postgres and survive a restart (create_all retired for notification)\n'
+printf '\n✓ SUCCESS: Alembic migration ran in an init container; notifications persist to Postgres and survive a restart (create_all retired for notification)\n'
 
 # ── cleanup on success ────────────────────────────────────────────────────────
 step "Cleanup (success)"

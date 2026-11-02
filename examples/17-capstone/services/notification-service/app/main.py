@@ -1,16 +1,16 @@
-"""notification-service — a §17 capstone data product (Kafka consumer).
+"""notification-service: a capstone data product (Kafka consumer).
 
-Consumes `order.placed` events from Kafka (its designed role — a consumer-only
-data product) and persists them to its `notifications` table.
+Consumes `order.placed` events from Kafka as a consumer-only data product and
+persists them to its `notifications` table.
 
-r25c: the table is created by an Alembic migration run in an init container
-before this process starts, so the app issues no DDL — it just consumes and
-persists. `/received` reads from the table.
+The table is created by an Alembic migration run in an init container before
+this process starts, so the app issues no DDL: it just consumes and persists.
+`/received` reads from the table.
 
 Endpoints:
-  GET /health    — liveness (process is up)
-  GET /healthz   — readiness (can reach Postgres)
-  GET /received  — notifications persisted so far (from the DB, newest first)
+  GET /health    liveness (process is up)
+  GET /healthz   readiness (can reach Postgres)
+  GET /received  notifications persisted so far (from the DB, newest first)
 """
 
 from __future__ import annotations
@@ -26,8 +26,8 @@ from app.db import check_db, dispose
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Managed Lifecycle: no schema creation here — migrations ran in the init
-    # container (CAP-021). Just start/stop the background Kafka consumer.
+    # Managed Lifecycle: no schema creation here; migrations ran in the init
+    # container. Just start/stop the background Kafka consumer.
     await start_consumer()
     yield
     await stop_consumer()
@@ -37,7 +37,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="notification-service",
     version="0.3.0",
-    description="notification-service data product for the §17 capstone — consumes and persists order events.",
+    description="notification-service data product for the capstone: consumes and persists order events.",
     lifespan=lifespan,
 )
 

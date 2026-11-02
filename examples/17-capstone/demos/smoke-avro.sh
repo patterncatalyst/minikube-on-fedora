@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 #
-# smoke-avro.sh — verify the runtime contract: order-service registers the
+# smoke-avro.sh: verify the runtime contract: order-service registers the
 # order.placed Avro schema with Apicurio and publishes Avro-encoded events;
 # notification-service fetches the schema by id and decodes them.
 #
 # Proves two things:
 #   (1) the schema lands in Apicurio (GET ccompat subject versions)
 #   (2) the event still flows end-to-end, now as Avro (notification /received
-#       shows the decoded order — which is only possible if the consumer
+#       shows the decoded order: which is only possible if the consumer
 #       fetched the writer schema from the registry by id)
 #
 # Flow: Strimzi+Kafka ready → deploy Apicurio → build+load
@@ -46,10 +46,10 @@ assert_local_image() {  # deployment-name
     local d="$1" img pol
     img="$(kubectl get deployment "$d" -n "$NS" -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null)"
     pol="$(kubectl get deployment "$d" -n "$NS" -o jsonpath='{.spec.template.spec.containers[0].imagePullPolicy}' 2>/dev/null)"
-    [[ "$img" == "${d}:v1" ]] || fail "${d} image is '${img}' — must be the bare '${d}:v1'"
-    [[ "$pol" == "Never" ]] || fail "${d} imagePullPolicy is '${pol}' — must be Never"
+    [[ "$img" == "${d}:v1" ]] || fail "${d} image is '${img}': must be the bare '${d}:v1'"
+    [[ "$pol" == "Never" ]] || fail "${d} imagePullPolicy is '${pol}': must be Never"
     minikube -p "$PROFILE" image ls 2>/dev/null | grep -qE "(^|/)${d}:v1\$" \
-        || fail "${d}:v1 not in 'minikube -p ${PROFILE} image ls' — ./scripts/build-image.sh services/${d} ${d} v1"
+        || fail "${d}:v1 not in 'minikube -p ${PROFILE} image ls': ./scripts/build-image.sh services/${d} ${d} v1"
     printf '    ✓ %s → %s (pullPolicy Never, present in the node)\n' "$d" "$img"
 }
 
@@ -136,7 +136,7 @@ for i in $(seq 1 30); do
 done
 (( seen )) || fail "notification did not consume/decode the Avro event within ~60s"
 
-printf '\n✓ SUCCESS — order.placed flows as registered Avro: schema in Apicurio + event decoded by the consumer via the registry\n'
+printf '\n✓ SUCCESS: order.placed flows as registered Avro: schema in Apicurio + event decoded by the consumer via the registry\n'
 
 # ── 8. cleanup on success ─────────────────────────────────────────────────────
 step "Cleanup (success)"

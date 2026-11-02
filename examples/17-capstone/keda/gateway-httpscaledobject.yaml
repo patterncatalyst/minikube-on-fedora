@@ -1,8 +1,8 @@
-# gateway-httpscaledobject.yaml — KEDA HTTP add-on autoscaling for the
-# graphql-gateway (r26b, CAP-025).
+# gateway-httpscaledobject.yaml: KEDA HTTP add-on autoscaling for the
+# graphql-gateway.
 #
 # The gateway is the mesh's synchronous read surface: clients issue GraphQL
-# queries over HTTP. The HTTP add-on scales it on in-flight request volume —
+# queries over HTTP. The HTTP add-on scales it on in-flight request volume;
 # including from ZERO. With no traffic the gateway costs nothing; the first
 # query through the add-on's interceptor wakes it (the interceptor holds the
 # request until a replica is Ready), and sustained concurrency scales it out.
@@ -11,8 +11,8 @@
 # This is the OTHER half of "elastic data products" from the Kafka-lag scaler:
 # event consumers scale on backlog, synchronous services scale on request load.
 #
-# Placement note (CAP-025): the HTTP add-on lives on the gateway, NOT
-# order-service — order-service is the Istio canary subject, and the add-on's
+# Placement note: the HTTP add-on lives on the gateway, NOT
+# order-service; order-service is the Istio canary subject, and the add-on's
 # interceptor would contend with Istio's VirtualService over that service's
 # ingress path. The gateway is kept out of the mesh (inject: "false" on its
 # Deployment) so the interceptor → gateway path is clean.

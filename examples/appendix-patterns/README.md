@@ -1,4 +1,4 @@
-# Kubernetes patterns appendix — runnable examples
+# Kubernetes patterns appendix: runnable examples
 
 The runnable code for the [Kubernetes patterns & CKAD
 appendix](https://patterncatalyst.github.io/minikube-on-fedora/appendix/k8s-patterns/).
@@ -11,7 +11,7 @@ runnable code, not site content.
 ## The profile
 
 Every example runs on a dedicated **`mof-patterns`** minikube profile, separate
-from §3's `minikube` profile and §17's `mof-capstone`. Create it once:
+from §3's `minikube` profile and the capstone's `mof-capstone`. Create it once:
 
 ```bash
 cd examples/appendix-patterns
@@ -20,7 +20,7 @@ cd examples/appendix-patterns
 
 It is sized for the heaviest appendix needs (Istio + KEDA + metrics-server
 together), lighter than the full capstone mesh. A few chapters need extras set at
-creation time — the NetworkSegmentation chapter needs the Calico CNI:
+creation time; the NetworkSegmentation chapter needs the Calico CNI:
 
 ```bash
 ./scripts/setup-patterns-profile.sh --replace --calico
@@ -48,7 +48,7 @@ examples/appendix-patterns/
 Four of the Foundational examples run a real shipping service. There's no
 registry: `build-service.sh` builds the service's Containerfile with Docker
 Engine and loads the image straight into the `mof-patterns` profile's
-containerd store, the same `imagePullPolicy: Never` approach the §17 capstone
+containerd store, the same `imagePullPolicy: Never` approach the capstone
 uses.
 
 ```bash

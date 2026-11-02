@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
-# setup-istio.sh — install the Istio control plane into the mof-capstone cluster and
+# setup-istio.sh: install the Istio control plane into the mof-capstone cluster and
 # enable sidecar injection, in preparation for the order-service v1→v2 canary
-# (r26, CAP-024).
+#.
 #
 # Like the other capstone platform installs (Postgres/Kafka operators,
 # OpenMetadata), this is a run-once-per-cluster step, separate from the app
@@ -11,19 +11,19 @@
 # What it does:
 #   1. Verifies istioctl is available (the §11 base setup installs it to
 #      ~/.local/bin; this script does not re-download it).
-#   2. Installs Istio with the `default` profile — control plane (istiod) plus
+#   2. Installs Istio with the `default` profile: control plane (istiod) plus
 #      the istio-ingressgateway the canary routes through. (Not `demo`, which
 #      adds addons we don't need; not `minimal`, which omits the ingress
 #      gateway.)
 #   3. Labels the `capstone` namespace for sidecar injection.
 #
-# SCOPE NOTE (CAP-024): r26 meshes order-service for the canary, not the whole
+# SCOPE NOTE: only order-service is meshed for the canary, not the whole
 # mesh. Labeling the namespace enables injection, but only pods CREATED or
-# RESTARTED afterward get a sidecar — so order-service (v1 recreated + v2 new)
+# RESTARTED afterward get a sidecar: so order-service (v1 recreated + v2 new)
 # joins the mesh while the already-running operator-managed infra pods
 # (Postgres, Kafka, Apicurio, OpenMetadata, OpenSearch) keep running WITHOUT
 # sidecars. Do NOT restart those infra pods while the label is in place unless
-# you first annotate them `sidecar.istio.io/inject: "false"` — operator-managed
+# you first annotate them `sidecar.istio.io/inject: "false"`: operator-managed
 # stateful pods need extra care (proxy lifecycle ordering) that's out of scope
 # here. Mesh-wide mTLS and observability are a later iteration.
 #
@@ -76,5 +76,5 @@ printf '  kubectl delete deployment order-service -n %s --ignore-not-found\n' "$
 printf '  helm upgrade --install capstone ./charts/capstone -n %s\n' "$NS"
 printf '\nThen run the canary demo + verification:\n'
 printf '  ./demos/smoke-canary.sh\n'
-printf '\nReminder (CAP-024 scope): do not restart the operator-managed infra pods\n'
+printf '\nReminder (canary scope): do not restart the operator-managed infra pods\n'
 printf '(Postgres, Kafka, Apicurio, OpenMetadata) while injection is enabled.\n'

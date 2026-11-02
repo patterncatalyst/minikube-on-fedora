@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 #
-# smoke-order.sh — the r21 walking-skeleton verification (r21a-corrected).
+# smoke-order.sh: the walking-skeleton verification.
 #
 # Proves the entire spine end-to-end:
 #   image build (Docker Engine) → load into profile → helm deploy →
 #   operator-managed Postgres → service connects → REST works →
 #   data round-trips through Postgres → assertions pass
 #
-# r21a changes:
+# changes:
 #   - builds and loads via scripts/build-image.sh (docker build →
 #     `minikube image load` into the profile's containerd store; no registry).
 #   - on failure, LEAVES the failed resources in place and dumps a
 #     diagnostic bundle inline (pod status, describe events, logs) instead
-#     of tearing everything down — so a failed run hands you the evidence
+#     of tearing everything down: so a failed run hands you the evidence
 #     directly (the §11/§12 demo pattern). Successful runs still clean up.
 #
 # Idempotent. Run from examples/17-capstone/:
@@ -39,7 +39,7 @@ SUCCESS=0
 step() { printf '\n==> %s\n' "$1"; }
 
 dump_diagnostics() {
-    step "DIAGNOSTIC DUMP (failure — resources left in place for inspection)"
+    step "DIAGNOSTIC DUMP (failure: resources left in place for inspection)"
     printf '\n--- pods ---\n'
     kubectl get pods -n "$NS" -o wide 2>&1
     local pod
@@ -89,9 +89,9 @@ PURGE_DB=0
 # ─── Pre-flight ──────────────────────────────────────────────────────────────
 
 step "Pre-flight checks"
-minikube status -p "$PROFILE" >/dev/null 2>&1 || fail "profile '$PROFILE' not running — ./scripts/setup-capstone-profile.sh"
+minikube status -p "$PROFILE" >/dev/null 2>&1 || fail "profile '$PROFILE' not running: ./scripts/setup-capstone-profile.sh"
 kubectl get crd clusters.postgresql.cnpg.io >/dev/null 2>&1 \
-    || fail "CloudNativePG CRDs not found — run scripts/setup-postgres-operator.sh first"
+    || fail "CloudNativePG CRDs not found: run scripts/setup-postgres-operator.sh first"
 command -v helm >/dev/null || fail "helm not in PATH"
 
 # ─── Build + load the image (docker build → minikube image load) ─────────────
@@ -120,7 +120,7 @@ done
 (( pg_ready )) || fail "Postgres primary did not become Ready within 300s"
 
 # ─── Deploy inventory-service ────────────────────────────────────────────────
-# POST /orders checks stock with inventory-service over gRPC (r23), so the
+# POST /orders checks stock with inventory-service over gRPC, so the
 # order spine needs it running; another smoke's cleanup may have removed it.
 
 step "Building + loading inventory-service"
@@ -144,8 +144,8 @@ kubectl rollout status deployment/order-service -n "$NS" --timeout=180s \
 step "Assert the Deployment uses the bare image with pullPolicy Never, present in the node"
 img=$(kubectl get deployment order-service -n "$NS" -o jsonpath='{.spec.template.spec.containers[0].image}')
 pol=$(kubectl get deployment order-service -n "$NS" -o jsonpath='{.spec.template.spec.containers[0].imagePullPolicy}')
-[[ "$img" == "${IMAGE_NAME}:${IMAGE_TAG}" ]] || fail "order-service image is '$img' — must be the bare '${IMAGE_NAME}:${IMAGE_TAG}'"
-[[ "$pol" == "Never" ]] || fail "order-service imagePullPolicy is '$pol' — must be Never"
+[[ "$img" == "${IMAGE_NAME}:${IMAGE_TAG}" ]] || fail "order-service image is '$img': must be the bare '${IMAGE_NAME}:${IMAGE_TAG}'"
+[[ "$pol" == "Never" ]] || fail "order-service imagePullPolicy is '$pol': must be Never"
 minikube -p "$PROFILE" image ls 2>/dev/null | grep -qE "(^|/)${IMAGE_NAME}:${IMAGE_TAG}\$" \
     || fail "${IMAGE_NAME}:${IMAGE_TAG} not in 'minikube -p $PROFILE image ls'"
 printf '    ✓ %s (pullPolicy Never, present in the node)\n' "$img"
@@ -197,8 +197,8 @@ printf '    confirmed: 1 row in orders.orders for id=%s\n' "$order_id"
 
 SUCCESS=1
 if (( PURGE_DB )); then
-    printf '\n✓ SUCCESS — order-service walking skeleton verified (DB purged on exit)\n'
+    printf '\n✓ SUCCESS: order-service walking skeleton verified (DB purged on exit)\n'
 else
-    printf '\n✓ SUCCESS — order-service walking skeleton verified\n'
+    printf '\n✓ SUCCESS: order-service walking skeleton verified\n'
     printf '  (Postgres left running for fast re-runs; pass --purge-db to tear it down)\n'
 fi

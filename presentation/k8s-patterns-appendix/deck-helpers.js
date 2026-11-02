@@ -1,5 +1,5 @@
-// deck-helpers.js — design system & helpers for the REST deck
-// Carries the visual conventions from the existing Python deck:
+// deck-helpers.js: design system & helpers for the deck
+// Carries the Red Hat deck house-style conventions:
 //   - 13.333 x 7.5 LAYOUT_WIDE
 //   - Eyebrow 12pt bold red EE0000, charSpacing 4
 //   - Title 30pt Overpass SemiBold #151515
@@ -62,7 +62,7 @@ const H = 7.5;
 function newDeck() {
   const pres = new PptxGenJS();
   pres.layout = "LAYOUT_WIDE";
-  pres.title = "Designing Cloud-Native REST APIs — Python";
+  pres.title = "Kubernetes Patterns & CKAD, worked on minikube";
   pres.author = "Robert Sedor";
   pres.company = "Red Hat";
   return pres;
@@ -76,7 +76,7 @@ function addFooter(slide, pageNum) {
     fontFace: FONT.body, fontSize: 10, color: COLOR.pageNum,
     align: "left", valign: "middle",
   });
-  // Red Hat color logo, bottom-right — present on every content slide
+  // Red Hat color logo, bottom-right, present on every content slide
   // (the cover and section dividers carry their own logo separately).
   try {
     slide.addImage({
@@ -133,7 +133,7 @@ function addBullets(slide, lines, opts = {}) {
   });
 }
 
-// Two-column bullets — matches the reference deck's agenda layout.
+// Two-column bullets, matching the reference deck's agenda layout.
 // `left` and `right` are arrays of strings (or {text, options} objects).
 // `muted` indicates items to render in muted italic style (e.g. appendices).
 function addTwoColBullets(slide, left, right, opts = {}) {
@@ -174,8 +174,7 @@ function addTwoColBullets(slide, left, right, opts = {}) {
   });
 }
 
-// Status-code table: 3-column layout — code | name | purpose
-// Designed for the 2xx/4xx/5xx slides so the bullets-as-prose pattern can be retired.
+// Three-column table (e.g. code | name | purpose), an alternative to bullets-as-prose.
 function addStatusTable(slide, rows, opts = {}) {
   const y = opts.y ?? 1.85;
   const h = opts.h ?? (opts.withCallout ? 3.55 : 4.85);
@@ -213,9 +212,9 @@ function addStatusTable(slide, rows, opts = {}) {
     color: COLOR.body,
     border: { type: "solid", color: COLOR.grid, pt: 0.5 },
     valign: "middle",
-    // Default 3-column widths suit short status codes in column 1. Reference
-    // tables (Appendix A/B) pass a wider colW so long labels (e.g. test-type
-    // names, CLI names) don't wrap. Widths should sum to ~12.09 (the table w).
+    // Default 3-column widths suit a short key in column 1. Reference
+    // tables pass a wider colW so long labels (e.g. pattern or CLI
+    // names) don't wrap. Widths should sum to ~12.09 (the table w).
     colW: opts.colW ?? [1.10, 2.40, 8.59],
     rowH: opts.rowH ?? 0.45,
   });
@@ -230,7 +229,7 @@ function addCaption(slide, text, y) {
 }
 
 function addPerfCallout(slide, text, opts = {}) {
-  // Distinctive "perf" sidebar — amber tint, left bar, eyebrow "⚡ PERFORMANCE"
+  // Distinctive "perf" sidebar: amber tint, left bar, eyebrow "⚡ PERFORMANCE"
   const x = opts.x ?? 0.62;
   const y = opts.y ?? 5.65;
   const w = opts.w ?? 12.09;
@@ -301,7 +300,7 @@ function addCodeSlide(slide, eyebrow, title, lang, codeLines, caption, opts = {}
     fill: { color: COLOR.codeBg },
     line: { color: COLOR.codeBg, width: 0 },
   });
-  // code text — render each line with simple syntax coloring (comments green)
+  // code text: render each line with simple syntax coloring (comments green)
   const items = codeLines.map((ln) => {
     const trimmed = ln.replace(/^\s+/, "");
     const isComment = trimmed.startsWith("#") || trimmed.startsWith("//");
@@ -331,7 +330,7 @@ function addCodeSlide(slide, eyebrow, title, lang, codeLines, caption, opts = {}
 }
 
 function addSectionDivider(slide, code, title, subtitle) {
-  // background — solid red, matches Python deck
+  // background: solid red (house style)
   slide.background = { color: COLOR.redDark };
   // section-panel.png covers full slide (textured red)
   try {

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# smoke-kafka.sh — verify the async spine: order-service publishes an
+# smoke-kafka.sh: verify the async spine: order-service publishes an
 # order.placed event to Kafka, notification-service consumes it.
 #
 # Flow:
@@ -11,7 +11,7 @@
 #   5. ensure Postgres Ready; deploy inventory, order, notification
 #   6. place an in-stock order via order-service REST (emits order.placed)
 #   7. poll notification-service GET /received until the order_id appears
-#   8. clean up on success (CAP-008); on failure, leave running + dump logs
+#   8. clean up on success; on failure, leave running + dump logs
 #
 # Usage:  ./demos/smoke-kafka.sh [--purge-db]
 
@@ -45,14 +45,14 @@ assert_local_image() {  # deployment-name
     local d="$1" img pol
     img="$(kubectl get deployment "$d" -n "$NS" -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null)"
     pol="$(kubectl get deployment "$d" -n "$NS" -o jsonpath='{.spec.template.spec.containers[0].imagePullPolicy}' 2>/dev/null)"
-    [[ "$img" == "${d}:v1" ]] || fail "${d} image is '${img}' — must be the bare '${d}:v1'"
-    [[ "$pol" == "Never" ]] || fail "${d} imagePullPolicy is '${pol}' — must be Never"
+    [[ "$img" == "${d}:v1" ]] || fail "${d} image is '${img}': must be the bare '${d}:v1'"
+    [[ "$pol" == "Never" ]] || fail "${d} imagePullPolicy is '${pol}': must be Never"
     minikube -p "$PROFILE" image ls 2>/dev/null | grep -qE "(^|/)${d}:v1\$" \
-        || fail "${d}:v1 not in 'minikube -p ${PROFILE} image ls' — ./scripts/build-image.sh services/${d} ${d} v1"
+        || fail "${d}:v1 not in 'minikube -p ${PROFILE} image ls': ./scripts/build-image.sh services/${d} ${d} v1"
     printf '    ✓ %s → %s (pullPolicy Never, present in the node)\n' "$d" "$img"
 }
 
-minikube status -p "$PROFILE" >/dev/null 2>&1 || fail "profile '$PROFILE' not running — ./scripts/setup-capstone-profile.sh"
+minikube status -p "$PROFILE" >/dev/null 2>&1 || fail "profile '$PROFILE' not running: ./scripts/setup-capstone-profile.sh"
 
 # ── 2. Strimzi operator ───────────────────────────────────────────────────────
 step "Ensuring the Strimzi operator is installed"
@@ -78,7 +78,7 @@ done
 
 # ── 5. Postgres + deploy services ─────────────────────────────────────────────
 step "Ensuring the shared Postgres cluster is Ready"
-kubectl get crd clusters.postgresql.cnpg.io >/dev/null 2>&1 || fail "CloudNativePG operator missing — ./scripts/setup-postgres-operator.sh"
+kubectl get crd clusters.postgresql.cnpg.io >/dev/null 2>&1 || fail "CloudNativePG operator missing: ./scripts/setup-postgres-operator.sh"
 helm upgrade --install "$PG_RELEASE" "$PG_CHART" -n "$NS" --create-namespace || fail "postgres CR install failed"
 pg_ready=0
 for i in $(seq 1 60); do
@@ -128,7 +128,7 @@ for i in $(seq 1 30); do
 done
 (( seen )) || fail "notification-service did not consume the order.placed event within ~60s"
 
-printf '\n✓ SUCCESS — async spine verified (order.placed: order-service → Kafka → notification-service)\n'
+printf '\n✓ SUCCESS: async spine verified (order.placed: order-service → Kafka → notification-service)\n'
 
 # ── 8. cleanup on success ─────────────────────────────────────────────────────
 step "Cleanup (success)"

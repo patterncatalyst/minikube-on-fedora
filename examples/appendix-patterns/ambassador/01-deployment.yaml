@@ -1,7 +1,7 @@
 # shipping-service, unmodified, with NO Postgres-related environment
 # variables at all. Its own config.py already defaults PG_HOST to
 # 127.0.0.1:5432 and the Postgres user/password/database to the exact values
-# 00-postgres.yaml's Secret uses — defaults written for a local ambassador,
+# 00-postgres.yaml's Secret uses; defaults written for a local ambassador,
 # per the comment already in that file. The ambassador sidecar is a plain TCP
 # proxy: it forwards raw bytes between 127.0.0.1:5432 and the real
 # patterns-postgres Service without ever parsing the Postgres wire protocol,

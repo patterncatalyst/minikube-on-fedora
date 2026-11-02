@@ -25,12 +25,12 @@ spec:
         bootstrapServers: my-kafka-kafka-bootstrap.kafka:9092
         consumerGroup: order-processor-group
         topic: orders
-        # One replica per 5 messages of lag. Tunable per workload —
+        # One replica per 5 messages of lag. Tunable per workload;
         # higher values mean more lag tolerated before scaling up
         # (cheaper); lower values mean faster scale-up (more responsive).
         lagThreshold: "5"
         # Where the consumer starts reading from when there's no
         # committed offset (first time the group sees the topic).
-        # "earliest" — process all retained messages (demo uses this).
-        # "latest" — skip backlog, start with new messages only.
+        # "earliest": process all retained messages (demo uses this).
+        # "latest": skip backlog, start with new messages only.
         offsetResetPolicy: earliest
