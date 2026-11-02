@@ -9,7 +9,7 @@ interaction is visible rather than hidden behind a serde library:
     bytes 5..:  Avro binary payload (fastavro schemaless)
 
 This is Option A from the design discussion: minimal dependencies (fastavro +
-httpx) and fully legible — the reader sees the schema get registered, the id
+httpx) and fully legible: the reader sees the schema get registered, the id
 stamped into the bytes, and the consumer fetch the schema by id to decode.
 
 Apicurio ccompat endpoints used:

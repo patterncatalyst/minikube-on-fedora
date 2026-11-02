@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 #
-# demo-canary.sh — the order-service v1→v2 canary as a REPEATABLE, BACKABLE-OUT
-# demo (Phase B). The verification-facing counterpart is smoke-canary.sh (which
+# demo-canary.sh: the order-service v1→v2 canary as a REPEATABLE, BACKABLE-OUT
+# demo. The verification-facing counterpart is smoke-canary.sh (which
 # asserts the split lands in expected bands); this script is the presenter-facing
 # one: bring the canary up at a chosen weight, shift it, and tear it cleanly back
 # to a v1-only baseline so it can be replayed.
 #
-# The data-mesh point: a data product (order-service) evolves its contract — v2
-# adds an additive `currency` field — and Istio shifts a controllable fraction of
+# The data-mesh point: a data product (order-service) evolves its contract: v2
+# adds an additive `currency` field: and Istio shifts a controllable fraction of
 # live traffic to the new contract version, with no flag-day break and a clean
 # rollback. v2 is the same image with API_VERSION=v2 (so GET /version reports v2
 # and advertises currency); the VirtualService weights decide the split.
@@ -42,10 +42,10 @@ cmd="${1:-}"; shift || true
 case "$cmd" in
   up)
     w1="${1:-90}"; w2="${2:-10}"
-    minikube status -p "$PROFILE" >/dev/null 2>&1 || fail "profile '$PROFILE' not running — ./scripts/setup-capstone-profile.sh"
+    minikube status -p "$PROFILE" >/dev/null 2>&1 || fail "profile '$PROFILE' not running: ./scripts/setup-capstone-profile.sh"
     require_published_port "$PROFILE" "$NODE_PORT_INGRESS" "$HOST_PORT_INGRESS"
     kubectl get deployment order-service -n "$NS" >/dev/null 2>&1 \
-        || fail "order-service (v1) not deployed — install it first via its chart"
+        || fail "order-service (v1) not deployed: install it first via its chart"
 
     step "Deploying the v2 subset alongside v1"
     kubectl apply -f "$V2_MANIFEST" >/dev/null || fail "failed to apply v2 manifest"
@@ -72,11 +72,11 @@ EOF
     [[ $# -eq 2 ]] || fail "usage: demo-canary.sh shift W_V1 W_V2  (e.g. 50 50)"
     step "Shifting the canary to $1/$2"
     apply_weights "$1" "$2"
-    ok "split shifted — re-run your observe loop to see the new ratio"
+    ok "split shifted: re-run your observe loop to see the new ratio"
     ;;
 
   down)
-    step "Backing the canary out — returning to a v1-only baseline"
+    step "Backing the canary out: returning to a v1-only baseline"
     # 1. Send all traffic to v1 first (so in-flight requests drain to a live subset),
     #    then remove the routing objects entirely (back to plain ClusterIP routing).
     sed "s/__W_V1__/100/; s/__W_V2__/0/" "$ROUTING" | kubectl apply -f - >/dev/null 2>&1 || true

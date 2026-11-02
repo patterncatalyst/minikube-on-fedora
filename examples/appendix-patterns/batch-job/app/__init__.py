@@ -1,4 +1,4 @@
-"""shipping-report — a net-new BatchJob/PeriodicJob runner for the
+"""shipping-report: a net-new BatchJob/PeriodicJob runner for the
 Kubernetes patterns appendix.
 
 Not a capstone data product: a small, disposable CLI that reads rows from

@@ -1,5 +1,5 @@
-# graphql-gateway reaches both services by DNS name alone — order-service
-# over REST, inventory-service over gRPC — never by Pod IP, which is the
+# graphql-gateway reaches both services by DNS name alone: order-service
+# over REST, inventory-service over gRPC, never by Pod IP, which is the
 # entire point of giving every workload a Service in front of it.
 apiVersion: apps/v1
 kind: Deployment

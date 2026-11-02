@@ -5,11 +5,11 @@ Revises:
 Create Date: 2026-05-22
 
 The first migration for notification-service. Creates the `notifications`
-table in the service's own `notifications` schema (CAP-003). The schema itself
+table in the service's own `notifications` schema. The schema itself
 is ensured by env.py before this runs.
 
 Note (Alembic async): upgrade()/downgrade() are plain *sync* functions even
-though the engine is async — Alembic runs them inside `connection.run_sync`,
+though the engine is async; Alembic runs them inside `connection.run_sync`,
 so `op.*` works normally and must not be awaited (per Alembic discussion #1208).
 """
 

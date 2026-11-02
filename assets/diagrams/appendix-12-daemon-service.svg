@@ -25,5 +25,5 @@
 <path d="M565,140 L565,190" fill="none" stroke="#555" stroke-width="2" stroke-dasharray="5 4" marker-end="url(#a)"/>
 <text x="571.0" y="159.0" font-size="11" fill="#ffffff" stroke="#ffffff" stroke-width="3" paint-order="stroke" text-anchor="middle">hostPath /var/log</text>
 <text x="571.0" y="159.0" font-size="11" fill="#555" text-anchor="middle">hostPath /var/log</text>
-<text x="430" y="310" font-size="14" fill="#888" text-anchor="middle">Exactly one node-collector Pod per node — the controller adds or removes a Pod the moment a node joins or leaves.</text>
+<text x="430" y="310" font-size="14" fill="#888" text-anchor="middle">Exactly one node-collector Pod per node; the controller adds or removes a Pod the moment a node joins or leaves.</text>
 </svg>

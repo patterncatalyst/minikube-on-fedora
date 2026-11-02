@@ -1,15 +1,15 @@
-# om-app-values.yaml — OpenMetadata *server* config for the capstone.
+# om-app-values.yaml: OpenMetadata *server* config for the capstone.
 #
 # OVERRIDE file, merged by Helm onto the upstream open-metadata/openmetadata
 # chart defaults (chart 2.0.5). Only the keys that differ from the chart
 # default are listed; the literal key paths below were taken from that chart's
 # own values.yaml, so they are real, not reconstructed.
 #
-# Decisions (CAP-022):
+# Decisions:
 #   * No Airflow: deployPipelinesConfig.enabled and
 #     pipelineServiceClientConfig.enabled both -> false. The server boots and
 #     serves the catalog/UI without any pipeline orchestrator; ingestion is run
-#     as one-off Jobs (r27b).
+#     as one-off Jobs.
 #   * Backend = capstone CloudNativePG Postgres, NOT the bundled MySQL. The
 #     `database` block is flipped from the chart's MySQL defaults to Postgres
 #     and pointed at the existing cluster's read-write service. The
@@ -17,8 +17,8 @@
 #     by setup-openmetadata.sh before this chart is installed.
 #   * Search = the single-node OpenSearch from om-deps-values.yaml. The chart
 #     default elasticsearch block already targets host=opensearch, port 9200,
-#     scheme http, searchType opensearch, auth/trustStore disabled — which
-#     matches our deps deploy exactly — so it needs NO override here.
+#     scheme http, searchType opensearch, auth/trustStore disabled, which
+#     matches our deps deploy exactly, so it needs no override here.
 
 # Pin the server image to the chart appVersion for reproducibility (the chart
 # default tag is "" which resolves to appVersion 2.0.5; pinning makes it
@@ -53,7 +53,7 @@ openmetadata:
       auth:
         username: openmetadata
         password:
-          # IMPORTANT: this secret name must NOT be "openmetadata-db-secret" —
+          # This secret name must not be "openmetadata-db-secret":
           # the chart GENERATES a Helm-owned secret of that name (holding
           # DB_HOST/DB_PORT/DB_USER/... assembled from this block) and reads the
           # password from the secret named here via secretKeyRef. Using the same
@@ -68,7 +68,7 @@ openmetadata:
       dbParams: "sslmode=require"
 
 # Modest resources for a single-node demo (chart default is `resources: {}`,
-# i.e. unbounded — give the JVM a sane envelope instead).
+# i.e. unbounded; give the JVM a sane envelope instead).
 resources:
   requests:
     cpu: "500m"

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# demo-add-data-product.sh up|down — the Phase A demonstration, replayable.
+# demo-add-data-product.sh up|down: the data-product demonstration, replayable.
 #
 # Walks the full add-a-data-product-to-the-mesh workflow for review-service, then
 # backs it out so it can be replayed:
@@ -16,7 +16,7 @@
 # discovery machinery (publish pattern, ingest-openmetadata.sh, get_token.py).
 #
 # Assumes the capstone is up (Apicurio, OpenMetadata, Postgres, inventory-service
-# all running — the products lineage target is inventory.stock). Run from
+# all running: the products lineage target is inventory.stock). Run from
 # examples/17-capstone/:  ./demos/demo-add-data-product.sh up   (then ... down)
 
 set -uo pipefail
@@ -54,10 +54,10 @@ MODE="${1:-}"
 
 # ─── Pre-flight ──────────────────────────────────────────────────────────────
 step "Pre-flight"
-minikube status -p "$PROFILE" >/dev/null 2>&1 || fail "profile '$PROFILE' not running — ./scripts/setup-capstone-profile.sh"
+minikube status -p "$PROFILE" >/dev/null 2>&1 || fail "profile '$PROFILE' not running: ./scripts/setup-capstone-profile.sh"
 for svc in apicurio openmetadata; do
     kubectl get svc "$svc" -n "$NS" >/dev/null 2>&1 \
-        || fail "$svc not found — bring the capstone up (./scripts/cluster-up.sh)"
+        || fail "$svc not found: bring the capstone up (./scripts/cluster-up.sh)"
 done
 
 if [[ "$MODE" == "up" ]]; then
@@ -108,7 +108,7 @@ PY
     code="$(curl -s -o /dev/null -w '%{http_code}' \
         -H "Authorization: Bearer $TOKEN" \
         "http://127.0.0.1:${L_OM}/api/v1/tables/name/$(python3 -c 'import urllib.parse,sys;print(urllib.parse.quote(sys.argv[1],safe=""))' "$REVIEWS_TABLE_FQN")")"
-    [[ "$code" == "200" ]] || warn "reviews table not found in catalog yet (HTTP $code) — ingestion may lag; check Explore"
+    [[ "$code" == "200" ]] || warn "reviews table not found in catalog yet (HTTP $code): ingestion may lag; check Explore"
     [[ "$code" == "200" ]] && ok "reviews table present in OpenMetadata"
 
     # ── Ways in ──────────────────────────────────────────────────────────────
@@ -144,7 +144,7 @@ else
             "http://127.0.0.1:${L_OM}/api/v1/databaseSchemas/name/${sch}?hardDelete=true&recursive=true")"
         [[ "$c" =~ ^20 ]] && ok "removed reviews schema from the catalog" || warn "catalog schema delete returned HTTP $c (verify-point)"
     else
-        warn "no OpenMetadata token — skipping catalog cleanup; remove 'reviews' in Explore manually"
+        warn "no OpenMetadata token: skipping catalog cleanup; remove 'reviews' in Explore manually"
     fi
 
     # 3. Apicurio artifact

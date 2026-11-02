@@ -1,16 +1,16 @@
 #!/usr/bin/env bash
 #
-# smoke-canary.sh — demonstrate AND verify the order-service v1→v2 canary
-# (r26, CAP-024).
+# smoke-canary.sh: demonstrate AND verify the order-service v1→v2 canary
+#.
 #
 # The data-mesh point: a data product evolves its contract (v2 adds a
 # `currency` field) without a flag-day break. v2 deploys alongside v1, and
-# Istio shifts a controllable fraction of live traffic to it — the canary of a
+# Istio shifts a controllable fraction of live traffic to it: the canary of a
 # contract, not just a binary. This script proves the mechanism end-to-end:
 #   * v1 (Helm-managed) and v2 (the istio/ overlay) both run, both meshed
 #     (an istio-proxy sidecar is injected into each)
 #   * traffic through the istio-ingressgateway splits by the VirtualService
-#     weight — measured by hitting GET /version and counting which subset answers
+#     weight: measured by hitting GET /version and counting which subset answers
 #   * SHIFTING the weight (re-applying the VirtualService) moves the split,
 #     which is the progressive-canary operation
 #
@@ -21,8 +21,8 @@
 # Prerequisites:
 #   - mof-capstone profile running (kubectl/helm are pinned to it by scripts/lib/env.sh)
 #   - scripts/setup-istio.sh has run (Istio installed, namespace injection on)
-#   - order-service (v1) deployed via the umbrella chart WITH the r26 selector
-#     (version=v1). If the live Deployment predates r26, this smoke detects the
+#   - order-service (v1) deployed via the umbrella chart with the subset selector
+#     (version=v1). If the live Deployment predates the subset selector, this smoke detects the
 #     stale selector and prints the one-time migration.
 #
 # VERIFY-POINTS (Istio API / install; confirm against the installed version):
@@ -40,7 +40,7 @@ REQUESTS=100
 step() { printf '\n==> %s\n' "$1"; }
 
 dump_diagnostics() {
-    step "DIAGNOSTIC DUMP (failure — resources left in place)"
+    step "DIAGNOSTIC DUMP (failure: resources left in place)"
     printf '\n--- order-service pods (both subsets) ---\n'
     kubectl get pods -n "$NS" -l app.kubernetes.io/name=order-service -o wide 2>&1
     printf '\n--- VirtualService / DestinationRule / Gateway ---\n'
@@ -56,7 +56,7 @@ fail() {
     exit 1
 }
 
-# apply_weights V1 V2 — render the VirtualService at the given split and apply
+# apply_weights V1 V2: render the VirtualService at the given split and apply
 apply_weights() {
     local w1="$1" w2="$2"
     sed "s/__W_V1__/${w1}/; s/__W_V2__/${w2}/" "$ISTIO_DIR/routing.yaml" \
@@ -66,7 +66,7 @@ apply_weights() {
     sleep 3
 }
 
-# measure_split LABEL EXPECT_V2_LOW EXPECT_V2_HIGH — drive traffic, assert band
+# measure_split LABEL EXPECT_V2_LOW EXPECT_V2_HIGH: drive traffic, assert band
 measure_split() {
     local label="$1" lo="$2" hi="$3"
     local resp v1 v2
@@ -82,7 +82,7 @@ measure_split() {
     [[ $((v1 + v2)) -ge $((REQUESTS - 5)) ]] \
         || fail "$label: only $((v1 + v2))/$REQUESTS responses parsed as v1/v2 (routing broken?)"
     [[ "$v2" -ge "$lo" && "$v2" -le "$hi" ]] \
-        || fail "$label: v2 count $v2 outside expected band [$lo,$hi] — split not honored"
+        || fail "$label: v2 count $v2 outside expected band [$lo,$hi]: split not honored"
     LAST_V1="$v1"; LAST_V2="$v2"
     printf '    ✓ %s split within expected band\n' "$label"
 }
@@ -90,19 +90,19 @@ measure_split() {
 # ─── Pre-flight ──────────────────────────────────────────────────────────────
 
 step "Pre-flight checks"
-minikube status -p "$PROFILE" >/dev/null 2>&1 || fail "profile '$PROFILE' not running — ./scripts/setup-capstone-profile.sh"
+minikube status -p "$PROFILE" >/dev/null 2>&1 || fail "profile '$PROFILE' not running: ./scripts/setup-capstone-profile.sh"
 for t in kubectl curl; do command -v "$t" >/dev/null || fail "$t not in PATH"; done
 kubectl get deployment istiod -n istio-system >/dev/null 2>&1 \
-    || fail "Istio not installed — run scripts/setup-istio.sh first"
+    || fail "Istio not installed: run scripts/setup-istio.sh first"
 kubectl get deployment order-service -n "$NS" >/dev/null 2>&1 \
-    || fail "order-service (v1) not deployed — install it first:
+    || fail "order-service (v1) not deployed: install it first:
        helm upgrade --install order-service charts/capstone/charts/order-service -n $NS"
 
-# Selector migration check (r26 immutability): v1 Deployment must select version=v1.
+# Selector migration check (selector immutability): v1 Deployment must select version=v1.
 SEL_VERSION="$(kubectl get deployment order-service -n "$NS" \
     -o jsonpath='{.spec.selector.matchLabels.version}' 2>/dev/null || echo '')"
 if [[ "$SEL_VERSION" != "v1" ]]; then
-    fail "order-service Deployment predates r26 (selector lacks version=v1). One-time migration:
+    fail "order-service Deployment predates the subset selector (lacks version=v1). One-time migration:
        kubectl delete deployment order-service -n $NS
        helm upgrade --install order-service charts/capstone/charts/order-service -n $NS
      then re-run this smoke. (Deployment selectors are immutable, so v1 must be recreated.)"
@@ -119,15 +119,15 @@ kubectl rollout status deployment/order-service-v2 -n "$NS" --timeout=3m \
 printf '    ✓ order-service-v2 rolled out\n'
 
 # Confirm BOTH subsets are meshed (istio-proxy present). Istio may inject the
-# proxy either as a regular container (classic) or as a native sidecar — an
-# initContainer with restartPolicy:Always (default on k8s >=1.29) — so check
+# proxy either as a regular container (classic) or as a native sidecar: an
+# initContainer with restartPolicy:Always (default on k8s >=1.29): so check
 # BOTH lists. Either way a meshed pod reports 2/2 Ready.
 for v in v1 v2; do
     names="$(kubectl get pod -n "$NS" -l "app.kubernetes.io/name=order-service,version=$v" \
         -o jsonpath='{.items[0].spec.containers[*].name} {.items[0].spec.initContainers[*].name}' 2>/dev/null || echo '')"
     printf '    %s containers: %s\n' "$v" "$names"
     [[ "$names" == *istio-proxy* ]] \
-        || fail "$v pod has no istio-proxy sidecar — injection didn't happen (was the namespace labeled / pod created after setup-istio.sh?)"
+        || fail "$v pod has no istio-proxy sidecar: injection didn't happen (was the namespace labeled / pod created after setup-istio.sh?)"
 done
 printf '    ✓ both subsets are in the mesh\n'
 

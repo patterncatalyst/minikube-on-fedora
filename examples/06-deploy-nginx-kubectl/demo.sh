@@ -16,7 +16,7 @@
 #   8. clean up manifests on exit (success or failure)
 #
 # Uses the default minikube profile (NOT a separate profile, unlike
-# examples/03-driver-check/) — leaves the cluster running for the
+# examples/03-driver-check/): leaves the cluster running for the
 # next demo. The built image stays in the cluster's local image cache
 # across runs (cached for fast re-runs); to force a rebuild from
 # scratch, run `minikube -p minikube image rm nginx-custom:v1` first.
@@ -162,7 +162,7 @@ kubectl get pods -l "app=${APP_NAME}" | sed 's/^/    /'
 pass "scaled to 3 replicas, all Running"
 
 # ── Done ────────────────────────────────────────────────────────────────────
-step "SUCCESS — image built + Deployment + NodePort Service + scaling all working"
+step "SUCCESS: image built + Deployment + NodePort Service + scaling all working"
 echo
 echo "  Cleanup will run automatically on script exit:"
 echo "    - nginx Deployment and Service deleted (nodePort 30080 freed)"

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# smoke-grpc.sh — verify the first cross-service call in the mesh:
+# smoke-grpc.sh: verify the first cross-service call in the mesh:
 # order-service → inventory-service (InventoryService.CheckStock over gRPC).
 #
 # Flow:
@@ -13,7 +13,7 @@
 #        - POST /orders for an in-stock SKU            → 201 (gRPC said available)
 #        - POST /orders for an out-of-stock SKU        → 409 (gRPC said no)
 #        - POST /orders for more than on-hand quantity → 409 (quantity check)
-#   6. clean up on success (CAP-008); on failure, leave running + dump diagnostics
+#   6. clean up on success; on failure, leave running + dump diagnostics
 #
 # Usage:  ./demos/smoke-grpc.sh [--purge-db]
 
@@ -43,7 +43,7 @@ fail() {
 step "Checking for committed gRPC stubs"
 for svc in inventory-service order-service; do
     if [[ ! -f "services/${svc}/gen/capstone/inventory/v1/inventory_pb2_grpc.py" ]]; then
-        fail "missing stubs for ${svc} — generate them first: ./scripts/gen-protos.sh"
+        fail "missing stubs for ${svc}: generate them first: ./scripts/gen-protos.sh"
     fi
 done
 printf '    ✓ stubs present in both services\n'
@@ -53,15 +53,15 @@ assert_local_image() {  # deployment-name
     local d="$1" img pol
     img="$(kubectl get deployment "$d" -n "$NS" -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null)"
     pol="$(kubectl get deployment "$d" -n "$NS" -o jsonpath='{.spec.template.spec.containers[0].imagePullPolicy}' 2>/dev/null)"
-    [[ "$img" == "${d}:v1" ]] || fail "${d} image is '${img}' — must be the bare '${d}:v1'"
-    [[ "$pol" == "Never" ]] || fail "${d} imagePullPolicy is '${pol}' — must be Never"
+    [[ "$img" == "${d}:v1" ]] || fail "${d} image is '${img}': must be the bare '${d}:v1'"
+    [[ "$pol" == "Never" ]] || fail "${d} imagePullPolicy is '${pol}': must be Never"
     minikube -p "$PROFILE" image ls 2>/dev/null | grep -qE "(^|/)${d}:v1\$" \
-        || fail "${d}:v1 not in 'minikube -p ${PROFILE} image ls' — ./scripts/build-image.sh services/${d} ${d} v1"
+        || fail "${d}:v1 not in 'minikube -p ${PROFILE} image ls': ./scripts/build-image.sh services/${d} ${d} v1"
     printf '    ✓ %s → %s (pullPolicy Never, present in the node)\n' "$d" "$img"
 }
 
 # ── 2. build + push both images ───────────────────────────────────────────────
-minikube status -p "$PROFILE" >/dev/null 2>&1 || fail "profile '$PROFILE' not running — ./scripts/setup-capstone-profile.sh"
+minikube status -p "$PROFILE" >/dev/null 2>&1 || fail "profile '$PROFILE' not running: ./scripts/setup-capstone-profile.sh"
 step "Building + loading inventory-service"
 ./scripts/build-image.sh services/inventory-service inventory-service v1 || fail "inventory build/load failed"
 step "Building + loading order-service"
@@ -69,7 +69,7 @@ step "Building + loading order-service"
 
 # ── 3. Postgres ───────────────────────────────────────────────────────────────
 step "Ensuring the shared Postgres cluster is Ready"
-kubectl get crd clusters.postgresql.cnpg.io >/dev/null 2>&1 || fail "CloudNativePG operator missing — ./scripts/setup-postgres-operator.sh"
+kubectl get crd clusters.postgresql.cnpg.io >/dev/null 2>&1 || fail "CloudNativePG operator missing: ./scripts/setup-postgres-operator.sh"
 helm upgrade --install "$PG_RELEASE" "$PG_CHART" -n "$NS" --create-namespace || fail "postgres CR install failed"
 pg_ready=0
 for i in $(seq 1 60); do
@@ -115,7 +115,7 @@ step "Excess quantity (WIDGET-001 x9999) → expect 409"
 code="$(post_order WIDGET-001 9999)"; echo "    HTTP $code"
 [[ "$code" == "409" ]] || fail "expected 409 for excess-quantity order, got $code"
 
-printf '\n✓ SUCCESS — order→inventory gRPC CheckStock verified end to end\n'
+printf '\n✓ SUCCESS: order→inventory gRPC CheckStock verified end to end\n'
 printf '  (in-stock placed; out-of-stock and excess-quantity both rejected via the gRPC round-trip)\n'
 
 # ── 6. cleanup on success ─────────────────────────────────────────────────────

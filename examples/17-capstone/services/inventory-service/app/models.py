@@ -1,8 +1,8 @@
 """SQLAlchemy models for inventory-service.
 
-r23: the inventory domain gets its first real table — `stock` — so the
+The inventory domain gets its first table, `stock`, so the
 gRPC CheckStock call has something to check against. The table lives in the
-service's own schema (`inventory`), enforcing per-service ownership (CAP-003).
+service's own schema (`inventory`), enforcing per-service ownership.
 inventory-service is the only service that writes this schema.
 """
 

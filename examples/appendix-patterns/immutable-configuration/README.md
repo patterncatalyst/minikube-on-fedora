@@ -30,7 +30,7 @@ kubectl --context mof-patterns patch configmap gateway-config-v1 -n patterns \
 ```
 
 The API server rejects the request outright: the error names the `data`
-field and the fact that the ConfigMap is immutable. There is no flag or
+field and that the ConfigMap is immutable. There is no flag or
 force option that gets around this; the only way forward is a new ConfigMap.
 
 Create it and confirm the running Pod is unaffected by its mere existence:

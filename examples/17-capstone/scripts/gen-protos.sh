@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 #
-# gen-protos.sh — generate Python gRPC stubs from proto/ and copy them into
+# gen-protos.sh: generate Python gRPC stubs from proto/ and copy them into
 # each service that needs them (option b: per-service committed copies).
 #
 # Run this ONCE whenever the protos change, then commit the regenerated
 # stubs alongside the proto change. The stubs are committed so the service
-# images build without buf/protoc inside them (CAP-013) and builds stay
-# reproducible (CAP-001).
+# images build without buf/protoc inside them and builds stay
+# reproducible.
 #
-# Generator: prefers `buf` (CAP-R19-4). Falls back to `python -m
+# Generator: prefers `buf`. Falls back to `python -m
 # grpc_tools.protoc` if buf isn't installed. buf's remote plugins need
 # network at generation time; the grpc_tools path works fully offline.
 #
@@ -41,7 +41,7 @@ if command -v buf >/dev/null 2>&1; then
     printf '    using buf\n'
     buf generate || fail "buf generate failed"
 elif python3 -c "import grpc_tools" >/dev/null 2>&1; then
-    printf '    buf not found — using python -m grpc_tools.protoc (system/active venv)\n'
+    printf '    buf not found: using python -m grpc_tools.protoc (system/active venv)\n'
     python3 -m grpc_tools.protoc \
         -I"$ROOT/proto" --python_out="$OUT" --grpc_python_out="$OUT" "$PROTO_FILE" \
         || fail "grpc_tools.protoc failed"

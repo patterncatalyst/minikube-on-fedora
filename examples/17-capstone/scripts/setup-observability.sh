@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
 #
-# setup-observability.sh — install the capstone observability stack into the
-# cluster (CAP-027 metrics, CAP-028 traces): Prometheus (+ kube-state-metrics),
+# setup-observability.sh: install the capstone observability stack into the
+# cluster (metrics and traces): Prometheus (+ kube-state-metrics),
 # Tempo (trace backend), and Grafana, all in the 'observability' namespace.
 #
 # It needs no application changes for METRICS: it scrapes the Istio sidecar on
 # the meshed order-service (istio_requests_total) and reads workload replica
 # counts from kube-state-metrics, which is what makes KEDA scaling visible.
 #
-# TRACES: Tempo is installed here as the backend (it receives OTLP directly — no
+# TRACES: Tempo is installed here as the backend (it receives OTLP directly: no
 # separate OpenTelemetry Collector, since our metrics come from scraping, not
 # OTLP). Nothing emits traces yet; instrumenting a service to send them is the
-# next step (see §17 and the tracing demo).
+# next step (see the capstone chapter and the tracing demo).
 #
 # Like the other capstone platform installs, this is run-once-per-cluster,
 # separate from the app releases, and idempotent.
@@ -36,7 +36,7 @@ GRAFANA_CHART_VERSION="${GRAFANA_CHART_VERSION:-13.4.0}"          # grafana-comm
 OBS_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../observability" && pwd)"
 
 command -v kubectl >/dev/null 2>&1 || { printf 'ERROR: kubectl not in PATH.\n' >&2; exit 1; }
-command -v helm    >/dev/null 2>&1 || { printf 'ERROR: helm not in PATH — see §2.\n' >&2; exit 1; }
+command -v helm    >/dev/null 2>&1 || { printf 'ERROR: helm not in PATH: see §2.\n' >&2; exit 1; }
 
 # ─── 1. helm repos ───────────────────────────────────────────────────────────
 printf '==> Ensuring the prometheus-community and grafana-community helm repos are registered\n'
@@ -56,7 +56,7 @@ helm upgrade --install prometheus prometheus-community/prometheus \
     --wait
 
 # ─── 3. Tempo (trace backend) ────────────────────────────────────────────────
-# Monolithic single-binary Tempo (r29b). In the grafana-community repo (the
+# Monolithic single-binary Tempo. In the grafana-community repo (the
 # grafana/* charts moved there 2026-01-30), so no extra repo beyond Grafana.
 printf '==> Installing Tempo (trace backend) into namespace %s\n' "$NAMESPACE"
 helm upgrade --install tempo grafana-community/tempo \
@@ -75,7 +75,7 @@ helm upgrade --install grafana grafana-community/grafana \
 
 # ─── Done ────────────────────────────────────────────────────────────────────
 printf '\n==> Prometheus + Grafana installed in the %s namespace.\n\n' "$NAMESPACE"
-printf 'Open Grafana and find the "Capstone — Scaling & Traffic" dashboard (after the\n'
+printf 'Open Grafana and find the "Capstone: Scaling & Traffic" dashboard (after the\n'
 printf 'host-access companions are applied; bootstrap-capstone.sh does this):\n'
 printf '  http://127.0.0.1:%s     (credentials: see observability/grafana-values.yaml)\n' "$HOST_PORT_GRAFANA"
 printf '  Prometheus: http://127.0.0.1:%s    Tempo: http://127.0.0.1:%s\n\n' "$HOST_PORT_PROMETHEUS" "$HOST_PORT_TEMPO"

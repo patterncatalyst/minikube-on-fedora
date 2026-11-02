@@ -14,7 +14,7 @@ spec:
       labels:
         {{- include "nginx-helm.selectorLabels" . | nindent 8 }}
       annotations:
-        # Rotates when the rendered ConfigMap content changes —
+        # Rotates when the rendered ConfigMap content changes;
         # ensures a `helm upgrade` that only changes values
         # actually triggers a Pod rollout (since the Deployment
         # spec is otherwise unchanged).

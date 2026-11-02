@@ -3,7 +3,7 @@
 Runnable example for the [Daemon Service chapter](https://patterncatalyst.github.io/minikube-on-fedora/appendix/k8s-patterns/12-daemon-service/).
 
 `node-collector`: a `DaemonSet` running one Pod per node, reading that
-node's own `/var/log` through a read-only `hostPath` mount — node-local
+node's own `/var/log` through a read-only `hostPath` mount: node-local
 infrastructure beside whatever shipping services happen to be scheduled
 there.
 
@@ -16,7 +16,7 @@ kubectl --context mof-patterns apply -f daemon-service/00-daemonset.yaml
 kubectl --context mof-patterns get daemonset node-collector -n patterns
 ```
 
-`DESIRED`, `CURRENT`, and `READY` all equal the node count — one Pod per
+`DESIRED`, `CURRENT`, and `READY` all equal the node count: one Pod per
 node, no `replicas` field to set because a DaemonSet doesn't take one.
 
 ### One Pod per node
@@ -45,7 +45,7 @@ kubectl --context mof-patterns get pods -n patterns -l app.kubernetes.io/name=no
 ```
 
 A second `node-collector` Pod appears on the new node with no manifest
-change at all — the DaemonSet controller reconciles "one Pod per node"
+change at all; the DaemonSet controller reconciles "one Pod per node"
 continuously, the same way a Deployment reconciles "N Pods total."
 
 ```bash

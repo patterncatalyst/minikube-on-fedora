@@ -1,19 +1,19 @@
-"""graphql-gateway — the §17 capstone's federated read layer.
+"""graphql-gateway: the capstone's federated read layer.
 
-r24 scope: a single Strawberry GraphQL endpoint that composes reads across
-services — order-service (REST) and inventory-service (gRPC) — into one
-queryable graph. The gateway is stateless; it owns no data and no schema.
+A single Strawberry GraphQL endpoint that composes reads across
+order-service (REST) and inventory-service (gRPC) into one queryable graph.
+The gateway is stateless; it owns no data and no schema.
 
 This models federation by *gateway orchestration* (one gateway calls the
-services). True subgraph federation — where each service exposes its own
-GraphQL subgraph and a gateway composes them via a supergraph — is the
-production-scale pattern; see §17 prose for when you'd use it (CAP-016).
+services). True subgraph federation, where each service exposes its own
+GraphQL subgraph and a gateway composes them via a supergraph, is the
+production-scale pattern.
 
 Endpoints:
-  GET  /health   — liveness (process is up)
-  GET  /healthz  — readiness (process can serve; gateway has no datastore)
-  GET  /sdl      — the GraphQL schema as SDL (the gateway's discovery contract)
-  /graphql       — the GraphQL endpoint (GraphiQL UI in a browser)
+  GET  /health   liveness (process is up)
+  GET  /healthz  readiness (process can serve; gateway has no datastore)
+  GET  /sdl      the GraphQL schema as SDL (the gateway's discovery contract)
+  /graphql       the GraphQL endpoint (GraphiQL UI in a browser)
 """
 
 from __future__ import annotations
@@ -28,7 +28,7 @@ from app.schema import schema
 app = FastAPI(
     title="graphql-gateway",
     version="0.1.0",
-    description="Federated GraphQL read layer for the §17 capstone (gateway orchestration).",
+    description="Federated GraphQL read layer for the capstone (gateway orchestration).",
 )
 
 graphql_app = GraphQLRouter(schema)
@@ -45,7 +45,7 @@ async def health() -> dict[str, str]:
 async def healthz() -> dict[str, str]:
     """Readiness: the gateway can serve GraphQL.
 
-    Deliberately does NOT probe downstream services — readiness should
+    This does not probe downstream services: readiness should
     reflect 'can I accept traffic', not 'are my dependencies healthy'.
     Coupling readiness to downstreams causes cascading unavailability;
     downstream failures surface per-field at query time instead.
@@ -55,11 +55,11 @@ async def healthz() -> dict[str, str]:
 
 @app.get("/sdl", response_class=PlainTextResponse, tags=["ops"])
 async def sdl() -> str:
-    """The gateway's GraphQL schema as SDL — its **discovery contract**.
+    """The gateway's GraphQL schema as SDL, its **discovery contract**.
 
     This is what gets published to Apicurio (as a GRAPHQL artifact) so the
     schema is registered, versioned, and discoverable. Unlike the Avro event
-    contract, it's not on any runtime path — nothing here fails if the
+    contract, it's not on any runtime path: nothing here fails if the
     registry is absent; it exists to be discovered (and later ingested into
     the data catalog).
     """

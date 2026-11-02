@@ -1,7 +1,7 @@
 """Database wiring for shipping-report.
 
 Plain synchronous psycopg3: a batch job is a short-lived process, not a
-long-running service, so there's no connection pool to manage — connect,
+long-running service, so there's no connection pool to manage: connect,
 do the work, disconnect.
 """
 
@@ -74,7 +74,7 @@ def partition(
     conn: psycopg.Connection, partition_index: int, partition_count: int
 ) -> Iterator[tuple[int, str, float, str]]:
     """Yield the rows this partition owns: id modulo partition_count. This
-    is the Indexed Job's own partitioning scheme — JOB_COMPLETION_INDEX
+    is the Indexed Job's own partitioning scheme; JOB_COMPLETION_INDEX
     selects the slice, and no two indexes ever see the same row."""
     with conn.cursor() as cur:
         cur.execute(

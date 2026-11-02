@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 #
-# smoke-keda-kafka.sh — demonstrate AND verify Kafka consumer-lag autoscaling of
-# notification-service (r26b, CAP-025).
+# smoke-keda-kafka.sh: demonstrate AND verify Kafka consumer-lag autoscaling of
+# notification-service.
 #
 # The elastic-data-product point: an event consumer should run only as much as
-# its backlog warrants — and nothing at all when the topic is quiet. This proves
+# its backlog warrants: and nothing at all when the topic is quiet. This proves
 # the full lifecycle:
 #   * with no lag, KEDA scales notification-service to ZERO
 #   * a burst of messages on `order-placed` creates lag → KEDA scales it UP
@@ -12,7 +12,7 @@
 #
 # The burst is raw bytes, not Avro: the consumer auto-commits and skips
 # undecodable messages (logs "skipping undecodable message"), so offsets advance
-# and lag clears — which is all the lag-based scaler needs. No order-service /
+# and lag clears: which is all the lag-based scaler needs. No order-service /
 # inventory / valid-Avro path required, keeping the demo dependency-light.
 #
 # Leaves resources in place on failure + dumps diagnostics. Idempotent.
@@ -29,14 +29,14 @@ BURST=500
 
 step() { printf '\n==> %s\n' "$1"; }
 
-# count_pods — non-terminating pods for the consumer (KEDA's replica count, live).
-# grep -vc emits exactly one integer (0 on empty input) — no spurious second line.
+# count_pods: non-terminating pods for the consumer (KEDA's replica count, live).
+# grep -vc emits exactly one integer (0 on empty input): no spurious second line.
 count_pods() {
     kubectl get pods -n "$NS" -l "$SEL" --no-headers 2>/dev/null | grep -vc 'Terminating'
 }
 
 dump() {
-    step "DIAGNOSTIC DUMP (failure — resources left in place)"
+    step "DIAGNOSTIC DUMP (failure: resources left in place)"
     kubectl get scaledobject,deployment,pods -n "$NS" -l "$SEL" 2>&1
     printf '\nKEDA HPA + scaler events:\n'
     kubectl get hpa -n "$NS" 2>&1
@@ -44,7 +44,7 @@ dump() {
 }
 fail() { printf '\n✗ FAILED: %s\n' "$1" >&2; dump; exit 1; }
 
-# wait_until "desc" <timeout_s> <predicate-cmd...> — poll every 3s
+# wait_until "desc" <timeout_s> <predicate-cmd...>: poll every 3s
 wait_until() {
     local desc="$1" timeout="$2"; shift 2
     local waited=0
@@ -62,21 +62,21 @@ is_scaledup(){ [[ "$(count_pods)" -gt 0 ]]; }
 
 # ─── Pre-flight ──────────────────────────────────────────────────────────────
 step "Pre-flight checks"
-minikube status -p "$PROFILE" >/dev/null 2>&1 || fail "profile '$PROFILE' not running — ./scripts/setup-capstone-profile.sh"
+minikube status -p "$PROFILE" >/dev/null 2>&1 || fail "profile '$PROFILE' not running: ./scripts/setup-capstone-profile.sh"
 kubectl get deployment keda-operator -n keda >/dev/null 2>&1 \
-    || fail "KEDA not installed — run scripts/setup-keda.sh first"
+    || fail "KEDA not installed: run scripts/setup-keda.sh first"
 kubectl get deployment "$DEP" -n "$NS" >/dev/null 2>&1 \
-    || fail "$DEP not deployed — helm upgrade --install notification-service charts/capstone/charts/notification-service -n $NS"
+    || fail "$DEP not deployed: helm upgrade --install notification-service charts/capstone/charts/notification-service -n $NS"
 
 step "Applying the Kafka consumer-lag ScaledObject"
 kubectl apply -f "$KEDA_DIR/notification-scaledobject.yaml" >/dev/null \
     || fail "failed to apply the ScaledObject"
-printf '    ✓ scaledobject applied — KEDA now owns %s replicas\n' "$DEP"
+printf '    ✓ scaledobject applied: KEDA now owns %s replicas\n' "$DEP"
 
 # ─── 1. Scale to zero (quiet topic) ──────────────────────────────────────────
 step "Waiting for scale-to-zero (no lag → 0 replicas, ~cooldown 30s)"
 wait_until "0 replicas" 150 is_zero \
-    || fail "$DEP did not scale to zero — is there residual lag, or is minReplicaCount honored?"
+    || fail "$DEP did not scale to zero: is there residual lag, or is minReplicaCount honored?"
 printf '    ✓ scaled to ZERO (consumer idle, costing nothing)\n'
 
 # ─── 2. Create lag → scale up ────────────────────────────────────────────────
@@ -93,7 +93,7 @@ printf '    ✓ produced %s messages (lag now ≈ %s)\n' "$BURST" "$BURST"
 
 step "Waiting for KEDA to scale UP on lag"
 wait_until ">0 replicas" 90 is_scaledup \
-    || fail "$DEP did not scale up despite lag — check the kafka trigger (bootstrap/consumerGroup/topic)"
+    || fail "$DEP did not scale up despite lag: check the kafka trigger (bootstrap/consumerGroup/topic)"
 MAXSEEN="$(count_pods)"
 sleep 6; [[ "$(count_pods)" -gt "$MAXSEEN" ]] && MAXSEEN="$(count_pods)"
 printf '    ✓ scaled UP to %s replica(s) on lag\n' "$MAXSEEN"
@@ -101,9 +101,9 @@ printf '    ✓ scaled UP to %s replica(s) on lag\n' "$MAXSEEN"
 # ─── 3. Backlog drains → scale back to zero ──────────────────────────────────
 step "Waiting for the backlog to drain and KEDA to scale back to ZERO"
 wait_until "0 replicas" 180 is_zero \
-    || fail "$DEP did not return to zero after draining — consumer stuck (not auto-committing)?"
+    || fail "$DEP did not return to zero after draining: consumer stuck (not auto-committing)?"
 printf '    ✓ drained and scaled back to ZERO\n'
 
 step "SUCCESS"
 printf 'notification-service is an elastic data product: 0 when idle, up to %s\n' "$MAXSEEN"
-printf 'under backlog, back to 0 when drained — driven by Kafka consumer lag.\n'
+printf 'under backlog, back to 0 when drained: driven by Kafka consumer lag.\n'

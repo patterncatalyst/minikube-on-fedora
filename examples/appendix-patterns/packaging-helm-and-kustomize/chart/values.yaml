@@ -1,6 +1,6 @@
 # Fixed name rather than the usual release-chart fullname pattern, so the
 # install/upgrade/rollback commands in the chapter don't have to recompute a
-# generated name — and so this release's objects never collide with the
+# generated name, and so this release's objects never collide with the
 # Kustomize deployment's, which use the "shipping-kustomize" name instead.
 nameOverride: shipping-helm
 

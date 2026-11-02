@@ -1,6 +1,6 @@
 # Three independent, non-replicating postgres:17-alpine instances standing
-# in for a per-zone shipment archive — not the data mesh's shared database,
-# just something genuinely stateful to practice the StatefulSet pattern
+# in for a per-zone shipment archive, not the data mesh's shared database,
+# just something stateful to practice the StatefulSet pattern
 # against. Each Pod gets its own PersistentVolumeClaim via
 # volumeClaimTemplates, created and bound before that Pod starts and never
 # shared with any other ordinal.

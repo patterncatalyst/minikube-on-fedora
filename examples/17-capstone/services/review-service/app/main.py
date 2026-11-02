@@ -1,22 +1,21 @@
-"""review-service — a §17 capstone data product: product reviews/ratings.
+"""review-service: a capstone data product: product reviews/ratings.
 
-A minimal REST data product, added (and backed out) as a Phase A demonstration
-of the add-a-data-product-to-the-mesh workflow: stand up the product, publish
-its OpenAPI contract to Apicurio, ingest it into OpenMetadata with lineage to
-the product (inventory) domain, and show the ways to retrieve the data and
-discover its metadata.
+A minimal REST data product that demonstrates the add-a-data-product-to-the-mesh
+workflow: stand up the product, publish its OpenAPI contract to Apicurio, ingest
+it into OpenMetadata with lineage to the product (inventory) domain, and show the
+ways to retrieve the data and discover its metadata.
 
 Endpoints:
-  GET  /health           — liveness (process is up)
-  GET  /healthz          — readiness (Postgres reachable)
-  GET  /version          — service + version (used by discovery)
-  POST /reviews          — create a review
-  GET  /reviews          — list reviews (optional ?sku= filter)
-  GET  /reviews/{id}     — fetch one review
+  GET  /health           liveness (process is up)
+  GET  /healthz          readiness (Postgres reachable)
+  GET  /version          service + version (used by discovery)
+  POST /reviews          create a review
+  GET  /reviews          list reviews (optional ?sku= filter)
+  GET  /reviews/{id}     fetch one review
 
-Storage: the service's own `reviews` Postgres schema (per-service ownership,
-CAP-003). Seeded with a few rows at startup so the catalog and lineage demo
-has data to show immediately.
+Storage: the service's own `reviews` Postgres schema (per-service ownership).
+Seeded with a few rows at startup so the catalog and lineage demo has data to
+show immediately.
 """
 
 from __future__ import annotations
@@ -46,7 +45,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="review-service",
     version="1.0.0",
-    description="review-service data product for the §17 capstone data mesh: product reviews/ratings.",
+    description="review-service data product for the capstone data mesh: product reviews and ratings.",
     lifespan=lifespan,
 )
 

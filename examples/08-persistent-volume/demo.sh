@@ -61,7 +61,7 @@ step "pre-flight: 'standard' StorageClass present and default"
 if ! kubectl get storageclass standard >/dev/null 2>&1; then
     info "Available storage classes:"
     kubectl get storageclass 2>&1 | sed 's/^/    /'
-    fail "'standard' StorageClass not found — run 'minikube addons enable default-storageclass storage-provisioner'"
+    fail "'standard' StorageClass not found: run 'minikube addons enable default-storageclass storage-provisioner'"
 fi
 pass "'standard' StorageClass available"
 
@@ -70,7 +70,7 @@ step "pre-flight: ${IMAGE_TAG} image in cluster cache"
 if ! minikube -p "${PROFILE}" image ls 2>/dev/null | grep -q "${IMAGE_TAG}"; then
     info "image not present; building from §6's Containerfile"
     if [[ ! -f "${SECTION6_DIR}/Containerfile" ]]; then
-        fail "${SECTION6_DIR}/Containerfile not found — examples/06 missing?"
+        fail "${SECTION6_DIR}/Containerfile not found: examples/06 missing?"
     fi
     if ! build_and_load "${IMAGE_TAG}" "${SECTION6_DIR}" "${PROFILE}"; then
         fail "image build/load failed (see output above)"
@@ -159,7 +159,7 @@ if ! kubectl wait --for=condition=Available "deployment/${APP_NAME}" \
 fi
 NEW_POD=$(kubectl get pods -l "app=${APP_NAME}" -o jsonpath='{.items[0].metadata.name}')
 if [[ "${NEW_POD}" == "${OLD_POD}" ]]; then
-    fail "Pod name didn't change — replacement did not happen"
+    fail "Pod name didn't change: replacement did not happen"
 fi
 info "new Pod: ${NEW_POD}"
 pass "Pod replaced; Deployment Available again"
@@ -173,7 +173,7 @@ case "${SEED_LOG}" in
         pass "initContainer found existing content → PV persisted"
         ;;
     *"seeding fresh content"*)
-        info "initContainer seeded fresh content — the PV should have persisted but didn't"
+        info "initContainer seeded fresh content: the PV should have persisted but didn't"
         fail "PV did not persist across Pod restart"
         ;;
     *)
@@ -203,12 +203,12 @@ fi
 echo "    before Pod restart: ${INITIAL_TIMESTAMP}"
 echo "    after Pod restart:  ${NEW_TIMESTAMP}"
 if [[ "${NEW_TIMESTAMP}" != "${INITIAL_TIMESTAMP}" ]]; then
-    fail "timestamps differ — content did NOT persist (PV not working as designed)"
+    fail "timestamps differ: content did NOT persist (PV not working as designed)"
 fi
-pass "timestamps match — PV did its job across Pod lifecycle"
+pass "timestamps match: PV did its job across Pod lifecycle"
 
 # ── Done ────────────────────────────────────────────────────────────────────
-step "SUCCESS — Deployment + PVC + persistence all verified"
+step "SUCCESS: Deployment + PVC + persistence all verified"
 echo
 echo "  Same image as §6/§7 (nginx-custom:v1), different content via"
 echo "  PV mount. initContainer seeded the PV on first run; the new"

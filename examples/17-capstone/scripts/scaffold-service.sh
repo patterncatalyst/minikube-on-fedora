@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
-# scaffold-service.sh — stamp out a new capstone service skeleton from the
-# proven order-service template (r21c).
+# scaffold-service.sh: stamp out a new capstone service skeleton from the
+# proven order-service template.
 #
-# What it generates (a "walking skeleton" service — CAP-006):
+# What it generates (a "walking skeleton" service):
 #   - services/<name>-service/         FastAPI app with /health + /healthz,
 #                                       async SQLAlchemy wired to its own
 #                                       Postgres schema, UBI 10 Containerfile
@@ -11,15 +11,15 @@
 #                                       NodePort Service), bare image name
 #                                       loaded into the node, pullPolicy Never
 #
-# What it deliberately does NOT generate (added in later iterations):
-#   - domain tables / REST CRUD (r23+), gRPC (r23), GraphQL (r24),
-#     Kafka producers/consumers (r25). r22 proves each service stands up,
+# What it does not generate:
+#   - domain tables / REST CRUD, gRPC, GraphQL,
+#     Kafka producers/consumers. The skeleton proves each service stands up,
 #     reaches its schema, and answers probes. Domain surface comes next.
 #
 # The generated service is uniform with order-service so the whole mesh
 # follows one shape. notification-service gets the same /health surface even
-# though it will ultimately be Kafka-consumer-only — a probe-able surface is
-# useful for testing regardless (user decision, r22).
+# though it will ultimately be Kafka-consumer-only: a probe-able surface is
+# useful for testing regardless (user decision).
 #
 # Usage:
 #   ./scripts/scaffold-service.sh <name> <schema> [nodePort]
@@ -66,7 +66,7 @@ cat > "${SVC_DIR}/pyproject.toml" <<'EOF'
 [tool.poetry]
 name = "__SERVICE__"
 version = "0.1.0"
-description = "__SERVICE__ data product for the §17 capstone — health skeleton (domain surface added in later iterations)"
+description = "__SERVICE__ data product for the capstone: health skeleton"
 authors = ["patterncatalyst"]
 readme = "README.md"
 package-mode = false
@@ -93,14 +93,14 @@ build-backend = "poetry.core.masonry.api"
 asyncio_mode = "auto"
 EOF
 
-# ─── services/<service>/Containerfile (r21b root-builder; proven) ─────────────
+# ─── services/<service>/Containerfile (root-builder; proven) ─────────────
 cat > "${SVC_DIR}/Containerfile" <<'EOF'
-# __SERVICE__ Containerfile — UBI 10 multi-stage build, Python 3.14 (CAP-005, CAP-050).
+# __SERVICE__ Containerfile: UBI 10 multi-stage build, Python 3.14.
 #
 # The BUILDER stage runs as root so it can write /opt/venv (the UBI default
-# user 1001 cannot — /opt is root-owned). The builder image is discarded, so
+# user 1001 cannot: /opt is root-owned). The builder image is discarded, so
 # there's no security cost. The RUNTIME stage enforces the non-root user
-# (1001:0) and only reads/executes the copied venv. (CAP-005 r21b amendment.)
+# (1001:0) and only reads/executes the copied venv.
 #
 # Per CONTRIBUTING.md: UBI 10 python-314-minimal base (fallback ubi9/python-314), runtime as USER 1001:0.
 
@@ -141,14 +141,14 @@ EOF
 cat > "${SVC_DIR}/README.md" <<'EOF'
 # __SERVICE__
 
-A §17 capstone data product. Owns the `__SCHEMA__` Postgres schema
-(per-service ownership, CAP-003).
+A capstone data product. Owns the `__SCHEMA__` Postgres schema
+(per-service ownership).
 
-**r22 scope (skeleton):** the service starts, ensures its schema exists, and
+**Skeleton scope:** the service starts, ensures its schema exists, and
 serves health probes:
 
-- `GET /health` — liveness (process up)
-- `GET /healthz` — readiness (Postgres reachable)
+- `GET /health`: liveness (process up)
+- `GET /healthz`: readiness (Postgres reachable)
 
 Its domain surface is added in later iterations (REST/gRPC/GraphQL/Kafka as
 appropriate to the service).
@@ -211,15 +211,15 @@ class Settings(BaseSettings):
 settings = Settings()
 EOF
 
-# ─── services/<service>/app/models.py (Base only — no tables yet) ─────────────
+# ─── services/<service>/app/models.py (Base only: no tables yet) ─────────────
 cat > "${SVC_DIR}/app/models.py" <<'EOF'
 """SQLAlchemy declarative base for __SERVICE__.
 
-r22 skeleton: no tables yet. The service's schema (`__SCHEMA__`) is created
+Skeleton: no tables yet. The service's schema (`__SCHEMA__`) is created
 at startup (see db.init_schema), ready for domain tables in a later
 iteration. When this service's domain model lands, add table classes here
 bound to `settings.service_schema` to keep the per-service ownership boundary
-(CAP-003) explicit, e.g.:
+ explicit, e.g.:
 
     class Widget(Base):
         __tablename__ = "widgets"
@@ -243,7 +243,7 @@ cat > "${SVC_DIR}/app/db.py" <<'EOF'
 Async SQLAlchemy 2.0 engine + session factory, plus a startup helper that
 ensures the service's schema exists before creating any tables.
 
-CAP-004: create-if-not-exists via metadata.create_all. Schema *evolution*
+Create-if-not-exists via metadata.create_all. Schema *evolution*
 (Alembic) is deferred to a later iteration.
 """
 
@@ -289,15 +289,15 @@ EOF
 
 # ─── services/<service>/app/main.py (health surface only) ─────────────────────
 cat > "${SVC_DIR}/app/main.py" <<'EOF'
-"""__SERVICE__ — a §17 capstone data product (r22 skeleton).
+"""__SERVICE__: a capstone data product (skeleton).
 
-r22 scope: the service stands up, connects to its Postgres schema
+Skeleton scope: the service stands up, connects to its Postgres schema
 (`__SCHEMA__`), and serves health probes. Its domain surface (REST/gRPC/
 GraphQL/Kafka, as appropriate to this service) is added in later iterations.
 
 Endpoints:
-  GET /health   — liveness (process is up)
-  GET /healthz  — readiness (can reach Postgres)
+  GET /health  : liveness (process is up)
+  GET /healthz : readiness (can reach Postgres)
 """
 
 from __future__ import annotations
@@ -316,14 +316,14 @@ async def lifespan(app: FastAPI):
     await init_schema()
     yield
     # Shutdown: dispose the connection pool cleanly (Managed Lifecycle
-    # pattern — Kubernetes Patterns, Ibryam & Huss).
+    # pattern: Kubernetes Patterns, Ibryam & Huss).
     await dispose()
 
 
 app = FastAPI(
     title="__SERVICE__",
     version="0.1.0",
-    description="__SERVICE__ data product for the §17 capstone data mesh (skeleton).",
+    description="__SERVICE__ data product for the capstone data mesh (skeleton).",
     lifespan=lifespan,
 )
 
@@ -348,7 +348,7 @@ EOF
 # ─── services/<service>/tests/__init__.py + a tiny health test ────────────────
 : > "${SVC_DIR}/tests/__init__.py"
 cat > "${SVC_DIR}/tests/test_health.py" <<'EOF'
-"""Liveness endpoint test for __SERVICE__ — no DB required.
+"""Liveness endpoint test for __SERVICE__: no DB required.
 
 Readiness (/healthz) is exercised in-cluster by the smoke test, since it
 needs a real Postgres. This unit test just confirms the app wires up and
@@ -379,7 +379,7 @@ EOF
 cat > "${CHART_DIR}/Chart.yaml" <<'EOF'
 apiVersion: v2
 name: __SERVICE__
-description: __SERVICE__ data product — FastAPI service backed by the capstone Postgres (__SCHEMA__ schema). r22 ships the health skeleton; domain surface added later.
+description: "__SERVICE__ data product: FastAPI service backed by the capstone Postgres (__SCHEMA__ schema)."
 type: application
 version: 0.1.0
 appVersion: "0.1.0"
@@ -538,18 +538,18 @@ find "$SVC_DIR" "$CHART_DIR" -type f -print0 | while IFS= read -r -d '' f; do
     sed -i "s/__SERVICE__/${SERVICE}/g; s/__SCHEMA__/${SCHEMA}/g; s/__BASE__/${BASE}/g; s/__NODEPORT__/${NODEPORT}/g" "$f"
 done
 
-step "Done — scaffolded ${SERVICE}"
+step "Done: scaffolded ${SERVICE}"
 
 # ─── Generate the lockfile so the image build works out of the box ───────────
 # The Containerfile's `poetry export` step requires a poetry.lock. order-service
-# has one committed (CAP-001); generate this service's now if poetry is on PATH.
+# has one committed; generate this service's now if poetry is on PATH.
 if command -v poetry >/dev/null 2>&1; then
-    step "Generating poetry.lock (CAP-001 — reproducible builds)"
+    step "Generating poetry.lock (reproducible builds)"
     ( cd "$SVC_DIR" && poetry lock ) \
         && printf '    ✓ poetry.lock written\n' \
-        || printf '    ! poetry lock failed — run `cd %s && poetry lock` before building\n' "$SVC_DIR"
+        || printf '    ! poetry lock failed: run `cd %s && poetry lock` before building\n' "$SVC_DIR"
 else
-    printf '\n  ! poetry not on PATH — before building, run:\n      cd %s && poetry lock\n' "$SVC_DIR"
+    printf '\n  ! poetry not on PATH: before building, run:\n      cd %s && poetry lock\n' "$SVC_DIR"
 fi
 
 cat <<EOF

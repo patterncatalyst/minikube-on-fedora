@@ -19,9 +19,9 @@ order, so it lives on its own pages rather than stretching this chapter.
 
 One chapter per pattern, across the six families the literature uses:
 foundational, structural, behavioral, configuration, advanced, and security. Each
-chapter works the pattern against the tutorial's own shipping services — the same
-order, inventory, payment, shipping, and notification services the capstone runs
-— so the pattern is grounded in a system you can place an order against rather
+chapter works the pattern against the tutorial's own shipping services (the same
+order, inventory, payment, shipping, and notification services the capstone runs),
+so the pattern is grounded in a system you can place an order against rather
 than a throwaway demo.
 
 The advanced family includes a real **operator**, written in Go with a custom
@@ -32,12 +32,12 @@ pattern catalogs use to sketch the idea.
 
 Each pattern chapter carries two recurring call-outs:
 
-- **🎓 CKAD exam lens** — maps the pattern to its Certified Kubernetes
+- **🎓 CKAD exam lens**: maps the pattern to its Certified Kubernetes
   Application Developer exam domain and weight, names the competency it
   exercises, and gives a short `kubectl` drill. A closing crosswalk chapter maps
   the whole appendix back to the exam's five domains, with a self-test task list,
   so the set doubles as CKAD revision.
-- **🤖 Explore with your agent** — a ready-to-run prompt for taking the pattern
+- **🤖 Explore with your agent**: a ready-to-run prompt for taking the pattern
   further with Claude.
 
 A few **gap chapters** cover the parts of the CKAD curriculum the patterns don't

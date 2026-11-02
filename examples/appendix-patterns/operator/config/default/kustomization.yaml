@@ -1,4 +1,4 @@
-# config/default/kustomization.yaml — the single entry point that deploys the
+# config/default/kustomization.yaml: the single entry point that deploys the
 # ShippingPolicy CRD, the operator's RBAC (ServiceAccount/Role/RoleBinding),
 # and the operator's own Deployment together into the patterns namespace.
 #

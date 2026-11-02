@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 #
-# cluster-status.sh — one-shot health report for the capstone cluster.
+# cluster-status.sh: one-shot health report for the capstone cluster.
 #
 # Answers, in a single command, the questions we kept running ten commands to
-# answer during the r29c debugging marathon:
+# answer during bring-up debugging:
 #   - Is the profile running and is the control plane actually healthy?
-#     (etcd can crashloop in place after a long uptime — see §17 troubleshooting.)
+#     (etcd can crashloop in place after a long uptime: see capstone troubleshooting.)
 #   - Which locally-built images are MISSING from the node?
 #     (`minikube -p mof-capstone image ls`; a missing image surfaces as
 #     ErrImageNeverPull because the Deployments use pullPolicy: Never.)
@@ -38,9 +38,9 @@ step "minikube profile"
 if minikube status -p "$PROFILE" >/dev/null 2>&1; then
     ok "profile '$PROFILE' is running"
 else
-    bad "profile '$PROFILE' is not running — start it with: ./scripts/cluster-up.sh"
+    bad "profile '$PROFILE' is not running: start it with: ./scripts/cluster-up.sh"
     note_problem
-    printf '\n(Stopping here — nothing else can be checked while the node is down.)\n'
+    printf '\n(Stopping here: nothing else can be checked while the node is down.)\n'
     exit 1
 fi
 
@@ -49,7 +49,7 @@ step "Control plane"
 if kubectl get --raw='/readyz' >/dev/null 2>&1; then
     ok "API server is serving (/readyz)"
 else
-    bad "API server is NOT responding — control plane may be wedged"
+    bad "API server is NOT responding: control plane may be wedged"
     note_problem
 fi
 # etcd specifically: a long-lived node can wedge etcd on its peer port (:2380),
@@ -110,13 +110,13 @@ report_ns capstone      "capstone (services)"
 report_ns observability "observability (Prometheus/Grafana/Tempo)"
 report_ns keda          "keda (autoscaler + HTTP add-on)"
 
-# KEDA HTTPScaledObject — the gateway is meant to scale to zero, so 0 pods is fine.
+# KEDA HTTPScaledObject: the gateway is meant to scale to zero, so 0 pods is fine.
 # KEDA HTTP add-on 0.16 reports a standard "Ready" condition (0.12 used
 # "HTTPScaledObjectIsReady").
 hso="$(kubectl get httpscaledobject -n capstone graphql-gateway-http \
     -o jsonpath='{.status.conditions[?(@.type=="Ready")].status}' 2>/dev/null || true)"
 if [[ "$hso" == "True" ]]; then
-    ok "KEDA HTTPScaledObject for graphql-gateway is Ready (gateway may be scaled to zero — expected)"
+    ok "KEDA HTTPScaledObject for graphql-gateway is Ready (gateway may be scaled to zero: expected)"
 else
     warn "KEDA HTTPScaledObject not reporting Ready (status: ${hso:-unknown})"
 fi
@@ -124,7 +124,7 @@ fi
 # ─── Verdict ─────────────────────────────────────────────────────────────────
 step "Verdict"
 if [[ $PROBLEMS -eq 0 ]]; then
-    ok "cluster looks healthy — ready to demo/smoke"
+    ok "cluster looks healthy: ready to demo/smoke"
 else
     bad "$PROBLEMS area(s) need attention (see above). ./scripts/cluster-up.sh heals images + a wedged control plane."
     exit 1

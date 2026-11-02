@@ -32,7 +32,7 @@ kubectl --context mof-patterns get secret inventory-db-credentials -n patterns -
 # changeme
 
 kubectl --context mof-patterns describe secret inventory-db-credentials -n patterns
-# password:  8 bytes — describe redacts the value; get -o yaml and jsonpath don't
+# password:  8 bytes: describe redacts the value; get -o yaml and jsonpath don't
 ```
 
 ## Two consumption paths, one Secret
@@ -44,7 +44,7 @@ kubectl --context mof-patterns exec -n patterns "$POD" -- env | grep -E '^PG_(US
 
 kubectl --context mof-patterns exec -n patterns "$POD" -- ls -l /etc/inventory/credentials/
 # -r--r----- for username, password, dbname (0440: owner+group, matching
-# this container's gid — not 0400, which a non-root container could never
+# this container's gid, not 0400, which a non-root container could never
 # read, since a projected volume's files are always owned by root)
 
 kubectl --context mof-patterns exec -n patterns "$POD" -- cat /etc/inventory/credentials/password

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
-# smoke-service.sh — build, deploy, and verify the health surface of a
-# scaffolded capstone service (r22). Generic counterpart to smoke-order.sh
+# smoke-service.sh: build, deploy, and verify the health surface of a
+# scaffolded capstone service. Generic counterpart to smoke-order.sh
 # (which also asserts order-service's domain endpoints).
 #
 # What it does:
@@ -10,7 +10,7 @@
 #   3. helm upgrade --install the service subchart
 #   4. wait for rollout, assert the bare image + pullPolicy Never, then GET /health and /healthz
 #      on the service's published NodePort (127.0.0.1:<per-service host port>)
-#   5. clean up the service release ON SUCCESS only (CAP-008); on failure,
+#   5. clean up the service release ON SUCCESS only; on failure,
 #      leave it running and dump diagnostics
 #
 # Usage:
@@ -32,7 +32,7 @@ cd "$ROOT"
 SVC_DIR="services/${SERVICE}"
 CHART="charts/capstone/charts/${SERVICE}"
 PG_RELEASE="capstone-postgres"
-PG_CHART="charts/capstone/charts/postgres"   # the Cluster CR chart (r21)
+PG_CHART="charts/capstone/charts/postgres"   # the Cluster CR chart
 # Per-service published NodePort (host port on 127.0.0.1 / nodePort in the profile).
 case "$SERVICE" in
     order-service)        LOCAL_PORT="$HOST_PORT_ORDER";        NODE_PORT="$NODE_PORT_ORDER" ;;
@@ -66,18 +66,18 @@ diagnostics() {
     minikube -p "$PROFILE" image ls 2>&1 | grep -E "(^|/)${SERVICE}:" >&2 || echo "(${SERVICE} not found in the node)" >&2
 }
 
-[[ -d "$SVC_DIR" ]] || fail "service dir $SVC_DIR not found — scaffold it first: ./scripts/scaffold-service.sh $BASE <schema>"
+[[ -d "$SVC_DIR" ]] || fail "service dir $SVC_DIR not found: scaffold it first: ./scripts/scaffold-service.sh $BASE <schema>"
 [[ -d "$CHART"   ]] || fail "chart dir $CHART not found"
 
 step "Pre-flight: profile"
-minikube status -p "$PROFILE" >/dev/null 2>&1 || fail "profile '$PROFILE' not running — ./scripts/setup-capstone-profile.sh"
+minikube status -p "$PROFILE" >/dev/null 2>&1 || fail "profile '$PROFILE' not running: ./scripts/setup-capstone-profile.sh"
 
 step "Build + load ${SERVICE}:v1 into ${PROFILE}"
 ./scripts/build-image.sh "$SVC_DIR" "$SERVICE" v1 || fail "image build/load failed"
 
 step "Ensure the shared Postgres cluster is up"
 kubectl get crd clusters.postgresql.cnpg.io >/dev/null 2>&1 \
-    || fail "CloudNativePG operator not installed — ./scripts/setup-postgres-operator.sh"
+    || fail "CloudNativePG operator not installed: ./scripts/setup-postgres-operator.sh"
 helm upgrade --install "$PG_RELEASE" "$PG_CHART" -n "$NS" --create-namespace \
     || fail "postgres CR install failed"
 
@@ -136,7 +136,7 @@ if [[ -n "$PRIMARY" ]]; then
     fi
 fi
 
-printf '\n✓ SUCCESS — %s health skeleton verified\n' "$SERVICE"
+printf '\n✓ SUCCESS: %s health skeleton verified\n' "$SERVICE"
 printf '  (Postgres left running for fast re-runs; pass --purge-db to tear it down)\n'
 
 step "Cleanup (success)"

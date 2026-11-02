@@ -1,15 +1,15 @@
-# kafka.yaml — OpenMetadata ingestion workflow: the capstone Kafka source.
+# kafka.yaml: OpenMetadata ingestion workflow, the capstone Kafka source.
 #
 # Run by the openmetadata/ingestion image as `metadata ingest -c <this>`,
 # inside a one-off Job. Catalogs the Strimzi cluster's topics as Topic entities
 # under a Messaging Service named `capstone-kafka`.
 #
-# DECISION C (CAP-023): BARE ingestion — bootstrap servers only, no schema
-# registry. Topics are discovered as entities; their Avro schemas are NOT
+# Bare ingestion: bootstrap servers only, no schema
+# registry. Topics are discovered as entities; their Avro schemas are not
 # linked yet. Pointing `schemaRegistryURL` at Apicurio's ccompat endpoint would
 # enrich `order-placed` with its registered `order-placed-value` schema, but
-# that is exactly the deferred Apicurio-ingestion decision — resolved in r27c,
-# not here. Keeping Kafka bare keeps Apicurio out of r27b's scope.
+# that is exactly the deferred Apicurio-ingestion decision, resolved
+# elsewhere. Keeping Kafka bare keeps Apicurio out of this file's scope.
 #
 # One placeholder is substituted by the Job at runtime:
 #   __OM_JWT__  ← an admin bearer token the Job fetches in-cluster
@@ -30,9 +30,9 @@ source:
     config:
       type: Kafka
       bootstrapServers: capstone-kafka-kafka-bootstrap:9092
-      # schemaRegistryURL deliberately omitted (decision C — bare). The
+      # schemaRegistryURL omitted here (bare ingestion). The
       # consumer-side runtime contract still lives in Apicurio; the catalog
-      # link to it is r27c's job.
+      # linking it is a later job.
   sourceConfig:
     config:
       type: MessagingMetadata

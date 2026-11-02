@@ -1,7 +1,7 @@
 # A disposable viewer Pod, mounting the same shipping-reports-data PVC the
 # CronJob's Jobs write to. A Job Pod reaches Succeeded the instant its
 # container exits, and Kubernetes never allows `kubectl exec` into a
-# container that isn't running — so inspecting a finished run's output needs
+# container that isn't running, so inspecting a finished run's output needs
 # a separate Pod that mounts the same volume, not the Job's own (already-dead)
 # Pod. Same fix as the Batch Job chapter's 05-report-viewer.yaml.
 apiVersion: v1

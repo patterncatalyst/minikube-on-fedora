@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Shared environment for the §17 capstone scripts and demos. Source it; do not
+# Shared environment for the capstone scripts and demos. Source it; do not
 # execute it. Sets the profile, namespace, the published-NodePort map and the
 # host/node port variables, and pins kubectl/helm/istioctl to the profile's
 # context so a changed current-context can never redirect a script.

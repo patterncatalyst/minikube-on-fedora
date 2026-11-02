@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 #
-# smoke-discovery.sh — publish the mesh's discovery contracts to Apicurio and
+# smoke-discovery.sh: publish the mesh's discovery contracts to Apicurio and
 # verify all of them (plus the Avro runtime contract) are registered.
 #
-# Completes the registry half of CAP-018: after this, Apicurio holds all four
-# protocols' contracts — Avro (runtime, registered by order-service) plus
-# OpenAPI, Protobuf, and GraphQL SDL (discovery, published here) — which is the
+# Completes the registry half: after this, Apicurio holds all four
+# protocols' contracts: Avro (runtime, registered by order-service) plus
+# OpenAPI, Protobuf, and GraphQL SDL (discovery, published here): which is the
 # feedstock OpenMetadata ingests later.
 #
 # Flow: ensure Strimzi+Kafka+Apicurio+Postgres → deploy inventory/order/gateway
@@ -46,10 +46,10 @@ assert_local_image() {  # deployment-name
     local d="$1" img pol
     img="$(kubectl get deployment "$d" -n "$NS" -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null)"
     pol="$(kubectl get deployment "$d" -n "$NS" -o jsonpath='{.spec.template.spec.containers[0].imagePullPolicy}' 2>/dev/null)"
-    [[ "$img" == "${d}:v1" ]] || fail "${d} image is '${img}' — must be the bare '${d}:v1'"
-    [[ "$pol" == "Never" ]] || fail "${d} imagePullPolicy is '${pol}' — must be Never"
+    [[ "$img" == "${d}:v1" ]] || fail "${d} image is '${img}': must be the bare '${d}:v1'"
+    [[ "$pol" == "Never" ]] || fail "${d} imagePullPolicy is '${pol}': must be Never"
     minikube -p "$PROFILE" image ls 2>/dev/null | grep -qE "(^|/)${d}:v1\$" \
-        || fail "${d}:v1 not in 'minikube -p ${PROFILE} image ls' — ./scripts/build-image.sh services/${d} ${d} v1"
+        || fail "${d}:v1 not in 'minikube -p ${PROFILE} image ls': ./scripts/build-image.sh services/${d} ${d} v1"
     printf '    ✓ %s → %s (pullPolicy Never, present in the node)\n' "$d" "$img"
 }
 # graphql-gateway is scaled to zero by KEDA HTTP when idle and its NodePort has no
@@ -65,7 +65,7 @@ ensure_gateway_up() {
     require_published_port "$PROFILE" "$NODE_PORT_GATEWAY" "$HOST_PORT_GATEWAY"
     wait_for_http "http://127.0.0.1:${HOST_PORT_GATEWAY}/health" 60 || fail "graphql-gateway not answering on 127.0.0.1:${HOST_PORT_GATEWAY}"
 }
-[[ -f "$PROTO_PATH" ]] || fail "proto not found at ${PROTO_PATH} — run ./scripts/gen-protos.sh? (the .proto is committed)"
+[[ -f "$PROTO_PATH" ]] || fail "proto not found at ${PROTO_PATH}: run ./scripts/gen-protos.sh? (the .proto is committed)"
 
 minikube status -p "$PROFILE" >/dev/null 2>&1 || fail "profile '$PROFILE' not running"
 
@@ -131,10 +131,10 @@ done
 # the Avro runtime contract is registered via ccompat (TopicNameStrategy subject)
 AVRO_V="$(curl -fsS "${APIC}/apis/ccompat/v7/subjects/order-placed-value/versions" 2>/dev/null || echo '')"
 printf '%s' "$AVRO_V" | python3 -c "import sys,json; d=json.load(sys.stdin); sys.exit(0 if isinstance(d,list) and d else 1)" 2>/dev/null \
-    && printf '    ✓ order-placed-value (AVRO, runtime — via ccompat)\n' \
-    || printf '    • order-placed-value (AVRO) not present yet — run smoke-avro.sh to register it\n'
+    && printf '    ✓ order-placed-value (AVRO, runtime: via ccompat)\n' \
+    || printf '    • order-placed-value (AVRO) not present yet: run smoke-avro.sh to register it\n'
 
-printf '\n✓ SUCCESS — discovery contracts published; Apicurio now holds all protocol contracts (OpenAPI, Protobuf, GraphQL SDL, + Avro runtime)\n'
+printf '\n✓ SUCCESS: discovery contracts published; Apicurio now holds all protocol contracts (OpenAPI, Protobuf, GraphQL SDL, + Avro runtime)\n'
 
 # ── cleanup on success ────────────────────────────────────────────────────────
 step "Cleanup (success)"

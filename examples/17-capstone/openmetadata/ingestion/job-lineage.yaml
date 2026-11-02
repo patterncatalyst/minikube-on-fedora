@@ -1,4 +1,4 @@
-# job-lineage.yaml — one-off Job that declares the cross-product lineage.
+# job-lineage.yaml: one-off Job that declares the cross-product lineage.
 #
 # Runs LAST (after om-ingest-postgres and om-ingest-kafka complete), because
 # the three entities it links must already exist in the catalog. Fetches an
@@ -24,7 +24,7 @@ spec:
         # the ingest container at startup AND prevents the Job pod from ever
         # completing (the proxy keeps running). A node cycle re-enabled namespace
         # injection (istio-injection=enabled), silently breaking these Jobs;
-        # this opts them out. (r34)
+        # this opts them out.
         sidecar.istio.io/inject: "false"
       labels:
         app.kubernetes.io/part-of: capstone
@@ -47,7 +47,7 @@ spec:
             - name: OM_HOST
               value: http://openmetadata:8585
             - name: OM_ADMIN_PASSWORD
-              value: admin            # demo default (r27); not a real secret
+              value: admin            # demo default; not a real secret
           volumeMounts:
             - name: ingestion-config
               mountPath: /opt/ingestion

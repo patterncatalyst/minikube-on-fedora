@@ -32,7 +32,7 @@ kubectl --context mof-patterns exec -n patterns "$POD" -- env | grep -E '^(servi
 ```
 
 `payment-service.conf` is not a valid environment variable name (it
-contains a dot), so `envFrom` silently skips that key — current kubelet
+contains a dot), so `envFrom` silently skips that key; current kubelet
 versions don't raise an event for it, so there's nothing to see in `kubectl
 describe pod`'s Events beyond the usual Scheduled/Pulled/Created/Started.
 The key reaches the container as a file instead, exactly as intended.
@@ -44,7 +44,7 @@ kubectl --context mof-patterns exec -n patterns "$POD" -- ls -l /config/app/paym
 ```
 
 Both files show mode `-r--r-----` (0440): readable by the owning root user
-and by group 0, which is also this container's group — not 0400, since a
+and by group 0, which is also this container's group, not 0400, since a
 projected volume's files are always owned by root:root and this container
 never runs as root, so a stricter 0400 would make the file unreadable by
 the app itself. Still not world- or other-group-readable.

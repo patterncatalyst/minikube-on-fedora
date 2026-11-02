@@ -18,7 +18,7 @@ spec:
       - name: nginx
         image: nginx-custom:v1
         # Built with docker and loaded into the cluster by
-        # build_and_load in demo.sh — it's not in any registry, so
+        # build_and_load in demo.sh; it's not in any registry, so
         # never pull.
         imagePullPolicy: Never
         ports:

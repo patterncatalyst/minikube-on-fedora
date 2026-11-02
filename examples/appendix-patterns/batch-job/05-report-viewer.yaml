@@ -1,7 +1,7 @@
 # A disposable viewer Pod, mounting the same shipping-reports-data PVC the
 # Jobs write to. Job Pods reach Succeeded the instant their container exits,
 # and Kubernetes never allows `kubectl exec` into a container that isn't
-# running — so inspecting a finished Job's output needs a separate Pod that
+# running, so inspecting a finished Job's output needs a separate Pod that
 # mounts the same volume, not the Job's own (already-dead) Pod.
 apiVersion: v1
 kind: Pod

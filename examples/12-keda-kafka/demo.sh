@@ -16,7 +16,7 @@
 #   9.  Wait cooldownPeriod + buffer for KEDA to scale back to 0
 #   10. Assert final state: replicas = 0
 #
-# Idempotent — re-runs reuse the existing Kafka cluster + image cache.
+# Idempotent: re-runs reuse the existing Kafka cluster + image cache.
 # First run is slow (~3-5 min for Kafka cluster bring-up + image build).
 # Re-runs are fast (~2 min, mostly the produce-and-drain cycle).
 
@@ -49,7 +49,7 @@ cleanup() {
         --ignore-not-found=true >/dev/null 2>&1 || true
     kubectl delete -n "${CONSUMER_NS}" -f "${MANIFESTS_DIR}/consumer-deployment.yaml" \
         --ignore-not-found=true >/dev/null 2>&1 || true
-    # Kafka cluster + topic stay — they're slow to recreate and idempotent
+    # Kafka cluster + topic stay: they're slow to recreate and idempotent
 }
 trap cleanup EXIT
 
@@ -62,15 +62,15 @@ kubectl get nodes >/dev/null 2>&1 || fail "kubectl cannot reach the cluster"
 pass "minikube cluster reachable"
 
 if ! kubectl get namespace "${KAFKA_NS}" >/dev/null 2>&1; then
-    fail "kafka namespace not present — run ./scripts/setup-strimzi.sh first"
+    fail "kafka namespace not present: run ./scripts/setup-strimzi.sh first"
 fi
 if ! kubectl get deployment strimzi-cluster-operator -n "${KAFKA_NS}" >/dev/null 2>&1; then
-    fail "Strimzi Cluster Operator not found — run ./scripts/setup-strimzi.sh first"
+    fail "Strimzi Cluster Operator not found: run ./scripts/setup-strimzi.sh first"
 fi
 pass "Strimzi operator present in '${KAFKA_NS}' namespace"
 
 if ! kubectl get deployment keda-operator -n keda >/dev/null 2>&1; then
-    fail "KEDA operator not found — run ./scripts/setup-keda.sh first"
+    fail "KEDA operator not found: run ./scripts/setup-keda.sh first"
 fi
 pass "KEDA operator present in 'keda' namespace"
 
@@ -79,11 +79,11 @@ step "applying Kafka cluster + topic CRs"
 kubectl apply -f "${MANIFESTS_DIR}/kafka-cluster.yaml"
 kubectl apply -f "${MANIFESTS_DIR}/kafka-topic.yaml"
 
-# Wait for Kafka cluster Ready. This is THE flaky step — first install
+# Wait for Kafka cluster Ready. This is THE flaky step: first install
 # can take 60-90s, sometimes more. Use Strimzi's Ready condition (not
 # the underlying StatefulSet) since the Cluster Operator owns the
 # top-level lifecycle logic.
-step "waiting for Kafka cluster '${KAFKA_CLUSTER}' to be Ready (up to ${KAFKA_READY_TIMEOUT}s — first-time install can take ~90s)"
+step "waiting for Kafka cluster '${KAFKA_CLUSTER}' to be Ready (up to ${KAFKA_READY_TIMEOUT}s: first-time install can take ~90s)"
 if ! kubectl wait --for=condition=Ready --timeout="${KAFKA_READY_TIMEOUT}s" \
         kafka/${KAFKA_CLUSTER} -n "${KAFKA_NS}" >/dev/null 2>&1; then
     info "Kafka cluster did not reach Ready. Diagnostics:"
@@ -197,7 +197,7 @@ if [[ -z "${SCALED_UP}" ]]; then
         2>/dev/null | sed 's/^/    /' || true
     fail "KEDA did not scale order-processor up within ${SCALEUP_TIMEOUT}s"
 fi
-pass "consumer scaled up — peak replicas: ${PEAK_REPLICAS}"
+pass "consumer scaled up: peak replicas: ${PEAK_REPLICAS}"
 
 # ── Phase 8: Let the consumer drain the topic ───────────────────────────────
 step "waiting for consumer to drain the topic (~${MSG_COUNT} × 0.5s / replicas)"
@@ -233,7 +233,7 @@ fi
 pass "consumer back at 0 replicas"
 
 # ── Done ────────────────────────────────────────────────────────────────────
-step "SUCCESS — KEDA scale-from-zero on Kafka consumer lag verified"
+step "SUCCESS: KEDA scale-from-zero on Kafka consumer lag verified"
 echo
 echo "  Workload:    order-processor (Python Kafka consumer)"
 echo "  Trigger:     Kafka topic '${TOPIC}' consumer lag"

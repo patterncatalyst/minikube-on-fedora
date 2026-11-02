@@ -39,9 +39,9 @@ trap cleanup EXIT
 
 # ── Pre-flight ──────────────────────────────────────────────────────────────
 step "pre-flight: required tools on PATH"
-command -v minikube >/dev/null 2>&1 || fail "minikube not on PATH — see §2"
-command -v kubectl  >/dev/null 2>&1 || fail "kubectl not on PATH — see §2"
-command -v jq       >/dev/null 2>&1 || fail "jq not on PATH — see §1"
+command -v minikube >/dev/null 2>&1 || fail "minikube not on PATH: see §2"
+command -v kubectl  >/dev/null 2>&1 || fail "kubectl not on PATH: see §2"
+command -v jq       >/dev/null 2>&1 || fail "jq not on PATH: see §1"
 pass "minikube, kubectl, jq present"
 
 step "pre-flight: Docker Engine"
@@ -117,7 +117,7 @@ kubectl --context "${PROFILE}" get pods -n kube-system | sed 's/^/    /'
 pass "all kube-system pods Ready"
 
 # ── Done ────────────────────────────────────────────────────────────────────
-step "SUCCESS — minikube + kubectl + docker driver + containerd + published port all working"
+step "SUCCESS: minikube + kubectl + docker driver + containerd + published port all working"
 echo
 echo "  The driver-check profile will be torn down momentarily."
 echo "  To work with minikube interactively, create the default profile with"

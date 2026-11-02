@@ -1,16 +1,16 @@
 """Kafka consumer for notification-service.
 
 Consumes registered **Avro** `order.placed` events (Confluent Wire Format;
-the writer schema is fetched from Apicurio by the id in each message — see
+the writer schema is fetched from Apicurio by the id in each message (see
 `avro_serde.py`) and **persists** each one to the `notifications` table.
 
 r25c change: received events are now written to Postgres (the `notifications`
 table created by Alembic), replacing the in-memory list. The benefit is real
-durability — a notification survives a pod restart, which the in-memory
+durability: a notification survives a pod restart, which the in-memory
 version did not.
 
 At-least-once delivery (Kleppmann, DDIA): Kafka can redeliver, so the write is
-idempotent — an INSERT ... ON CONFLICT DO NOTHING keyed by the unique
+idempotent: an INSERT ... ON CONFLICT DO NOTHING keyed by the unique
 `order_id` makes a redelivery a no-op rather than a duplicate row.
 
 Managed Lifecycle: the consumer runs as a background asyncio task started and
@@ -49,7 +49,7 @@ async def persist_event(event: dict) -> None:
     """Idempotently insert one consumed event as a notification row."""
     order_id = event["order_id"]
     values = {
-        "id": order_id,  # order_id is a stable, unique key — reuse it as PK
+        "id": order_id,  # order_id is a stable, unique key; reuse it as PK
         "order_id": order_id,
         **{f: event.get(f) for f in _FIELDS},
     }
@@ -96,7 +96,7 @@ async def _consume_loop() -> None:
     )
     await consumer.start()
     logger.info(
-        "kafka consumer started (topic=%s group=%s, Avro via %s) — persisting to DB",
+        "kafka consumer started (topic=%s group=%s, Avro via %s), persisting to DB",
         settings.kafka_order_topic,
         settings.kafka_group,
         settings.apicurio_url,
@@ -105,12 +105,12 @@ async def _consume_loop() -> None:
         async for msg in consumer:
             try:
                 event = await _serde.decode(msg.value)
-            except Exception as exc:  # noqa: BLE001 — bad/undecodable message
+            except Exception as exc:  # noqa: BLE001  bad/undecodable message
                 logger.warning("skipping undecodable message at offset %s: %s", msg.offset, exc)
                 continue
             try:
                 await persist_event(event)
-            except Exception as exc:  # noqa: BLE001 — surface but keep consuming
+            except Exception as exc:  # noqa: BLE001  surface but keep consuming
                 logger.error("failed to persist event for order %s: %s", event.get("order_id"), exc)
                 continue
             logger.info("persisted %s for order %s", event.get("event_type"), event.get("order_id"))

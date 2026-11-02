@@ -1,5 +1,5 @@
-# A minimal, disposable Postgres for the appendix examples. This is NOT the
-# CloudNativePG-managed cluster the §17 capstone runs: no operator, no
+# A minimal, disposable Postgres for the appendix examples. This is not the
+# CloudNativePG-managed cluster the capstone runs: no operator, no
 # persistent storage, no replication. It exists only so notification-service
 # has something to report "ready" against on the mof-patterns profile. Losing
 # its data on a restart is fine for this example.

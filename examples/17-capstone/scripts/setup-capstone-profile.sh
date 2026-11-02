@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #
-# setup-capstone-profile.sh — create (or replace) the mof-capstone minikube
-# profile sized for the full §17 stack.
+# setup-capstone-profile.sh: create (or replace) the mof-capstone minikube
+# profile sized for the full capstone stack.
 #
-# The profile is intentionally separate from §3's `minikube` profile and §11's
+# The profile is separate from §3's `minikube` profile and §11's
 # `istio` profile so the larger resource footprint doesn't disturb earlier
 # sections' state. It is named `mof-capstone` (not `capstone`) because the name
 # `capstone` belongs to another repository's cluster on the same host; the
@@ -93,7 +93,7 @@ kubectl get pods -n kube-system
 
 # The node is a container; its PID limit caps TOTAL processes across all pods.
 # The full meshed capstone (CNPG, Kafka, KEDA, OpenMetadata + OpenSearch JVMs,
-# observability, services and their Envoy sidecars) runs ~2000+ tasks (CAP-040).
+# observability, services and their Envoy sidecars) runs ~2000+ tasks.
 # Docker Engine's default is unlimited (0 / -1); report the value, and fail only
 # when a daemon-level default clearly caps it.
 pids_limit=$(docker inspect -f '{{.HostConfig.PidsLimit}}' "$PROFILE" 2>/dev/null || echo unknown)
@@ -117,7 +117,7 @@ printf '\n'
 printf 'Next steps:\n'
 printf '  1. The platform stack (Strimzi, KEDA, Istio, Apicurio, OpenMetadata,\n'
 printf '     observability, Postgres) installs with ./scripts/bootstrap-capstone.sh.\n'
-printf '  2. To free the profile when done with §17:\n'
+printf '  2. To free the profile when done with the capstone:\n'
 printf '       ./scripts/teardown.sh\n'
 printf '  3. kubectl and helm in this repo always target the %s context;\n' "$PROFILE"
 printf '     your current-context is never changed by these scripts.\n'

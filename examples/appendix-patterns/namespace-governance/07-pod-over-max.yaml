@@ -1,6 +1,6 @@
-# Deliberately violates 03-limitrange.yaml's max (cpu 500m / memory 512Mi):
+# Violates 03-limitrange.yaml's max (cpu 500m / memory 512Mi) by design:
 # applying this after the LimitRange exists fails admission outright, with no
-# pod created at all — a LimitRange rejects out-of-band values the same way
+# pod created at all; a LimitRange rejects out-of-band values the same way
 # it supplies defaults for missing ones.
 apiVersion: v1
 kind: Pod

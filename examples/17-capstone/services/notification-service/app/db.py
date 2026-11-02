@@ -2,12 +2,11 @@
 
 Async SQLAlchemy 2.0 engine + session factory.
 
-r25c: the service's schema and tables are created and evolved by **Alembic
-migrations** (run by an init container before the app starts — see CAP-021),
-NOT by `Base.metadata.create_all`. The previous `init_schema()` helper is gone:
-when the app process starts, the `notifications` schema and table already
-exist, so the app never issues DDL. This is the create-all retirement called
-for in CAP-004, applied to this service.
+The service's schema and tables are created and evolved by **Alembic
+migrations** (run by an init container before the app starts), not by
+`Base.metadata.create_all`. There is no `init_schema()` helper: when the app
+process starts, the `notifications` schema and table already exist, so the app
+never issues DDL of its own.
 """
 
 from __future__ import annotations

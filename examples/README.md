@@ -39,7 +39,7 @@ aggregator that runs them all.
 
 The tutorial's Containerfiles, when rendered as code blocks, are for
 the reader to copy and paste. The runnable version under
-`examples/` is what you actually test against — same file, different
+`examples/` is what you test against: the same file for a different
 purpose.
 
 Keeping them separate lets you:

@@ -1,18 +1,17 @@
-"""Kafka producer for order-service — publishes `order.placed` as registered Avro.
+"""Kafka producer for order-service: publishes `order.placed` as registered Avro.
 
-r25 published this event as ad-hoc JSON. r25b makes it a real **runtime
-contract**: the event is serialized as Avro against a schema registered in
-Apicurio, and the bytes carry the schema id (Confluent Wire Format, see
-`avro_serde.py`). The consumer fetches that schema by id to decode — neither
-side can encode or decode without the registry.
+The event is a runtime **contract**: it is serialized as Avro against a schema
+registered in Apicurio, and the bytes carry the schema id (Confluent Wire
+Format, see `avro_serde.py`). The consumer fetches that schema by id to decode,
+so neither side can encode or decode without the registry.
 
 order-service *owns* this contract: the canonical schema lives in
 `schemas/order-placed.avsc` alongside the service that produces it.
 
 Managed Lifecycle (Kubernetes Patterns): the producer starts and the schema
 registers on app startup; the producer stops on shutdown. Publishing happens
-after the order is durably persisted (the dual-write caveat from CAP-017 and
-§17 still applies — the outbox pattern is the production answer).
+after the order is durably persisted. The dual-write caveat still applies, and
+the outbox pattern is the production answer.
 """
 
 from __future__ import annotations
@@ -74,11 +73,11 @@ async def start_producer(max_attempts: int = 30, max_delay: float = 4.0) -> None
                 settings.kafka_order_subject,
             )
             return
-        except Exception as exc:  # noqa: BLE001 — startup tolerates any connect error
+        except Exception as exc:  # noqa: BLE001  startup tolerates any connect error
             last_exc = exc
             try:
                 await producer.stop()
-            except Exception:  # noqa: BLE001 — best-effort cleanup of half-open client
+            except Exception:  # noqa: BLE001  best-effort cleanup of half-open client
                 pass
             delay = min(float(attempt), max_delay)
             logger.warning(

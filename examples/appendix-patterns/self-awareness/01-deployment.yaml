@@ -1,6 +1,6 @@
 # shipping-service with the Self Awareness pattern applied: Downward API
 # fields injected as environment variables, plus a downwardAPI volume that
-# mounts the Pod's own labels, annotations, and resource limits as files —
+# mounts the Pod's own labels, annotations, and resource limits as files;
 # nothing shipping-service's own code has to ask the API server for.
 apiVersion: apps/v1
 kind: Deployment

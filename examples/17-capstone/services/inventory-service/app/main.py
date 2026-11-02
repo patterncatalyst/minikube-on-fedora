@@ -1,14 +1,14 @@
-"""inventory-service — a §17 capstone data product.
+"""inventory-service: a capstone data product.
 
-r23 scope: REST health surface + a gRPC server implementing
+A REST health surface plus a gRPC server implementing
 InventoryService.CheckStock, backed by the `stock` table in the service's
 `inventory` schema. The gRPC server runs in the same asyncio loop as
-FastAPI, started/stopped by the lifespan — one process, two ports.
+FastAPI, started/stopped by the lifespan: one process, two ports.
 
 Endpoints:
-  GET /health        — liveness (process is up)
-  GET /healthz       — readiness (can reach Postgres)
-  GET /stock         — list current stock (read-only convenience for demos)
+  GET /health        liveness (process is up)
+  GET /healthz       readiness (can reach Postgres)
+  GET /stock         list current stock (read-only convenience for demos)
 gRPC:
   InventoryService/CheckStock  (port from settings.grpc_port, default 50051)
 """
@@ -42,7 +42,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="inventory-service",
     version="0.2.0",
-    description="inventory-service data product for the §17 capstone — REST health + gRPC CheckStock.",
+    description="inventory-service data product for the capstone: REST health and gRPC CheckStock.",
     lifespan=lifespan,
 )
 
@@ -66,7 +66,7 @@ async def healthz() -> dict[str, str]:
 
 @app.get("/stock", tags=["inventory"])
 async def list_stock() -> list[dict]:
-    """List current stock levels — a read-only convenience for demos/debugging."""
+    """List current stock levels, a read-only convenience for demos/debugging."""
     async with SessionLocal() as session:
         rows = (await session.execute(select(Stock))).scalars().all()
     return [{"sku": r.sku, "quantity_on_hand": r.quantity_on_hand} for r in rows]

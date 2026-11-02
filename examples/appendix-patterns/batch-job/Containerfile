@@ -1,7 +1,7 @@
-# shipping-report Containerfile — UBI 10 multi-stage build, Python 3.14, uv.
+# shipping-report Containerfile: UBI 10 multi-stage build, Python 3.14, uv.
 #
 # Net-new runner (not a capstone service): a tiny CLI, no HTTP server, no
-# OpenTelemetry — scope matches what the BatchJob/PeriodicJob patterns
+# OpenTelemetry; scope matches what the BatchJob/PeriodicJob patterns
 # actually need. Built with uv per house standard; the BUILDER stage runs
 # as root to write /opt/venv, the RUNTIME stage drops to the UBI default
 # non-root user.

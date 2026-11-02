@@ -76,8 +76,8 @@ reaches across that boundary to mutate another domain's data directly.
 software product: it's discoverable, addressable, trustworthy, self-describing, and
 carries explicit expectations about quality and availability. It is not a renamed
 table. In this build, each domain service publishes its API contracts to a registry
-and its metadata to a catalog, so consumers can find it, understand it, and depend on
-it: the subject of the
+and its metadata to a catalog, so consumers can discover it and depend on its
+contract: the subject of the
 [contracts & catalog page]({{ '/capstone/data-mesh/04-contracts-and-catalog/' | relative_url }}).
 
 **Self-serve data platform.** Domain teams should not each build their own event

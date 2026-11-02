@@ -1,4 +1,4 @@
-# §17 capstone umbrella chart values.
+# capstone umbrella chart values.
 #
 # Every component has an `enabled` flag so the deploy can be staged
 # incrementally. Default values represent the steady-state full-deploy
@@ -40,7 +40,7 @@ global:
 # ─────────────────────────────────────────────────────────────────────────────
 strimziCluster:
   enabled: true
-  # Kafka cluster CR — the Strimzi operator must already be installed
+  # Kafka cluster CR: the Strimzi operator must already be installed
   # (per §12 pattern). The cluster runs in the capstone namespace.
   # NOTE: this block is not read by any template. The Kafka version is set in
   # charts/kafka/values.yaml (`version`, a subchart value; override with
@@ -76,7 +76,7 @@ openmetadata:
 postgres:
   enabled: true
   # One shared Postgres cluster, one schema per service. Deployed via the
-  # CloudNativePG operator (operator install instructions in §17 r21 prose).
+  # CloudNativePG operator (operator install instructions in capstone prose).
   instances: 1
   storage:
     size: 20Gi
@@ -240,4 +240,4 @@ graphqlGateway:
     limits:
       memory: 256Mi
   # GraphQL gateway is REST-receiving (federated query endpoint),
-  # not KEDA-scaled — single replica is sufficient for the demos.
+  # not KEDA-scaled; single replica is sufficient for the demos.

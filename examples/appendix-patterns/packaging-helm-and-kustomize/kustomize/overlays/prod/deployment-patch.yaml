@@ -1,4 +1,4 @@
-# prod overlay: two replicas and headroom for real traffic.
+# prod overlay: two replicas and headroom for production traffic.
 apiVersion: apps/v1
 kind: Deployment
 metadata:

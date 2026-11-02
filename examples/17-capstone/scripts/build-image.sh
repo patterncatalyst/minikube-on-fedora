@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# build-image.sh — build a service image with Docker Engine and load it into the
+# build-image.sh: build a service image with Docker Engine and load it into the
 # mof-capstone minikube profile's containerd store.
 #
 # `docker build -f Containerfile` + `minikube -p mof-capstone image load`. There

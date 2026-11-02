@@ -1,8 +1,8 @@
-# job-kafka.yaml — one-off Job that runs the Kafka ingestion workflow.
+# job-kafka.yaml: one-off Job that runs the Kafka ingestion workflow.
 #
 # Same shape as job-postgres.yaml: mounts om-ingestion-config, fetches an admin
 # token, injects it into a writable copy of kafka.yaml, runs `metadata ingest`.
-# No database password is needed (Kafka ingestion is bare — decision C).
+# No database password is needed (Kafka ingestion is bare).
 apiVersion: batch/v1
 kind: Job
 metadata:
@@ -22,7 +22,7 @@ spec:
         # the ingest container at startup AND prevents the Job pod from ever
         # completing (the proxy keeps running). A node cycle re-enabled namespace
         # injection (istio-injection=enabled), silently breaking these Jobs;
-        # this opts them out. (r34)
+        # this opts them out.
         sidecar.istio.io/inject: "false"
       labels:
         app.kubernetes.io/part-of: capstone
@@ -52,7 +52,7 @@ spec:
             - name: OM_HOST
               value: http://openmetadata:8585
             - name: OM_ADMIN_PASSWORD
-              value: admin            # demo default (r27); not a real secret
+              value: admin            # demo default; not a real secret
           volumeMounts:
             - name: ingestion-config
               mountPath: /opt/ingestion

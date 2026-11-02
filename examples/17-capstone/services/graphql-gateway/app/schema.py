@@ -3,8 +3,8 @@
 Defines the unified graph the client queries. The `order` query resolves an
 order from order-service (REST); the nested `stock` field on that order
 resolves from inventory-service (gRPC). The client asks one question and
-gets a stitched answer spanning two services and two protocols — the value
-GraphQL adds over calling each service directly (CAP-012).
+gets a stitched answer spanning two services and two protocols, the value
+GraphQL adds over calling each service directly.
 
 Strawberry auto-converts snake_case Python fields to camelCase in the schema
 (item_sku → itemSku, quantity_on_hand → quantityOnHand).
@@ -64,7 +64,7 @@ def _order_from_rest(data: dict) -> Order:
 class Query:
     @strawberry.field
     async def order(self, id: strawberry.ID) -> Order | None:
-        """Fetch a single order (REST) — its `stock` field federates to gRPC."""
+        """Fetch a single order (REST); its `stock` field federates to gRPC."""
         data = await fetch_order(str(id))
         return _order_from_rest(data) if data is not None else None
 

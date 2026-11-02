@@ -1,8 +1,8 @@
-# prometheus-values.yaml — lean, single-node Prometheus for the capstone (r29,
-# CAP-027). This is NOT a production monitoring setup: short retention, no
-# persistence, and only the components we actually use. The point is to SEE the
-# cluster — workload replica counts (the KEDA scaling signal) and Istio request
-# metrics for the meshed order-service — not to run a long-lived TSDB.
+# prometheus-values.yaml: lean, single-node Prometheus for the capstone. This
+# is not a production monitoring setup: short retention, no
+# persistence, and only the components we actually use. The point is to see the
+# cluster: workload replica counts (the KEDA scaling signal) and Istio request
+# metrics for the meshed order-service, not to run a long-lived TSDB.
 #
 # Used by scripts/setup-observability.sh:
 #   helm upgrade --install prometheus prometheus-community/prometheus \
@@ -15,7 +15,7 @@ server:
     scrape_interval: 30s
     scrape_timeout: 10s
   persistentVolume:
-    # emptyDir — no StorageClass dependency, nothing to clean up. Metrics are
+    # emptyDir: no StorageClass dependency, nothing to clean up. Metrics are
     # lost if the pod restarts, which is fine for a teaching cluster.
     enabled: false
   resources:
@@ -25,8 +25,8 @@ server:
     limits:
       memory: 1Gi
 
-# Trim everything we don't need for the demo — keeps the footprint near the
-# CAP-026 budget (~512Mi/1Gi for Prometheus itself).
+# Trim everything we don't need for the demo; keeps the footprint near the
+# budget (~512Mi/1Gi for Prometheus itself).
 alertmanager:
   enabled: false
 prometheus-pushgateway:
@@ -50,8 +50,8 @@ kube-state-metrics:
 
 # The chart's default scrape config already includes a 'kubernetes-pods' job that
 # honors prometheus.io/scrape annotations. Istio adds those annotations to meshed
-# pods (order-service), so the Envoy sidecar's merged metrics — including
-# istio_requests_total — are picked up automatically with no extra config.
+# pods (order-service), so the Envoy sidecar's merged metrics, including
+# istio_requests_total, are picked up automatically with no extra config.
 #
 # KEDA's components don't carry those annotations, so add an explicit job for the
 # keda namespace. This is best-effort: if a port name differs by version the job

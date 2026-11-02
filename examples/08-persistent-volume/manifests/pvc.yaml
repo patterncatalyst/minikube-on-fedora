@@ -5,7 +5,7 @@ metadata:
   labels:
     app: nginx-pv
 spec:
-  # ReadWriteOnce — the minikube hostpath provisioner backs this
+  # ReadWriteOnce: the minikube hostpath provisioner backs this
   # with a directory on the (single) node; RWO is the natural fit.
   # For multi-node clusters with multiple replicas, you'd want RWX
   # and a backend that supports it (NFS, CephFS, EFS, etc.).
@@ -14,5 +14,5 @@ spec:
   resources:
     requests:
       storage: 100Mi
-  # No storageClassName — falls through to the default StorageClass.
+  # No storageClassName: falls through to the default StorageClass.
   # On minikube that's "standard" (k8s.io/minikube-hostpath).

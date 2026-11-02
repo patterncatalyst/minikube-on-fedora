@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 #
-# setup-kiali.sh — add Kiali (the mesh-visualization console) to the capstone
+# setup-kiali.sh: add Kiali (the mesh-visualization console) to the capstone
 # cluster, wired to the EXISTING capstone observability stack rather than
-# standing up its own (CAP-0NN). Run-once-per-cluster, idempotent.
+# standing up its own. Run-once-per-cluster, idempotent.
 #
 # Why this exists: the capstone observability stack (setup-observability.sh) is
 # Prometheus + Tempo + Grafana in the `observability` namespace. Kiali gives the
-# one thing that stack doesn't: a live mesh-topology graph — the products and the
+# one thing that stack doesn't: a live mesh-topology graph: the products and the
 # traffic between them, the canary split included. The demo walkthrough's final
 # act drives it.
 #
@@ -69,7 +69,7 @@ if [[ ! -f "$KIALI_MANIFEST" ]]; then
 fi
 
 kubectl get ns "$ISTIO_SYSTEM" >/dev/null 2>&1 \
-    || { printf 'ERROR: namespace %s not found — run scripts/setup-istio.sh first.\n' "$ISTIO_SYSTEM" >&2; exit 1; }
+    || { printf 'ERROR: namespace %s not found: run scripts/setup-istio.sh first.\n' "$ISTIO_SYSTEM" >&2; exit 1; }
 
 # the single-stack wiring targets must exist; warn (not fail) so Kiali can still
 # come up for topology even if a metrics piece is mid-install.
@@ -96,7 +96,7 @@ printf '    tracing:    %s (Tempo)\n' "$TEMPO_URL"
 
 # Build the desired config.yaml for the kiali ConfigMap. Kiali reads this on
 # startup; we patch ONLY the config.yaml key so the addon's own labels and
-# metadata are preserved (idempotent — re-running produces the same value).
+# metadata are preserved (idempotent: re-running produces the same value).
 read -r -d '' KIALI_CONFIG <<EOF || true
 istio_namespace: ${ISTIO_SYSTEM}
 auth:
@@ -148,6 +148,6 @@ printf '  kubectl apply -f host-access/kiali-host.yaml   # companion NodePort 30
 printf '  open http://127.0.0.1:%s/kiali   (Graph → namespace: capstone)\n' "$HOST_PORT_KIALI"
 printf '\nVerify:\n'
 printf '  ./demos/smoke-kiali.sh\n'
-printf '\nNote: the live traffic graph only shows edges while traffic is flowing —\n'
+printf '\nNote: the live traffic graph only shows edges while traffic is flowing :\n'
 printf 'run a demo (e.g. ./demos/smoke-trace-flow.sh or ./demos/demo-canary.sh)\n'
 printf 'to make the products and their calls appear.\n'

@@ -8,7 +8,7 @@
 # Removes:
 #   - Consumer Deployment + ScaledObject (default, demo's normal cleanup)
 #   - Kafka cluster CR + KafkaNodePool + KafkaTopic (the heavyweight
-#     state demo.sh's trap intentionally LEAVES for re-run speed)
+#     state demo.sh's trap leaves for re-run speed)
 #   - With --remove-operators: Strimzi Cluster Operator + the kafka
 #     namespace, and KEDA + HTTP add-on + the keda namespace
 #
@@ -61,7 +61,7 @@ kubectl delete kafka my-kafka -n kafka \
 # Then the KafkaNodePool (Strimzi should cascade, but be explicit)
 kubectl delete kafkanodepool dual-role -n kafka \
     --ignore-not-found=true --wait=true --timeout=60s >/dev/null 2>&1 || true
-# PVCs the cluster created (Strimzi sets deleteClaim: false intentionally)
+# PVCs the cluster created (Strimzi sets deleteClaim: false)
 kubectl delete pvc -n kafka -l strimzi.io/cluster=my-kafka \
     --ignore-not-found=true >/dev/null 2>&1 || true
 pass "Kafka cluster + topics + PVCs removed"

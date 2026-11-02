@@ -31,11 +31,11 @@
       "locked": false,
       "fontSize": 18,
       "fontFamily": 2,
-      "text": "A reference data mesh on Kubernetes / OpenShift",
+      "text": "A reference data mesh on Kubernetes",
       "textAlign": "middle",
       "verticalAlign": "top",
       "containerId": null,
-      "originalText": "A reference data mesh on Kubernetes / OpenShift",
+      "originalText": "A reference data mesh on Kubernetes",
       "lineHeight": 1.25
     },
     {

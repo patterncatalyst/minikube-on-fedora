@@ -1,9 +1,9 @@
 # HTTPScaledObject: the KEDA HTTP add-on's own CRD, reusing the exact shape
-# the §17 capstone runs in production against its own graphql-gateway
+# the capstone runs in production against its own graphql-gateway
 # (examples/17-capstone/keda/gateway-httpscaledobject.yaml), scoped here to
 # the patterns namespace. The interceptor sits in front of graphql-gateway,
 # counts in-flight requests, and holds the first request at zero replicas
-# until a Pod is Ready — this is the scale-to-zero story that replaces a
+# until a Pod is Ready; this is the scale-to-zero story that replaces a
 # Knative Service for an HTTP workload, with no Knative installation at all.
 apiVersion: http.keda.sh/v1alpha1
 kind: HTTPScaledObject

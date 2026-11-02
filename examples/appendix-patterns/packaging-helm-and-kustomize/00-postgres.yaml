@@ -1,5 +1,5 @@
 # A minimal, disposable Postgres for the appendix examples. Shared by both
-# the Helm release and the Kustomize deployment below — they write into
+# the Helm release and the Kustomize deployment below; they write into
 # different schemas in the same database, which is fine for a throwaway
 # instance with no persistent storage.
 apiVersion: v1

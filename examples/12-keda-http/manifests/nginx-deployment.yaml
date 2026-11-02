@@ -1,7 +1,7 @@
 # examples/12-keda-http/manifests/nginx-deployment.yaml
 #
 # Reuses nginx-custom:v1 from §6 (multi-stage UBI image). Starts at
-# replicas: 0 — KEDA HTTP add-on takes ownership the moment the
+# replicas: 0; KEDA HTTP add-on takes ownership the moment the
 # HTTPScaledObject is applied.
 ---
 apiVersion: apps/v1

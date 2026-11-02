@@ -12,9 +12,9 @@ spec:
   selector:
     matchLabels:
       app.kubernetes.io/name: order-service
-      # r26: the selector includes the subset so this Deployment owns ONLY its
+      # the selector includes the subset so this Deployment owns ONLY its
       # v1 pods, leaving the v2 overlay Deployment to own version=v2. NOTE:
-      # selector is an immutable field — enabling the canary on an already-
+      # selector is an immutable field; enabling the canary on an already-
       # deployed v1 requires deleting the old Deployment once before
       # `helm upgrade` recreates it (smoke-canary.sh detects + instructs).
       version: v1
@@ -23,21 +23,21 @@ spec:
       labels:
         app.kubernetes.io/name: order-service
         app.kubernetes.io/part-of: capstone
-        # r26: subset label for the Istio canary. The DestinationRule's `v1`
+        # subset label for the Istio canary. The DestinationRule's `v1`
         # subset matches version=v1; the v2 overlay Deployment carries
         # version=v2. The Service selector keys on app.kubernetes.io/name, so
-        # it fronts BOTH versions — Istio decides the split by subset.
+        # it fronts both versions; Istio decides the split by subset.
         version: v1
       annotations:
-        # r26: opt this workload into the mesh so Envoy enforces the canary
-        # routing (selective injection — we mesh order-service for the canary,
+        # opt this workload into the mesh so Envoy enforces the canary
+        # routing (selective injection: we mesh order-service for the canary,
         # not the whole namespace, to keep sidecars off the operator-managed
         # infra pods). Harmless until Istio is installed and the namespace
         # permits injection.
         sidecar.istio.io/inject: "true"
-        # r37 (CAP-037): order-service connects to Postgres, Kafka, and Apicurio
+        # order-service connects to Postgres, Kafka, and Apicurio
         # during FastAPI startup. As a meshed pod, its outbound connections only
-        # work once istio-proxy has programmed its routes — so hold the app
+        # work once istio-proxy has programmed its routes, so hold the app
         # container until the proxy is ready, closing the startup race that
         # otherwise makes the first DB connect fail and crash-loop. Paired with
         # startup retry/backoff in db.py + events.py as belt-and-suspenders.
@@ -64,7 +64,7 @@ spec:
               value: {{ .Values.apicurio.url | quote }}
             - name: KAFKA_ORDER_SUBJECT
               value: {{ .Values.apicurio.orderSubject | quote }}
-            # Postgres connection — pulled from the CloudNativePG app Secret.
+            # Postgres connection, pulled from the CloudNativePG app Secret.
             # Predictable Demands pattern: declare exactly what we need.
             - name: PG_HOST
               value: "{{ .Values.postgres.clusterName }}-rw.{{ .Release.Namespace }}.svc.cluster.local"

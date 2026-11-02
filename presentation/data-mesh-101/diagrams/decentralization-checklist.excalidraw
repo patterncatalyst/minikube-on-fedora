@@ -31,11 +31,11 @@
       "locked": false,
       "fontSize": 18,
       "fontFamily": 2,
-      "text": "We decentralized everything \u2014 except data",
+      "text": "We decentralized everything, except data",
       "textAlign": "middle",
       "verticalAlign": "top",
       "containerId": null,
-      "originalText": "We decentralized everything \u2014 except data",
+      "originalText": "We decentralized everything, except data",
       "lineHeight": 1.25
     },
     {
@@ -806,11 +806,11 @@
       "locked": false,
       "fontSize": 11,
       "fontFamily": 2,
-      "text": "the missing step \u2014 scale up data & analytics",
+      "text": "the missing step: scale up data & analytics",
       "textAlign": "left",
       "verticalAlign": "top",
       "containerId": null,
-      "originalText": "the missing step \u2014 scale up data & analytics",
+      "originalText": "the missing step: scale up data & analytics",
       "lineHeight": 1.25
     },
     {

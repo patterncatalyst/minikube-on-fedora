@@ -1,8 +1,8 @@
 # shipping-service, unmodified, plus a native sidecar that polls its two
 # health endpoints over localhost (the Pod's shared network namespace) every
 # five seconds and appends the result to a shared emptyDir volume. The
-# sidecar is declared as an initContainers entry with restartPolicy: Always —
-# the native-sidecar mechanism — rather than as a second ordinary container,
+# sidecar is declared as an initContainers entry with restartPolicy: Always,
+# the native-sidecar mechanism, rather than as a second ordinary container,
 # so it starts before shipping-service, stays running for the Pod's whole
 # life, and is the last thing the kubelet stops when the Pod terminates.
 apiVersion: apps/v1

@@ -3,7 +3,7 @@
 # examples/12-keda-http/demo.sh
 #
 # Demonstrates KEDA scale-from-zero on HTTP traffic via the KEDA
-# HTTP add-on (BETA at v0.16.0 — see §12 prose).
+# HTTP add-on (BETA at v0.16.0: see §12 prose).
 #
 # Phases:
 #   1.  Pre-flight: Docker Engine, minikube up with its published
@@ -14,7 +14,7 @@
 #   4.  Assert nginx is at 0 replicas
 #   5.  Apply the keda-interceptor-host companion NodePort Service
 #       (nodePort 30080 -> 127.0.0.1:18080)
-#   6.  Fire one request (Host: nginx.local) — interceptor buffers
+#   6.  Fire one request (Host: nginx.local): interceptor buffers
 #       until the Pod is up. First request takes a few seconds
 #       (cold-start)
 #   7.  Run `hey -n 500 -c 50` to drive sustained load
@@ -22,7 +22,7 @@
 #   9.  Wait for load to finish + scaledownPeriod for scale-down
 #   10. Assert replicas = 0
 #
-# Idempotent — image cache + KEDA install survive cleanup.
+# Idempotent: image cache + KEDA install survive cleanup.
 
 set -euo pipefail
 
@@ -66,10 +66,10 @@ kubectl get nodes >/dev/null 2>&1 || fail "kubectl cannot reach the cluster"
 pass "minikube cluster reachable"
 
 if ! kubectl get deployment keda-operator -n keda >/dev/null 2>&1; then
-    fail "KEDA core not found — run ./scripts/setup-keda.sh first"
+    fail "KEDA core not found: run ./scripts/setup-keda.sh first"
 fi
 if ! kubectl get deployment keda-add-ons-http-interceptor -n keda >/dev/null 2>&1; then
-    fail "KEDA HTTP add-on not found — run ./scripts/setup-keda.sh first"
+    fail "KEDA HTTP add-on not found: run ./scripts/setup-keda.sh first"
 fi
 pass "KEDA + HTTP add-on present in 'keda' namespace"
 
@@ -79,14 +79,14 @@ require_free_nodeport "${INTERCEPTOR_NODEPORT}"
 require_published_port "${PROFILE_NAME}" "${INTERCEPTOR_NODEPORT}" "${INTERCEPTOR_PORT}"
 pass "nodePort ${INTERCEPTOR_NODEPORT} free and published on 127.0.0.1:${INTERCEPTOR_PORT}"
 
-command -v hey >/dev/null 2>&1 || fail "hey not in PATH — see §2 (go install)"
+command -v hey >/dev/null 2>&1 || fail "hey not in PATH: see §2 (go install)"
 
 # ── Phase 2: Ensure nginx-custom image is cached ────────────────────────────
 step "ensuring ${IMAGE_TAG} is in the minikube profile's image cache"
 if ! minikube image ls -p "${PROFILE_NAME}" 2>/dev/null | grep -q "${IMAGE_TAG}"; then
     info "image not present; building from §6's Containerfile"
     if [[ ! -f "${SECTION6_DIR}/Containerfile" ]]; then
-        fail "${SECTION6_DIR}/Containerfile not found — examples/06 missing?"
+        fail "${SECTION6_DIR}/Containerfile not found: examples/06 missing?"
     fi
     build_and_load "${IMAGE_TAG}" "${SECTION6_DIR}" "${PROFILE_NAME}" \
         || fail "build_and_load ${IMAGE_TAG} failed"
@@ -133,10 +133,10 @@ if [[ -z "${NP_READY}" ]]; then
     echo
     fail "interceptor did not accept connections on 127.0.0.1:${INTERCEPTOR_PORT} within 30s"
 fi
-pass "interceptor reachable on 127.0.0.1:${INTERCEPTOR_PORT} (note: this does NOT validate routing — see cold-start phase)"
+pass "interceptor reachable on 127.0.0.1:${INTERCEPTOR_PORT} (note: this does NOT validate routing: see cold-start phase)"
 
 # ── Phase 6: Cold-start request ─────────────────────────────────────────────
-step "firing single cold-start request — interceptor will buffer until Pod is ready"
+step "firing single cold-start request: interceptor will buffer until Pod is ready"
 COLD_START_BEGIN=$(date +%s)
 # Capture both the response body AND the HTTP status code separately.
 # -w '%{http_code}' on its own line appended after the body lets us
@@ -153,7 +153,7 @@ BODY=$(echo "${RAW}" | sed '/---STATUS---/,$d')
 info "cold-start request took ${COLD_START_S}s, status code: ${HTTP_CODE}"
 
 # Assertion 1: HTTP status must be 200. A 404 here means the interceptor
-# didn't recognize the route — which would mean the HTTPScaledObject's
+# didn't recognize the route: which would mean the HTTPScaledObject's
 # Host matching isn't wired up to this request.
 if [[ "${HTTP_CODE}" != "200" ]]; then
     info "non-200 response from interceptor. Body (first 500 chars):"
@@ -170,14 +170,14 @@ if [[ "${HTTP_CODE}" != "200" ]]; then
     info "Interceptor service:"
     kubectl get service -n keda keda-add-ons-http-interceptor-proxy \
         -o wide 2>/dev/null | sed 's/^/    /' || true
-    fail "cold-start returned HTTP ${HTTP_CODE} — routing through interceptor is not working"
+    fail "cold-start returned HTTP ${HTTP_CODE}: routing through interceptor is not working"
 fi
 
 # Assertion 2: Response body must contain nginx-specific content. A
 # generic <html> response could be the interceptor's own 404 page.
 case "${BODY}" in
     *"Test Page for the HTTP Server"*|*"nginx"*|*"Welcome to nginx"*)
-        : # nginx content found — good
+        : # nginx content found: good
         ;;
     *)
         info "200 OK but body doesn't look like nginx content (first 500 chars):"
@@ -186,29 +186,29 @@ case "${BODY}" in
         ;;
 esac
 
-# Assertion 3: An honest cold-start through the interceptor takes
+# Assertion 3: A cold-start through the interceptor takes
 # measurable time. If it returned in 0 seconds, the workload was
 # probably already running OR the response wasn't a real backend
 # response. (Sub-second responses CAN happen if the Pod was somehow
 # already up; we warn but don't fail.)
 if [[ "${COLD_START_S}" -eq 0 ]]; then
     info "WARNING: cold-start completed in <1s. This is unusual for"
-    info "         a scale-from-zero cold-start — the interceptor"
+    info "         a scale-from-zero cold-start: the interceptor"
     info "         normally needs several seconds to bring a Pod up."
     info "         Verify the deployment was actually at 0 replicas"
     info "         before this phase, not pre-warmed."
 fi
-pass "cold-start succeeded — HTTP 200 with nginx content after ${COLD_START_S}s"
+pass "cold-start succeeded: HTTP 200 with nginx content after ${COLD_START_S}s"
 
 # ── Phase 7: Drive load with hey ────────────────────────────────────────────
 step "driving load: hey -n ${LOAD_REQUESTS} -c ${LOAD_CONCURRENCY}"
-# IMPORTANT — Host header gotcha:
+# IMPORTANT: Host header gotcha:
 # hey is written in Go. Go's net/http package silently IGNORES Host
 # headers set via the headers map (issue golang/go#7682). So
-# `hey -H "Host: nginx.local"` does NOT set the Host — Go sends the
+# `hey -H "Host: nginx.local"` does NOT set the Host: Go sends the
 # Host from the URL (`127.0.0.1:18080`), the interceptor sees no
 # matching route, and returns 404 for every request.
-# hey provides a dedicated `-host` flag for this — it sets the Go
+# hey provides a dedicated `-host` flag for this: it sets the Go
 # request's `Host` field directly, which IS sent on the wire.
 # curl handles `-H 'Host:'` correctly as a special case, which is
 # why the cold-start curl above works.
@@ -250,7 +250,7 @@ echo "${HEY_SUMMARY}" | sed 's/^/    /'
 #
 # Two parsing gotchas this code now handles:
 # 1. Don't anchor on leading whitespace before "Status code distribution:"
-#    — earlier versions used `awk '/^  Status...'` which never matched
+#   : earlier versions used `awk '/^  Status...'` which never matched
 #    because hey outputs it at column 0
 # 2. Every pipe ending in grep needs `|| true` to suppress nonzero exit
 #    codes when there's nothing to match. Without it, `set -e` + `pipefail`
@@ -284,10 +284,10 @@ if [[ -n "${BAD_LINES}" ]]; then
     info "HTTPScaledObject status:"
     kubectl describe httpscaledobject nginx-http-scaler 2>/dev/null \
         | sed 's/^/    /' || true
-    fail "hey load returned non-2xx responses — routing through interceptor failed"
+    fail "hey load returned non-2xx responses: routing through interceptor failed"
 fi
 if [[ "${TOTAL_OK}" -lt $((LOAD_REQUESTS / 2)) ]]; then
-    fail "fewer than half of hey requests succeeded (${TOTAL_OK}/${LOAD_REQUESTS}) — routing is unreliable"
+    fail "fewer than half of hey requests succeeded (${TOTAL_OK}/${LOAD_REQUESTS}): routing is unreliable"
 fi
 info "hey 2xx successes: ${TOTAL_OK}/${LOAD_REQUESTS}"
 
@@ -299,7 +299,7 @@ if [[ -z "${SCALED_UP}" ]]; then
         2>/dev/null | sed 's/^/    /' || true
     fail "KEDA HTTP add-on did not scale nginx up"
 fi
-pass "nginx scaled up — peak replicas: ${PEAK_REPLICAS}"
+pass "nginx scaled up: peak replicas: ${PEAK_REPLICAS}"
 
 # ── Phase 9: Wait for scale-down ────────────────────────────────────────────
 step "waiting for KEDA to scale down to 0 (scaledownPeriod=30s, allow up to ${SCALEDOWN_TIMEOUT}s)"
@@ -322,7 +322,7 @@ fi
 pass "nginx back at 0 replicas"
 
 # ── Done ────────────────────────────────────────────────────────────────────
-step "SUCCESS — KEDA scale-from-zero on HTTP traffic verified"
+step "SUCCESS: KEDA scale-from-zero on HTTP traffic verified"
 echo
 echo "  Workload:        nginx-http (nginx-custom:v1)"
 echo "  Trigger:         HTTP request concurrency"

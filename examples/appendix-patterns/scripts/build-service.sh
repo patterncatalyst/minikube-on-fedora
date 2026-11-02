@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# build-service.sh — build one of the §17 capstone's shipping services with
+# build-service.sh: build one of the capstone's shipping services with
 # Docker Engine and load it into the mof-patterns minikube profile's
 # containerd store.
 #

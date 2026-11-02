@@ -5,7 +5,7 @@
 # KAFKA_ORDER_TOPIC, KAFKA_GROUP, and APICURIO_URL come from the
 # notification-config ConfigMap created in 01-configmap.yaml.
 #
-# KAFKA_BOOTSTRAP deliberately points at nothing reachable: this example is
+# KAFKA_BOOTSTRAP points at nothing reachable: this example is
 # scoped to env var sourcing, not a live Kafka pipeline (no Strimzi install
 # on the mof-patterns profile). notification-service's own background
 # consumer task is fire-and-forget: a failed connection attempt logs a

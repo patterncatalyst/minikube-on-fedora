@@ -3,7 +3,7 @@
 Async SQLAlchemy 2.0 engine + session factory, plus a startup helper that
 ensures the service's schema exists before creating any tables.
 
-CAP-004: create-if-not-exists via metadata.create_all. Schema *evolution*
+Create-if-not-exists via metadata.create_all. Schema *evolution*
 (Alembic) is deferred to a later iteration.
 """
 

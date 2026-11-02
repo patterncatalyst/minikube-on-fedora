@@ -1,11 +1,11 @@
-# order-service Containerfile — UBI 10 multi-stage build, Python 3.14 (CAP-005, CAP-050).
-# r23: also copies committed gRPC client stubs (gen/) — CAP-013.
+# order-service Containerfile: UBI 10 multi-stage build, Python 3.14.
+# Also copies committed gRPC client stubs (gen/).
 #
 # r21b fix: the UBI python image's default user is 1001, which cannot
 # write to /opt/venv (/opt is root-owned). The r21/r21a build failed with
 # "Permission denied: '/opt/venv'".
 #
-# Fix (idiomatic multi-stage): the BUILDER stage runs as root — it's
+# The builder stage runs as root; it's
 # discarded, so there's no security cost to writing /opt/venv there. Only the
 # RUNTIME stage enforces the non-root user (1001:0), and it merely reads and
 # executes the copied venv (with --chown to make ownership unambiguous).
@@ -23,7 +23,7 @@ WORKDIR /build
 RUN pip install --no-cache-dir "poetry==1.8.4" "poetry-plugin-export==1.8.0"
 
 # Dependency manifests first for layer caching. poetry.lock* glob works
-# whether or not the lock is committed (committing recommended — CAP-001).
+# whether or not the lock is committed (committing recommended).
 COPY pyproject.toml poetry.lock* ./
 
 # Export pinned requirements and install into an isolated venv at /opt/venv.

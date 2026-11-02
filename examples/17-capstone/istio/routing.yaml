@@ -1,18 +1,18 @@
-# routing.yaml — the Istio traffic-management resources for the order-service
-# canary (r26, CAP-024). Three objects:
+# routing.yaml: the Istio traffic-management resources for the order-service
+# canary. Three objects:
 #
-#   Gateway          — exposes order-service through the istio-ingressgateway,
+#   Gateway          exposes order-service through the istio-ingressgateway,
 #                      so external traffic (the smoke, or a browser) enters the
 #                      mesh and the VirtualService can shape it.
-#   VirtualService   — the canary control: splits HTTP traffic between the v1
+#   VirtualService   the canary control: splits HTTP traffic between the v1
 #                      and v2 subsets by weight. The weights carry placeholders
 #                      __W_V1__ / __W_V2__ that smoke-canary.sh substitutes, so
 #                      the same file drives 90/10, 50/50, 0/100, etc.
-#   DestinationRule  — names the two subsets (v1, v2) by the `version` pod
+#   DestinationRule  names the two subsets (v1, v2) by the `version` pod
 #                      label, so the VirtualService can target them.
 #
-# VERIFY-POINTS (Istio API; confirm against the installed Istio version —
-# matches §11's 1.29.x — these are not renderable offline):
+# Istio API notes (confirm against the installed Istio version, which
+# matches the 1.29.x line; these are not renderable offline):
 #   * apiVersion networking.istio.io/v1 (v1beta1 also accepted on 1.29.x).
 #   * The Gateway selector `istio: ingressgateway` matches the default
 #     ingress-gateway install; the smoke reaches it on the published NodePort

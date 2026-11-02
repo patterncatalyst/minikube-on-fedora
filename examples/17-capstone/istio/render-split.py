@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""render-split.py — emit a tiny SVG bar chart of an observed canary split.
+"""render-split.py: emit a tiny SVG bar chart of an observed canary split.
 
 The "make the traffic split visible" stretch from the r26 design intent, kept
 to stdlib so it runs anywhere. Given the v1 and v2 request counts the smoke

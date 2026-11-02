@@ -1,4 +1,4 @@
-# grafana-values.yaml — lean Grafana for the capstone (r29, CAP-027). Provisions
+# grafana-values.yaml: lean Grafana for the capstone. Provisions
 # the Prometheus datasource and one dashboard whose top panel is the whole point
 # of this section: desired vs ready replicas over time, so the KEDA scaling you
 # triggered in the demos becomes something you can actually watch (including the
@@ -8,10 +8,10 @@
 # host-access/grafana-host.yaml, nodePort 30300):
 #   open http://127.0.0.1:3000   (credentials: see this values file)
 #
-# A Tempo datasource for traces is added in r29b.
+# A Tempo datasource for traces is also provisioned.
 
 adminUser: admin
-adminPassword: capstone           # demo only — not a real secret
+adminPassword: capstone           # demo only, not a real secret
 
 persistence:
   enabled: false                  # dashboards are provisioned from config, not saved state
@@ -21,7 +21,7 @@ resources:
     cpu: 100m
     memory: 256Mi
   limits:
-    # r29c.1: was 256Mi — Grafana OOMKilled (exit 137) at 256Mi once it loads
+    # Was 256Mi: Grafana OOMKilled (exit 137) at 256Mi once it loads
     # provisioned dashboards and serves datasource queries under a browser. 512Mi
     # is the comfortable floor for Grafana.
     memory: 512Mi
@@ -41,8 +41,8 @@ datasources:
         access: proxy
         url: http://prometheus-server.observability.svc.cluster.local
         isDefault: true
-      # Traces backend (r29b). Tempo's query API is on :3200. Instrumented
-      # services (r29c) send OTLP to tempo:4317; Grafana reads traces from :3200.
+      # Traces backend. Tempo's query API is on :3200. Instrumented
+      # services send OTLP to tempo:4317; Grafana reads traces from :3200.
       - name: Tempo
         uid: tempo
         type: tempo
@@ -68,7 +68,7 @@ dashboards:
       json: |
         {
           "uid": "capstone-scaling",
-          "title": "Capstone — Scaling & Traffic",
+          "title": "Capstone: Scaling & Traffic",
           "schemaVersion": 39,
           "version": 1,
           "editable": true,
@@ -78,7 +78,7 @@ dashboards:
             {
               "id": 1,
               "type": "timeseries",
-              "title": "Workload replicas — desired vs ready (KEDA scaling)",
+              "title": "Workload replicas: desired vs ready (KEDA scaling)",
               "description": "graphql-gateway and notification-service scale to and from zero. Watch desired step 0→1 on demand and back to 0 on idle; brief flapping near zero is the HTTP add-on settling.",
               "gridPos": { "h": 10, "w": 24, "x": 0, "y": 0 },
               "datasource": { "type": "prometheus", "uid": "prometheus" },
@@ -113,7 +113,7 @@ dashboards:
               "id": 2,
               "type": "timeseries",
               "title": "order-service request rate by response code (Istio mesh)",
-              "description": "From the Envoy sidecar's istio_requests_total — no application instrumentation. Drive it with demos/smoke-canary.sh.",
+              "description": "From the Envoy sidecar's istio_requests_total, with no application instrumentation. Drive it with demos/smoke-canary.sh.",
               "gridPos": { "h": 9, "w": 24, "x": 0, "y": 10 },
               "datasource": { "type": "prometheus", "uid": "prometheus" },
               "fieldConfig": {

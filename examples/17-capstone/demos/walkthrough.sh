@@ -1,33 +1,31 @@
 #!/usr/bin/env bash
 #
-# walkthrough.sh — the capstone's replayable presenter walkthrough (Phase E).
+# walkthrough.sh: the capstone's replayable presenter walkthrough.
 #
 # Five acts, each shelling out to an existing demo/smoke script with narration
 # between them. Presenter-driven: Enter to advance between acts so you control
 # the tempo and can answer questions in the gaps. Maps one-for-one to the deck's
 # "What you can see it do" slide:
 #
-#   1. trace      — one GraphQL query → trace spans across three products in Tempo
+#   1. trace     : one GraphQL query → trace spans across three products in Tempo
 #                   (calls the gateway directly on its NodePort, bypassing the
-#                   KEDA HTTP-add-on interceptor — see CAP-046)
-#   2. scale      — KEDA scales notification-service on Kafka lag (zero → up → zero)
-#   3. canary     — order-service v1→v2 contract evolution, weight-shifted by Istio
-#   4. lineage    — OpenMetadata shows the cross-product lineage of the spine
-#   5. topology   — Kiali shows the live mesh graph with the canary split
+#                   KEDA HTTP-add-on interceptor)
+#   2. scale     : KEDA scales notification-service on Kafka lag (zero → up → zero)
+#   3. canary    : order-service v1→v2 contract evolution, weight-shifted by Istio
+#   4. lineage   : OpenMetadata shows the cross-product lineage of the spine
+#   5. topology  : Kiali shows the live mesh graph with the canary split
 #
 # Run from examples/17-capstone/. Each act exits non-zero on failure with the
-# act's own diagnostics — the walkthrough stops there so you can investigate
+# act's own diagnostics: the walkthrough stops there so you can investigate
 # (resources left in place; the underlying demos are designed for that).
 #
-# Note on Act 1 (CAP-046, June 2026): KEDA HTTP v0.14.0's interceptor has an
-# upstream Go panic on POST forwarding (kedacore/http-add-on#1668, fixed in
-# v0.15.0; the stack now pins v0.16.0, CAP-051). The act still calls the graphql-gateway
-# directly on its published NodePort (127.0.0.1:18099) — the trace itself (HTTP
-# server → REST client → gRPC client across three products) is unchanged; only
-# the entry path is. The NodePort has no endpoints while KEDA holds the gateway
-# at zero, so the preflight requires an available gateway replica and the act
-# waits for it to answer before sending the query. The interceptor entry path
-# can be restored now that the fix has shipped (smoke-keda-http.sh and
+# Note on Act 1: the act calls the graphql-gateway directly on its published
+# NodePort (127.0.0.1:18099) rather than through the KEDA HTTP add-on
+# interceptor. The trace itself (HTTP server → REST client → gRPC client across
+# three products) is unchanged; only the entry path differs. The NodePort has no
+# endpoints while KEDA holds the gateway at zero, so the preflight requires an
+# available gateway replica and the act waits for it to answer before sending the
+# query. The interceptor entry path can be used instead (smoke-keda-http.sh and
 # smoke-trace-flow.sh exercise it); this act is unchanged until verified live.
 #
 # There are no background processes: every service is reached on a published
@@ -72,7 +70,7 @@ PREFLIGHT=1
 
 usage() {
     cat <<'USAGE'
-walkthrough.sh — the capstone's five-act presenter walkthrough
+walkthrough.sh: the capstone's five-act presenter walkthrough
 
   ./demos/walkthrough.sh                     # all five acts, Enter to advance
   ./demos/walkthrough.sh --only ACT          # run one act in isolation
@@ -144,7 +142,7 @@ run_act() {
         return 0
     else
         printf '\n%s  ✗ act FAILED: %s%s\n' "$RED" "$title" "$RST"
-        printf '%s    (resources left in place — investigate, then resume with --only or --skip)%s\n' "$DIM" "$RST"
+        printf '%s    (resources left in place: investigate, then resume with --only or --skip)%s\n' "$DIM" "$RST"
         return 1
     fi
 }
@@ -158,7 +156,7 @@ preflight() {
 
     # check: at least one Ready pod matching a label selector in a namespace.
     # Resilient to chart name changes (Deployment vs StatefulSet, release-name
-    # prefixes, etc.) — we don't care WHAT kind of object owns the pod, only
+    # prefixes, etc.): we don't care WHAT kind of object owns the pod, only
     # that it's Ready.
     ready_by_label() { # ready_by_label <namespace> <label-selector>
         local ns="$1" sel="$2" line
@@ -195,7 +193,7 @@ preflight() {
     fi
     if want_act trace; then
         # trace bypasses the interceptor and calls the graphql-gateway NodePort
-        # (127.0.0.1:18099) directly — see CAP-046. That NodePort has endpoints
+        # (127.0.0.1:18099) directly. That NodePort has endpoints
         # only while a gateway replica is Available. The KEDA HTTP add-on scales
         # it straight back to zero when no traffic reaches the interceptor, so a
         # manual scale-up doesn't last: hold the generated ScaledObject at one
@@ -232,13 +230,13 @@ preflight() {
               "./scripts/ingest-openmetadata.sh   (or re-run bootstrap-capstone.sh, which now does this)"
     fi
     if want_act topology; then
-        check "Kiali Ready (CAP-042)" \
+        check "Kiali Ready" \
               "ready_by_label $ISTIO_SYSTEM 'app.kubernetes.io/name=kiali'" \
               "./scripts/setup-kiali.sh   (or re-run bootstrap-capstone.sh, which now does this)"
     fi
 
     if (( fail > 0 )); then
-        printf '\n%s  preflight found %d problem(s) — fix the items above, or pass --no-preflight to bypass.%s\n' "$RED" "$fail" "$RST"
+        printf '\n%s  preflight found %d problem(s): fix the items above, or pass --no-preflight to bypass.%s\n' "$RED" "$fail" "$RST"
         exit 1
     fi
     printf '  %sall preflight checks passed%s\n' "$GRN" "$RST"
@@ -249,7 +247,7 @@ preflight() {
 clear 2>/dev/null || true
 cat <<INTRO
 ${BOLD}${BLU}╔═══════════════════════════════════════════════════════════════════════╗
-║              ${RST}${BOLD}Data Mesh on OpenShift — live walkthrough${RST}${BOLD}${BLU}                ║
+║              ${RST}${BOLD}Data Mesh on minikube: live walkthrough${RST}${BOLD}${BLU}                 ║
 ╚═══════════════════════════════════════════════════════════════════════╝${RST}
 
   ${DIM}Five acts, one for each piece of the deck's "What you can see it do"
@@ -268,8 +266,8 @@ INTRO
 prompt_enter "press Enter to start"
 
 # ─── ACT 1 · TRACE ───────────────────────────────────────────────────────────
-# This act intentionally bypasses the KEDA HTTP-add-on interceptor — see the
-# header comment and CAP-046. We call the graphql-gateway NodePort directly on
+# This act bypasses the KEDA HTTP-add-on interceptor: see the
+# header comment. We call the graphql-gateway NodePort directly on
 # 127.0.0.1:18099, send the GraphQL query there, and verify the resulting trace
 # lands in Tempo. The trace itself is identical to what runs in production; only
 # the entry path is different. Returning to the interceptor path is a live-verification
@@ -280,13 +278,13 @@ trace_act() {
     local query='{"query":"{ order(id: \"trace-probe\") { id itemSku quantity stock { sku quantityOnHand available } } }"}'
 
     info "gateway entry: graphql-gateway NodePort → ${gw}"
-    info "  (bypasses keda-add-ons-http-interceptor-proxy — see CAP-046)"
+    info "  (bypasses keda-add-ons-http-interceptor-proxy)"
     require_published_port "$PROFILE" "$NODE_PORT_GATEWAY" "$HOST_PORT_GATEWAY"
 
     # The NodePort only answers while a gateway replica is Available. Poll the
     # liveness probe until it does (up to ~30s).
     if ! wait_for_http "${gw}/health" 30; then
-        printf '%s  ✗ graphql-gateway not answering on %s — is a replica up (KEDA may have scaled it to zero)?%s\n' "$RED" "$gw" "$RST"
+        printf '%s  ✗ graphql-gateway not answering on %s: is a replica up (KEDA may have scaled it to zero)?%s\n' "$RED" "$gw" "$RST"
         return 1
     fi
     printf '%s    ✓ gateway answering on %s%s\n' "$GRN" "$gw" "$RST"
@@ -308,7 +306,7 @@ trace_act() {
                        "${gw}/graphql" 2>/dev/null || echo "000")
 
     if [[ "$http_status" == "200" ]]; then
-        printf '%s    ✓ gateway returned HTTP 200 — a trace should now be exporting%s\n' "$GRN" "$RST"
+        printf '%s    ✓ gateway returned HTTP 200: a trace should now be exporting%s\n' "$GRN" "$RST"
         # try to surface the trace id from response headers (traceresponse, x-trace-id, etc.)
         trace_id="$(grep -iE '^(traceresponse|x-trace-id|x-amzn-trace-id|x-b3-traceid):' \
                           /tmp/walkthrough-trace-headers.txt 2>/dev/null \
@@ -329,56 +327,56 @@ trace_act() {
 
 if want_act trace; then
     act_header "trace" "Trace across products" \
-      "One GraphQL query at the gateway becomes a trace with spans in three products. The mesh's interesting behavior lives BETWEEN products — this is what makes it legible."
+      "One GraphQL query at the gateway becomes a trace with spans in three products. The mesh's interesting behavior lives BETWEEN products: this is what makes it legible."
     narrate "we drive a single query through graphql-gateway"
     narrate "the resolver makes a REST call to order-service and a gRPC call to inventory-service"
     narrate "all three spans land in Tempo, stitched by a shared trace id"
-    info "entry path: the graphql-gateway NodePort on 127.0.0.1:${HOST_PORT_GATEWAY} (see CAP-046)"
+    info "entry path: the graphql-gateway NodePort on 127.0.0.1:${HOST_PORT_GATEWAY}"
     info "  the interceptor path is covered by smoke-keda-http.sh (#1668 fixed in KEDA HTTP 0.15.0)"
     prompt_enter "press Enter to run"
     if trace_act; then
         printf '\n%s  ✓ act passed: trace%s\n' "$GRN" "$RST"
     else
         printf '\n%s  ✗ act FAILED: trace%s\n' "$RED" "$RST"
-        printf '%s    (resources left in place — investigate, then resume with --only or --skip)%s\n' "$DIM" "$RST"
+        printf '%s    (resources left in place: investigate, then resume with --only or --skip)%s\n' "$DIM" "$RST"
         exit 1
     fi
     narrate "what to point at next: open Grafana → Explore → Tempo"
     narrate "  search by service name graphql-gateway, pick a recent trace"
-    narrate "  you'll see the span tree — HTTP server → REST client → gRPC client — across products"
+    narrate "  you'll see the span tree: HTTP server → REST client → gRPC client, across products"
 fi
 
 # ─── ACT 2 · SCALE ───────────────────────────────────────────────────────────
 
 if want_act scale; then
-    act_header "scale" "Elastic data product — KEDA on Kafka lag" \
+    act_header "scale" "Elastic data product: KEDA on Kafka lag" \
       "An event consumer's real demand is the backlog waiting for it. KEDA scales notification-service on lag, including all the way down to zero when idle."
-    narrate "at rest, notification-service is at zero replicas — it costs nothing"
+    narrate "at rest, notification-service is at zero replicas: it costs nothing"
     narrate "we publish a burst on order-placed; lag rises; KEDA wakes replicas"
     narrate "as the backlog drains, KEDA scales it back down to zero"
     info "underlying script: demos/smoke-keda-kafka.sh"
     prompt_enter "press Enter to run"
     run_act "scale" ./demos/smoke-keda-kafka.sh || exit 1
     narrate "the lesson: scale on the work WAITING, not the work being done"
-    narrate "a consumer pegged at 0% CPU with a 10k backlog needs to scale UP — lag sees that, CPU can't"
+    narrate "a consumer pegged at 0% CPU with a 10k backlog needs to scale UP: lag sees that, CPU can't"
 fi
 
 # ─── ACT 3 · CANARY ──────────────────────────────────────────────────────────
 
 if want_act canary; then
-    act_header "canary" "Canary a contract — v1 → v2, by weight" \
+    act_header "canary" "Canary a contract: v1 → v2, by weight" \
       "The interesting thing to canary in a mesh isn't a new binary, it's a new version of the CONTRACT. v2 adds the additive currency field; Istio shifts live traffic by weight; rollback is the same operation in reverse."
-    narrate "step 1 — bring up the canary at 90/10 (v2 gets 10% of traffic)"
+    narrate "step 1: bring up the canary at 90/10 (v2 gets 10% of traffic)"
     info "underlying script: demos/demo-canary.sh up 90 10"
     prompt_enter "press Enter to bring up 90/10"
     run_act "canary up 90/10" ./demos/demo-canary.sh up 90 10 || exit 1
 
-    narrate "step 2 — shift to 50/50 (no flag-day; the same VirtualService, two numbers changed)"
+    narrate "step 2: shift to 50/50 (no flag-day; the same VirtualService, two numbers changed)"
     info "underlying script: demos/demo-canary.sh shift 50 50"
     prompt_enter "press Enter to shift to 50/50"
     run_act "canary shift 50/50" ./demos/demo-canary.sh shift 50 50 || exit 1
 
-    narrate "step 3 — clean rollback to v1-only (the same mechanism in reverse)"
+    narrate "step 3: clean rollback to v1-only (the same mechanism in reverse)"
     info "underlying script: demos/demo-canary.sh down"
     prompt_enter "press Enter to roll back to v1-only"
     run_act "canary down" ./demos/demo-canary.sh down || exit 1
@@ -392,26 +390,26 @@ fi
 if want_act lineage; then
     act_header "lineage" "Cross-product lineage in OpenMetadata" \
       "A mesh's whole premise is consumers finding products without a broker. The catalog answers which products exist, who owns them, who consumes whom, and where data came from."
-    narrate "we don't run ingestion here — we verify the lineage that was declared"
+    narrate "we don't run ingestion here: we verify the lineage that was declared"
     narrate "the spine: orders (Postgres) → order-placed topic (Kafka) → notification consumer"
     info "underlying script: demos/smoke-om-lineage.sh"
     prompt_enter "press Enter to verify the lineage"
     run_act "lineage" ./demos/smoke-om-lineage.sh || exit 1
     narrate "what to show in the UI: OpenMetadata → orders table → Lineage tab"
-    narrate "the graph runs operational → event → consumer — across three products"
+    narrate "the graph runs operational → event → consumer: across three products"
 fi
 
 # ─── ACT 5 · TOPOLOGY ────────────────────────────────────────────────────────
 
 if want_act topology; then
     act_header "topology" "Live mesh topology in Kiali" \
-      "Kiali's traffic graph is the live view of the mesh: products, the edges between them, and — if the canary is up — the split rendered as parallel paths."
+      "Kiali's traffic graph is the live view of the mesh: products, the edges between them, and: if the canary is up, the split rendered as parallel paths."
     narrate "first, confirm Kiali itself is healthy and sees the capstone namespace"
     info "underlying script: demos/smoke-kiali.sh"
     prompt_enter "press Enter to verify Kiali"
     run_act "topology (smoke)" ./demos/smoke-kiali.sh || exit 1
 
-    narrate "Kiali is published on a NodePort — open it in the browser"
+    narrate "Kiali is published on a NodePort: open it in the browser"
     require_published_port "$PROFILE" "$NODE_PORT_KIALI" "$HOST_PORT_KIALI"
     if wait_for_http "http://127.0.0.1:${HOST_PORT_KIALI}/kiali/healthz" 30; then
         printf '%s    ✓ Kiali live at http://127.0.0.1:%s/kiali%s\n' "$GRN" "$HOST_PORT_KIALI" "$RST"

@@ -1,13 +1,13 @@
 # review-service
 
-A §17 capstone data product. Owns the `reviews` Postgres schema
-(per-service ownership, CAP-003).
+A capstone data product. Owns the `reviews` Postgres schema
+(per-service ownership).
 
 **r22 scope (skeleton):** the service starts, ensures its schema exists, and
 serves health probes:
 
-- `GET /health` — liveness (process up)
-- `GET /healthz` — readiness (Postgres reachable)
+- `GET /health`: liveness (process up)
+- `GET /healthz`: readiness (Postgres reachable)
 
 Its domain surface is added in later iterations (REST/gRPC/GraphQL/Kafka as
 appropriate to the service).

@@ -41,7 +41,7 @@ EOF
 The call fails with `429 Too Many Requests` and a message naming the PDB:
 `Cannot evict pod as it would violate the pod's disruption budget.` This is
 exactly the API `kubectl drain`, the descheduler, and a cluster autoscaler
-all call internally before removing a Pod — none of them can remove this
+all call internally before removing a Pod; none of them can remove this
 one while it's the only replica.
 
 ### A direct delete bypasses it entirely

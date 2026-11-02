@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 #
-# smoke-graphql.sh — verify the federated read layer: a single GraphQL query
+# smoke-graphql.sh: verify the federated read layer: a single GraphQL query
 # to graphql-gateway that stitches an order (order-service, REST) with its
 # live stock (inventory-service, gRPC) into one response.
 #
@@ -12,7 +12,7 @@
 #   5. place an in-stock order via order-service REST to get an order id
 #   6. query the gateway:  { order(id) { id itemSku quantity stock { sku quantityOnHand available } } }
 #      and assert the response carries BOTH the order fields and nested stock
-#   7. clean up on success (CAP-008); on failure, leave running + dump logs
+#   7. clean up on success; on failure, leave running + dump logs
 #
 # Usage:  ./demos/smoke-graphql.sh [--purge-db]
 
@@ -41,7 +41,7 @@ fail() {
 step "Checking for committed gRPC stubs"
 for svc in inventory-service order-service graphql-gateway; do
     [[ -f "services/${svc}/gen/capstone/inventory/v1/inventory_pb2_grpc.py" ]] \
-        || fail "missing stubs for ${svc} — run ./scripts/gen-protos.sh"
+        || fail "missing stubs for ${svc}: run ./scripts/gen-protos.sh"
 done
 printf '    ✓ stubs present\n'
 
@@ -51,10 +51,10 @@ assert_local_image() {  # deployment-name
     local d="$1" img pol
     img="$(kubectl get deployment "$d" -n "$NS" -o jsonpath='{.spec.template.spec.containers[0].image}' 2>/dev/null)"
     pol="$(kubectl get deployment "$d" -n "$NS" -o jsonpath='{.spec.template.spec.containers[0].imagePullPolicy}' 2>/dev/null)"
-    [[ "$img" == "${d}:v1" ]] || fail "${d} image is '${img}' — must be the bare '${d}:v1'"
-    [[ "$pol" == "Never" ]] || fail "${d} imagePullPolicy is '${pol}' — must be Never"
+    [[ "$img" == "${d}:v1" ]] || fail "${d} image is '${img}': must be the bare '${d}:v1'"
+    [[ "$pol" == "Never" ]] || fail "${d} imagePullPolicy is '${pol}': must be Never"
     minikube -p "$PROFILE" image ls 2>/dev/null | grep -qE "(^|/)${d}:v1\$" \
-        || fail "${d}:v1 not in 'minikube -p ${PROFILE} image ls' — ./scripts/build-image.sh services/${d} ${d} v1"
+        || fail "${d}:v1 not in 'minikube -p ${PROFILE} image ls': ./scripts/build-image.sh services/${d} ${d} v1"
     printf '    ✓ %s → %s (pullPolicy Never, present in the node)\n' "$d" "$img"
 }
 
@@ -73,7 +73,7 @@ ensure_gateway_up() {
 }
 
 # ── 3. build + load all three ─────────────────────────────────────────────────
-minikube status -p "$PROFILE" >/dev/null 2>&1 || fail "profile '$PROFILE' not running — ./scripts/setup-capstone-profile.sh"
+minikube status -p "$PROFILE" >/dev/null 2>&1 || fail "profile '$PROFILE' not running: ./scripts/setup-capstone-profile.sh"
 for svc in "${SERVICES[@]}"; do
     step "Building + loading ${svc}"
     ./scripts/build-image.sh "services/${svc}" "${svc}" v1 || fail "${svc} build/load failed"
@@ -81,7 +81,7 @@ done
 
 # ── 4. Postgres + deploy ──────────────────────────────────────────────────────
 step "Ensuring the shared Postgres cluster is Ready"
-kubectl get crd clusters.postgresql.cnpg.io >/dev/null 2>&1 || fail "CloudNativePG operator missing — ./scripts/setup-postgres-operator.sh"
+kubectl get crd clusters.postgresql.cnpg.io >/dev/null 2>&1 || fail "CloudNativePG operator missing: ./scripts/setup-postgres-operator.sh"
 helm upgrade --install "$PG_RELEASE" "$PG_CHART" -n "$NS" --create-namespace || fail "postgres CR install failed"
 pg_ready=0
 for i in $(seq 1 60); do
@@ -138,7 +138,7 @@ print("    ✓ stitched: order (REST) + stock (gRPC) in one response; on_hand=%d
       % (st["quantityOnHand"], st["available"]))
 PY
 
-printf '\n✓ SUCCESS — federated GraphQL query verified (order via REST + stock via gRPC, stitched by the gateway)\n'
+printf '\n✓ SUCCESS: federated GraphQL query verified (order via REST + stock via gRPC, stitched by the gateway)\n'
 
 # ── 7. cleanup on success ─────────────────────────────────────────────────────
 step "Cleanup (success)"

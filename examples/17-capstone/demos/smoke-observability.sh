@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 #
-# smoke-observability.sh — verify the metrics stack (r29, CAP-027) is actually
+# smoke-observability.sh: verify the metrics stack is actually
 # working: Prometheus is up and scraping (kube-state-metrics gives us capstone
 # workload metrics; the Istio series exists), and Grafana is up with the
 # capstone dashboard provisioned.
 #
-# This checks the PLUMBING, not pretty graphs — it confirms the data is flowing
+# This checks the PLUMBING, not pretty graphs: it confirms the data is flowing
 # so the dashboard has something to draw. Run the scaling/canary demos to make
 # the graphs actually move.
 #
@@ -21,7 +21,7 @@ GRAF_PORT="$HOST_PORT_GRAFANA"      # published NodePort on 127.0.0.1
 
 step() { printf '\n==> %s\n' "$1"; }
 dump() {
-    step "DIAGNOSTIC DUMP (failure — resources left in place)"
+    step "DIAGNOSTIC DUMP (failure: resources left in place)"
     kubectl get deployment,pods -n "$NS" 2>&1
 }
 fail() { printf '\n✗ FAILED: %s\n' "$1"; dump; exit 1; }
@@ -40,11 +40,11 @@ wait_ready() { # wait_ready <deployment> <seconds>
 # ─── Pre-flight ──────────────────────────────────────────────────────────────
 step "Pre-flight checks"
 kubectl get ns "$NS" >/dev/null 2>&1 \
-    || fail "namespace $NS not found — run scripts/setup-observability.sh first"
+    || fail "namespace $NS not found: run scripts/setup-observability.sh first"
 kubectl get deploy prometheus-server -n "$NS" >/dev/null 2>&1 \
-    || fail "prometheus-server not found — run scripts/setup-observability.sh"
+    || fail "prometheus-server not found: run scripts/setup-observability.sh"
 kubectl get deploy grafana -n "$NS" >/dev/null 2>&1 \
-    || fail "grafana not found — run scripts/setup-observability.sh"
+    || fail "grafana not found: run scripts/setup-observability.sh"
 
 step "Waiting for Prometheus and Grafana to be Ready"
 wait_ready prometheus-server 180 || fail "prometheus-server did not become Ready"
@@ -71,13 +71,13 @@ printf '    ✓ Prometheus has capstone replica metrics (kube-state-metrics scra
 
 step "Confirming the Istio request series is present (order-service is meshed)"
 # The series should EXIST even at 0 req/s once the sidecar has reported once.
-# If empty, it usually just means no traffic has flowed yet — a soft note, not a
+# If empty, it usually just means no traffic has flowed yet: a soft note, not a
 # hard failure, since metrics plumbing is already proven above.
 istio="$(curl -sG "$PROM_Q" --data-urlencode 'query=istio_requests_total{destination_workload="order-service"}' 2>/dev/null)"
 if printf '%s' "$istio" | grep -q '"result":\[{'; then
     printf '    ✓ istio_requests_total present for order-service\n'
 else
-    printf '    ⚠ no istio_requests_total yet — drive traffic (./demos/smoke-canary.sh)\n'
+    printf '    ⚠ no istio_requests_total yet: drive traffic (./demos/smoke-canary.sh)\n'
     printf '      then re-check. (Metrics plumbing is already proven above.)\n'
 fi
 
@@ -93,7 +93,7 @@ step "Checking Grafana health and the provisioned dashboard"
 health="$(curl -s --max-time 5 "http://127.0.0.1:${GRAF_PORT}/api/health" 2>/dev/null)"
 printf '%s' "$health" | grep -q '"database": *"ok"' \
     || fail "Grafana /api/health did not report database ok (got: $health)"
-# Read the admin login from the Grafana secret (never printed) — the chart preserves an
+# Read the admin login from the Grafana secret (never printed): the chart preserves an
 # existing password on upgrade, so it isn't reliably the values default.
 GRAF_USER="$(kubectl get secret grafana -n "$NS" -o jsonpath='{.data.admin-user}' 2>/dev/null | base64 -d)"
 GRAF_PASS="$(kubectl get secret grafana -n "$NS" -o jsonpath='{.data.admin-password}' 2>/dev/null | base64 -d)"
@@ -101,7 +101,7 @@ code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 5 \
     -u "${GRAF_USER}:${GRAF_PASS}" "http://127.0.0.1:${GRAF_PORT}/api/dashboards/uid/capstone-scaling" 2>/dev/null)"
 [[ "$code" == "200" ]] \
     || fail "Grafana dashboard 'capstone-scaling' not provisioned (HTTP $code from the dashboards API)"
-printf '    ✓ Grafana healthy and the "Capstone — Scaling & Traffic" dashboard is provisioned\n'
+printf '    ✓ Grafana healthy and the "Capstone: Scaling & Traffic" dashboard is provisioned\n'
 
 step "SUCCESS"
 printf 'Metrics stack verified. Open the dashboard and drive a demo to watch it move:\n'

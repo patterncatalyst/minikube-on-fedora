@@ -62,7 +62,7 @@ step "pre-flight: ${IMAGE_TAG} image in cluster cache"
 if ! minikube -p "${PROFILE}" image ls 2>/dev/null | grep -q "${IMAGE_TAG}"; then
     info "image not present; building from §6's Containerfile"
     if [[ ! -f "${SECTION6_DIR}/Containerfile" ]]; then
-        fail "${SECTION6_DIR}/Containerfile not found — examples/06 missing?"
+        fail "${SECTION6_DIR}/Containerfile not found: examples/06 missing?"
     fi
     if ! build_and_load "${IMAGE_TAG}" "${SECTION6_DIR}" "${PROFILE}"; then
         fail "image build/load failed (see output above)"
@@ -142,7 +142,7 @@ case "${RESP}" in
 esac
 
 # ── Done ────────────────────────────────────────────────────────────────────
-step "SUCCESS — NodePort Service for ${APP_NAME} reachable at ${URL}"
+step "SUCCESS: NodePort Service for ${APP_NAME} reachable at ${URL}"
 echo
 echo "  The NodePort was published when the profile was created:"
 echo "    --ports=127.0.0.1:${HOST_PORT}:${NODE_PORT}  (host :${HOST_PORT} -> node :${NODE_PORT})"

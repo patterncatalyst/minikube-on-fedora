@@ -1,17 +1,17 @@
 # notification-service with its real Alembic migration as an init container
-# (the same wiring as the §17 capstone's Helm chart, reproduced here as plain
+# (the same wiring as the capstone's Helm chart, reproduced here as plain
 # manifests). The init container runs `alembic upgrade head` against the same
 # image, so the `notifications` schema and table exist before the main
-# container's first line of Python ever runs — the app issues no DDL of its
-# own (CAP-021 in the capstone).
+# container's first line of Python ever runs; the app issues no DDL of its
+# own (handled by an init container in the capstone).
 #
 # Apply this Deployment BEFORE 00-postgres.yaml exists (see the chapter and
 # this directory's README) to see the init container itself fail and retry:
 # with no Postgres to connect to, `alembic upgrade head` exits non-zero
 # immediately (env.py has no retry loop), and the kubelet restarts the init
 # container on backoff while the main container sits in Waiting:
-# PodInitializing. KAFKA_BOOTSTRAP is deliberately left pointing at nothing
-# reachable — this example is scoped to the init-container ordering contract,
+# PodInitializing. KAFKA_BOOTSTRAP is left pointing at nothing
+# reachable; this example is scoped to the init-container ordering contract,
 # not a live Kafka pipeline, same scoping the Managed Lifecycle chapter uses
 # for this same service.
 apiVersion: apps/v1

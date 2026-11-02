@@ -29,7 +29,7 @@ kubectl --context mof-patterns exec -n patterns "$POD" -- env | grep -E '^(POD_|
 the Pod's own `metadata`/`status`/`spec`, with no ConfigMap, no Secret, and
 no call to the API server from inside the container. `CPU_REQUEST` and
 `MEMORY_LIMIT` read this exact container's own declared resources back out
-as a `resourceFieldRef` — the same numbers Predictable Demands declares, now
+as a `resourceFieldRef`: the same numbers Predictable Demands declares, now
 visible to the process itself.
 
 ### The downward API volume: updated in place

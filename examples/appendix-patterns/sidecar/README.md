@@ -38,7 +38,7 @@ kubectl --context mof-patterns exec -n patterns "$POD" -c probe-tailer -- tail -
 
 Each line is a timestamp and the HTTP status the sidecar got from
 `shipping-service` over `127.0.0.1`, entirely inside the Pod's own network
-namespace — no Service, no DNS, no network policy involved.
+namespace: no Service, no DNS, no network policy involved.
 
 ### Shutdown order
 
@@ -52,7 +52,7 @@ kubectl --context mof-patterns get pod -n patterns "$POD" -w
 ```
 
 The main container's status flips to `Terminating` first; the native sidecar
-keeps running until shipping-service has actually exited, then stops last —
+keeps running until shipping-service has actually exited, then stops last,
 the reverse of its startup order.
 
 ## Cleanup

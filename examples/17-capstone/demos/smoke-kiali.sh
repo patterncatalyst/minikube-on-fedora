@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 #
-# smoke-kiali.sh — verify Kiali (CAP-0NN) is up and wired to the capstone
+# smoke-kiali.sh: verify Kiali is up and wired to the capstone
 # observability stack: the deployment is Ready, the API answers, Prometheus is
 # reachable from Kiali's point of view, and the `capstone` namespace is visible
 # to the graph.
 #
-# This checks the PLUMBING, not a pretty graph — it confirms Kiali can render
+# This checks the PLUMBING, not a pretty graph: it confirms Kiali can render
 # the mesh topology once traffic flows. Run a demo (smoke-trace-flow.sh,
 # demo-canary.sh, smoke-keda-kafka.sh) to make edges actually appear in the graph.
 #
@@ -30,7 +30,7 @@ KIALI_WEBROOT="/kiali"   # must match server.web_root in setup-kiali.sh (addon p
 
 step() { printf '\n==> %s\n' "$1"; }
 dump() {
-    step "DIAGNOSTIC DUMP (failure — resources left in place)"
+    step "DIAGNOSTIC DUMP (failure: resources left in place)"
     printf '\n--- kiali deployment / pod ---\n'
     kubectl get deploy,pods -n "$ISTIO_SYSTEM" -l app.kubernetes.io/name=kiali -o wide 2>&1
     printf '\n--- kiali ConfigMap (external_services) ---\n'
@@ -57,7 +57,7 @@ step "Pre-flight checks"
 command -v kubectl >/dev/null 2>&1 || fail "kubectl not in PATH"
 command -v curl    >/dev/null 2>&1 || fail "curl not in PATH"
 kubectl get deploy kiali -n "$ISTIO_SYSTEM" >/dev/null 2>&1 \
-    || fail "kiali deployment not found in $ISTIO_SYSTEM — run scripts/setup-kiali.sh first"
+    || fail "kiali deployment not found in $ISTIO_SYSTEM: run scripts/setup-kiali.sh first"
 
 # ─── 1. Kiali is Ready ───────────────────────────────────────────────────────
 step "Waiting for the Kiali deployment to be Ready"
@@ -71,7 +71,7 @@ CFG="$(kubectl get configmap kiali -n "$ISTIO_SYSTEM" -o jsonpath='{.data.config
 if printf '%s' "$CFG" | grep -q "prometheus-server.${OBS_NS}"; then
     printf '    ✓ external_services.prometheus → prometheus-server.%s\n' "$OBS_NS"
 else
-    fail "kiali config does not point at prometheus-server.${OBS_NS} — re-run scripts/setup-kiali.sh"
+    fail "kiali config does not point at prometheus-server.${OBS_NS}: re-run scripts/setup-kiali.sh"
 fi
 
 # ─── 3. Hit the API on the published NodePort ────────────────────────────────
@@ -101,12 +101,12 @@ GRAPH_CODE="$(curl -s -o /dev/null -w '%{http_code}' \
 if [[ "$GRAPH_CODE" == "200" ]]; then
     printf '    ✓ Kiali graph API answered 200 (Prometheus reachable)\n'
 else
-    printf '    ! Kiali graph API returned HTTP %s — Prometheus wiring may not be live yet.\n' "$GRAPH_CODE"
+    printf '    ! Kiali graph API returned HTTP %s: Prometheus wiring may not be live yet.\n' "$GRAPH_CODE"
     printf '      This is a note, not a failure: the graph fills in once traffic flows and\n'
     printf '      Prometheus has scraped it. Re-check after running a demo.\n'
 fi
 
 # ─── Done ────────────────────────────────────────────────────────────────────
-step "PASS — Kiali is up, wired to the capstone stack, and sees the $APP_NS namespace."
+step "PASS: Kiali is up, wired to the capstone stack, and sees the $APP_NS namespace."
 printf '\nView the live topology (run a demo first to create traffic):\n'
 printf '  open http://127.0.0.1:%s%s/   (Graph → namespace: %s)\n' "$KIALI_PORT" "$KIALI_WEBROOT" "$APP_NS"
