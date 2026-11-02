@@ -11,10 +11,10 @@ permalink: /appendix/k8s-patterns/
         <h1>The patterns, worked with our own services.</h1>
         <p class="hero__lead">
             A chapter per pattern across the six families of cloud-native
-            Kubernetes design — foundational, structural, behavioral,
-            configuration, advanced, and security — each one worked with the
-            tutorial's shipping services instead of a textbook's toy app, and
-            each cross-referenced to where it lands on the CKAD exam.
+            Kubernetes design: foundational, structural, behavioral,
+            configuration, advanced, and security. Each one is worked with the
+            tutorial's own shipping services, and cross-referenced to where it
+            lands on the CKAD exam.
         </p>
         <p class="hero__lead">
             It's organized as its own set with its own reading order. Every
@@ -35,7 +35,7 @@ permalink: /appendix/k8s-patterns/
     <div class="container">
         <h2 class="section-heading">The set</h2>
         <p class="section-sub">
-            Read a family at a time. Each chapter is self-contained — the
+            Read a family at a time. Each chapter is self-contained: the
             pattern, why it matters, the manifests worked against a shipping
             service, cleanup, and a pointer to the runnable example.
         </p>
@@ -74,19 +74,19 @@ permalink: /appendix/k8s-patterns/
             This appendix is reached from
             <a href="{{ '/docs/18-kubernetes-patterns/' | relative_url }}">§18</a>
             of the main tutorial. The earlier sections stood up the cluster and
-            its building blocks —
-            <a href="{{ '/docs/06-deploying-with-kubectl/' | relative_url }}">kubectl</a>,
+            its building blocks
+            (<a href="{{ '/docs/06-deploying-with-kubectl/' | relative_url }}">kubectl</a>,
             <a href="{{ '/docs/09-helm/' | relative_url }}">helm</a>,
             <a href="{{ '/docs/11-istio/' | relative_url }}">Istio</a>,
-            <a href="{{ '/docs/12-keda/' | relative_url }}">KEDA</a> —
+            <a href="{{ '/docs/12-keda/' | relative_url }}">KEDA</a>),
             and the <a href="{{ '/capstone/data-mesh/' | relative_url }}">§17
-            capstone</a> wired them into one running system. This appendix steps
+            final project</a> wired them into one running system. This appendix steps
             back and names the <em>patterns</em> behind those pieces, one at a
             time, with the CKAD exam as a second lens.
         </p>
         <p>
             The examples run on a dedicated <code>mof-patterns</code> minikube
-            profile, separate from the capstone's <code>mof-capstone</code>; the
+            profile, separate from the final project's <code>mof-capstone</code>; the
             host prerequisites are the same as
             <a href="{{ '/docs/01-prerequisites/' | relative_url }}">§1</a>.
             This appendix stays on plain Kubernetes; the OpenShift Local (CRC)
