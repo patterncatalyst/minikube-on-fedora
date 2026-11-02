@@ -164,13 +164,24 @@ else
     printf '  (none)\n'
 fi
 
-# 8. Runtime / access / OS policy, plus version pins.
-# Scope: every tracked text file except presentation/, _plans/, lockfiles,
-# screenshots, this script, and .github/workflows/pages.yml (its
-# `runs-on: ubuntu-latest` is CI infrastructure, not tutorial content).
+# 8. Runtime / access / OS policy, plus version pins. Two scopes:
+#   - OS / runtime drift (macOS, Windows, podman, Ubuntu, Homebrew, ...) is
+#     scanned across ALL tracked prose and code: this project is Fedora +
+#     docker + containerd only, so those names must not appear anywhere except
+#     where a line is explicitly policy-exempt (e.g. the onboarding postmortem
+#     that explains why podman was dropped). Matched case-sensitively, since
+#     these are proper nouns — this is what keeps "five windows into a pod"
+#     from tripping the Windows rule.
+#   - Access patterns (port-forward, minikube tunnel, dashboards) and :latest
+#     pins are a MAIN-TUTORIAL editorial choice, scanned in _docs/ and
+#     _capstone/ only. The k8s-patterns appendix deliberately teaches
+#     port-forward and minikube tunnel and ships runnable examples that use
+#     them, so it is out of scope for those two checks.
+# Excluded from all of check 8: presentation/, _plans/, assets/ (generated
+# diagrams and screenshots), lockfiles, this script, and pages.yml.
 hdr "Runtime / access / OS policy (check 8)"
 git ls-files -z \
-    | grep -zvE '^(presentation/|_plans/|assets/screenshots/)|\.lock$|^\.github/workflows/pages\.yml$|^scripts/editorial-audit\.sh$' \
+    | grep -zvE '^(presentation/|_plans/|assets/)|\.lock$|^\.github/workflows/pages\.yml$|^scripts/editorial-audit\.sh$' \
     | while IFS= read -r -d '' f; do
         [[ -f "$f" ]] && grep -Iq . "$f" 2>/dev/null && printf '%s\n' "$f"
     done > "$WORK/files.txt" || true
@@ -192,12 +203,24 @@ done < "$WORK/files.txt"
 paste -d'\t' "$WORK/meta.txt" "$WORK/text.txt" > "$WORK/all.tsv" 2>/dev/null || true
 printf '  scanned %d files, %d non-exempt lines\n' "$(wc -l < "$WORK/files.txt")" "$(wc -l < "$WORK/text.txt")"
 
-# scan_pattern LABEL REGEX KIND   (KIND is "policy" or "pin")
+# scan_pattern LABEL REGEX KIND [SCOPE_RE]
+#   KIND is "policy" or "pin". Content is matched case-sensitively (proper-noun
+#   OS names, exact flags). SCOPE_RE (optional) is an ERE matched against each
+#   finding's source file path; omit it to scan every file, or pass e.g.
+#   '^(_docs|_capstone)/' to restrict a check to the main-tutorial prose.
 scan_pattern() {
-    local label="$1" re="$2" kind="$3" idx n
-    idx=$(grep -niE -e "$re" "$WORK/text.txt" 2>/dev/null | cut -d: -f1 || true)
+    local label="$1" re="$2" kind="$3" scope="${4:-}" idx n
+    idx=$(grep -nE -e "$re" "$WORK/text.txt" 2>/dev/null | cut -d: -f1 || true)
     [[ -z "$idx" ]] && return 0
-    printf '%s\n' "$idx" > "$WORK/idx.txt"
+    if [[ -n "$scope" ]]; then
+        printf '%s\n' "$idx" \
+          | awk -v tsv="$WORK/all.tsv" -v scope="$scope" '
+                BEGIN { while ((getline line < tsv) > 0) { n++; c = index(line, ":"); path[n] = substr(line, 1, c - 1) } }
+                (path[$1] ~ scope) { print }' > "$WORK/idx.txt"
+    else
+        printf '%s\n' "$idx" > "$WORK/idx.txt"
+    fi
+    [[ -s "$WORK/idx.txt" ]] || return 0
     n=$(wc -l < "$WORK/idx.txt")
     counts["$kind:$label"]=$n
     printf '\n  [%s] %s (%d)\n' "$kind" "$label" "$n"
@@ -206,14 +229,11 @@ scan_pattern() {
         "$WORK/idx.txt" "$WORK/all.tsv"
 }
 
-POLICY_PATTERNS=(
-    'port-forward'
-    'minikube tunnel'
-    'minikube service'
-    'kubectl proxy'
-    'istioctl dashboard'
-    'minikube dashboard'
-    'ssh -L'
+# Main-tutorial prose scope for the access-pattern and pin checks below.
+TUTORIAL_SCOPE='^(_docs|_capstone)/'
+
+# OS / runtime drift — must not appear anywhere (scanned globally).
+DRIFT_PATTERNS=(
     '--driver=podman'
     'driver podman'
     '--rootless'
@@ -241,15 +261,29 @@ POLICY_PATTERNS=(
     'VirtualBox'
     'apt(-get)? install'
 )
-for pat in "${POLICY_PATTERNS[@]}"; do
+# Access-pattern preference — a main-tutorial editorial choice (scanned in
+# _docs/ and _capstone/ only; the appendix teaches these tools deliberately).
+ACCESS_PATTERNS=(
+    'port-forward'
+    'minikube tunnel'
+    'minikube service'
+    'kubectl proxy'
+    'istioctl dashboard'
+    'minikube dashboard'
+    'ssh -L'
+)
+for pat in "${DRIFT_PATTERNS[@]}"; do
     scan_pattern "$pat" "$pat" policy
+done
+for pat in "${ACCESS_PATTERNS[@]}"; do
+    scan_pattern "$pat" "$pat" policy "$TUTORIAL_SCOPE"
 done
 (( ${#counts[@]} == 0 )) && printf '  (none)\n'
 
-hdr "Unpinned versions (check 8b)"
+hdr "Unpinned versions (check 8b) — main-tutorial prose only"
 before=${#counts[@]}
 for pat in ':latest\b' 'releases/latest' '@latest' 'stable\.txt'; do
-    scan_pattern "$pat" "$pat" pin
+    scan_pattern "$pat" "$pat" pin "$TUTORIAL_SCOPE"
 done
 [[ ${#counts[@]} -eq $before ]] && printf '  (none)\n'
 
