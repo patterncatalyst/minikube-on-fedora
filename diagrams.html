@@ -1,7 +1,7 @@
 ---
 layout: default
 title: Diagrams
-description: "Every figure from the book on one page, with its editable Excalidraw source."
+description: "Every figure from the guide and its Kubernetes-patterns appendix on one page, each with its editable Excalidraw source."
 permalink: /diagrams/
 ---
 
@@ -23,7 +23,8 @@ permalink: /diagrams/
     <span class="hero__eyebrow">Diagrams</span>
     <h1>Every figure, on one page.</h1>
     <p class="hero__lead">
-      The 5 diagrams from minikube on Fedora, in reading order. Each one renders
+      All 38 figures, in reading order: 5 from the minikube on Fedora guide and
+      33 from the Kubernetes patterns &amp; CKAD appendix. Each one renders
       inline here and ships a paired <code>.excalidraw</code> source you can
       open on excalidraw.com and edit.
     </p>
@@ -32,12 +33,54 @@ permalink: /diagrams/
 
 <section class="section">
   <div class="container">
+    <h2>Minikube on Fedora</h2>
     <div class="diagram-gallery">
       {%- include excalidraw.html file="03-minikube-topology" alt="minikube on Fedora 44 topology" caption="" -%}
       {%- include excalidraw.html file="06-k8s-primitives" alt="Kubernetes workload primitives" caption="" -%}
       {%- include excalidraw.html file="11-istio-mesh" alt="Istio service mesh: control plane and data plane" caption="" -%}
       {%- include excalidraw.html file="12-hpa-vs-keda" alt="HPA vs KEDA scaling models" caption="" -%}
       {%- include excalidraw.html file="12-keda-http-addon" alt="KEDA HTTP add-on data flow" caption="" -%}
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <h2>Appendix: Kubernetes patterns &amp; CKAD</h2>
+    <div class="diagram-gallery">
+      {%- include excalidraw.html file="appendix-01-predictable-demands" alt="ConfigMap and PersistentVolumeClaim as hard requirements feeding a Pod, with the scheduler applying its PriorityClass" caption="" -%}
+      {%- include excalidraw.html file="appendix-02-declarative-deployment" alt="RollingUpdate keeps at least three Pods serving at all times by surging one extra; Recreate drops to zero Pods before the replacement starts" caption="" -%}
+      {%- include excalidraw.html file="appendix-03-health-probe" alt="A startup probe gates liveness and readiness until the container reports healthy; readiness alone is not enough to join the Service's endpoints if a readiness gate is also set" caption="" -%}
+      {%- include excalidraw.html file="appendix-04-managed-lifecycle" alt="The sequence from postStart through delete, preStop, SIGTERM, and shutdown" caption="" -%}
+      {%- include excalidraw.html file="appendix-05-automated-placement" alt="Node selector, node affinity, pod anti-affinity, and tolerations placing Pods across the two mof-patterns nodes" caption="" -%}
+      {%- include excalidraw.html file="appendix-06-init-container" alt="An init container gating the main container's start, with a nonzero exit leaving the Pod stuck PodInitializing" caption="" -%}
+      {%- include excalidraw.html file="appendix-07-sidecar" alt="A native sidecar starting before the app and stopping after it, the reverse of an ordinary second container" caption="" -%}
+      {%- include excalidraw.html file="appendix-08-adapter" alt="shipping-service's JSON output translated into Prometheus exposition text by an adapter sidecar, with an external scraper reading only the translated port" caption="" -%}
+      {%- include excalidraw.html file="appendix-09-ambassador" alt="shipping-service always connecting to 127.0.0.1:5432; the ambassador alone decides which real backend that address reaches" caption="" -%}
+      {%- include excalidraw.html file="appendix-10-batch-job" alt="A Job partitions shipment_events across three Pods by completion index, each writing its own CSV to a shared PVC" caption="" -%}
+      {%- include excalidraw.html file="appendix-11-periodic-job" alt="A CronJob firing on schedule to create successive Jobs, each writing its own report, with history limited to the most recent few" caption="" -%}
+      {%- include excalidraw.html file="appendix-12-daemon-service" alt="Two nodes, each running its own shipping service Pods beside a node-collector DaemonSet Pod reading that node's hostPath logs" caption="" -%}
+      {%- include excalidraw.html file="appendix-13-singleton-service" alt="An Eviction API request against order-service's single replica blocked by its PodDisruptionBudget, contrasted with a direct pod delete that bypasses it entirely" caption="" -%}
+      {%- include excalidraw.html file="appendix-14-stateless-service" alt="payment-service's Service fronting three interchangeable Pods; one is deleted and replaced with a new identity while the Service keeps answering throughout" caption="" -%}
+      {%- include excalidraw.html file="appendix-15-stateful-service" alt="A headless Service providing per-Pod DNS names for three ordinal StatefulSet Pods, each bound to its own PersistentVolumeClaim" caption="" -%}
+      {%- include excalidraw.html file="appendix-16-service-discovery" alt="Services of three types in front of order-service, inventory-service, and graphql-gateway, with an Ingress routing by path through a single address" caption="" -%}
+      {%- include excalidraw.html file="appendix-17-self-awareness" alt="A Pod's own metadata, status, spec, and resources flowing into a container as Downward API environment variables and a mounted volume" caption="" -%}
+      {%- include excalidraw.html file="appendix-18-env-var-configuration" alt="Three sources feeding one container's environment: a literal value, a ConfigMap key, and a Secret key" caption="" -%}
+      {%- include excalidraw.html file="appendix-19-configuration-resource" alt="The same ConfigMap and the same Secret, each reaching the container as bulk env vars and as a mounted file" caption="" -%}
+      {%- include excalidraw.html file="appendix-20-configuration-template" alt="A template and an overlay feeding an init container, which writes one rendered file into a shared volume before the main container starts" caption="" -%}
+      {%- include excalidraw.html file="appendix-21-immutable-configuration" alt="ConfigMap v1 and v2, both immutable, with a Deployment's reference moving from one to the other and a rollout following it" caption="" -%}
+      {%- include excalidraw.html file="appendix-22-controller" alt="Two reconcile loops with the identical shape: the generic Watch to Reconcile() to Owned objects cycle, instantiated once as the built-in ReplicaSet controller over Pods and once as the custom ShippingPolicy controller over a Deployment and ConfigMap" caption="" -%}
+      {%- include excalidraw.html file="appendix-23-elastic-scale" alt="HPA and VPA on shipping-service reading the Pods themselves, contrasted with KEDA's HTTPScaledObject on graphql-gateway reading request concurrency from outside the Pods entirely, which is what lets it scale to zero" caption="" -%}
+      {%- include excalidraw.html file="appendix-24-image-builder" alt="minikube image build runs on the node itself with no Kubernetes object behind it, while a Kaniko Job is a real Pod that builds and pushes to an in-cluster registry a Deployment later pulls from through a second, different address" caption="" -%}
+      {%- include excalidraw.html file="appendix-25-operator" alt="A ShippingPolicy custom resource watched by the operator's Reconcile loop, which owns a child Deployment and ConfigMap, creating and updating both from the spec and reading the Deployment's own status.replicas back into the ShippingPolicy's status.conditions" caption="" -%}
+      {%- include excalidraw.html file="appendix-26-access-control" alt="A ServiceAccount, bound by a RoleBinding to a Role naming two specific resources, with an unnamed Secret left outside the grant" caption="" -%}
+      {%- include excalidraw.html file="appendix-27-network-segmentation" alt="inventory-service denies all ingress by default; graphql-gateway is the one allowed caller on the gRPC port; payment-service has no allow rule at all" caption="" -%}
+      {%- include excalidraw.html file="appendix-28-process-containment" alt="A Pod's securityContext (non-root UID, dropped capabilities, read-only root) alongside a namespace enforcing the baseline Pod Security Standard, rejecting a privileged Pod" caption="" -%}
+      {%- include excalidraw.html file="appendix-29-secure-configuration" alt="A Secret reaching inventory-service two ways (an env var and a 0400-mode file), with the Secret's own object flagged as base64, not encrypted, in etcd" caption="" -%}
+      {%- include excalidraw.html file="appendix-30-observability-and-debugging" alt="kubectl's five windows into a running pod: logs, exec, port-forward, describe/events, and an ephemeral container attached on demand" caption="" -%}
+      {%- include excalidraw.html file="appendix-31-packaging-helm-and-kustomize" alt="Two ways to parameterize the same Deployment: a Helm chart rendering values.yaml into a tracked release, and a Kustomize base patched by dev and prod overlays with no release object at all" caption="" -%}
+      {%- include excalidraw.html file="appendix-32-namespace-governance" alt="A namespace with a ResourceQuota capping totals and a LimitRange defaulting and bounding each container, alongside the PriorityClass recap that governs scheduling and eviction order underneath both" caption="" -%}
+      {%- include excalidraw.html file="appendix-33-ckad-crosswalk" alt="The five CKAD exam domains sized by their share of the exam: Design & Build 20%, Deployment 20%, Observability & Maintenance 15%, Environment/Config & Security 25%, Services & Networking 20%" caption="" -%}
     </div>
   </div>
 </section>
