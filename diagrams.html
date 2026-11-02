@@ -23,10 +23,10 @@ permalink: /diagrams/
     <span class="hero__eyebrow">Diagrams</span>
     <h1>Every figure, on one page.</h1>
     <p class="hero__lead">
-      All 38 figures, in reading order: 5 from the minikube on Fedora guide and
-      33 from the Kubernetes patterns &amp; CKAD appendix. Each one renders
-      inline here and ships a paired <code>.excalidraw</code> source you can
-      open on excalidraw.com and edit.
+      All 57 figures, in reading order: 5 from the minikube on Fedora guide, 19
+      from the §17 data-mesh capstone, and 33 from the Kubernetes patterns &amp;
+      CKAD appendix. Each one renders inline here and ships a paired
+      <code>.excalidraw</code> source you can open on excalidraw.com and edit.
     </p>
   </div>
 </section>
@@ -40,6 +40,33 @@ permalink: /diagrams/
       {%- include excalidraw.html file="11-istio-mesh" alt="Istio service mesh: control plane and data plane" caption="" -%}
       {%- include excalidraw.html file="12-hpa-vs-keda" alt="HPA vs KEDA scaling models" caption="" -%}
       {%- include excalidraw.html file="12-keda-http-addon" alt="KEDA HTTP add-on data flow" caption="" -%}
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <h2>Capstone: data mesh on minikube (§17)</h2>
+    <div class="diagram-gallery">
+      {%- include excalidraw.html file="17-monolith-to-mesh" alt="From a monolithic data platform to a mesh of data products" caption="" -%}
+      {%- include excalidraw.html file="17-operational-vs-analytical" alt="Operational vs. analytical data planes" caption="" -%}
+      {%- include excalidraw.html file="17-data-mesh-four-principles" alt="The four principles and how they map to Kubernetes primitives" caption="" -%}
+      {%- include excalidraw.html file="17-platform-planes" alt="The three planes of the self-serve data platform" caption="" -%}
+      {%- include excalidraw.html file="17-principles-to-pieces" alt="Each of the four principles and the OpenShift/Kubernetes pieces that deliver it: one picture of the mapping" caption="" -%}
+      {%- include excalidraw.html file="17-capstone-data-mesh" alt="Final project architecture: data mesh on minikube" caption="" -%}
+      {%- include excalidraw.html file="17-data-product-anatomy" alt="Anatomy of a data product: ports in, ports out, transformation and governance inside" caption="" -%}
+      {%- include excalidraw.html file="17-capstone-contracts" alt="Each service's contract surface: OpenAPI, Protobuf, schema, SDL" caption="" -%}
+      {%- include excalidraw.html file="17-capstone-contract-flow" alt="How a contract flows: the runtime path versus the discovery path" caption="" -%}
+      {%- include excalidraw.html file="17-contracts-registry-catalog" alt="Contracts in the registry, discovery and lineage in the catalog" caption="" -%}
+      {%- include excalidraw.html file="17-api-implementations" alt="Four protocols by role: REST at the edge, gRPC between services, GraphQL composing reads, events on the async backbone" caption="" -%}
+      {%- include excalidraw.html file="17-analytical-data-composition" alt="How analytical data is composed across domains into a served product" caption="" -%}
+      {%- include excalidraw.html file="17-ingestion-streaming-sourcing" alt="Domain events and change-data-capture feeding the analytical side" caption="" -%}
+      {%- include excalidraw.html file="17-service-mesh" alt="The final project's mesh in canary mode: sidecars beside each product, mTLS between them, weights moving traffic from v1 to v2" caption="" -%}
+      {%- include excalidraw.html file="17-keda-lag" alt="KEDA scaling notification-service on Kafka consumer-group lag: scaling to zero when the backlog is empty, back up as events arrive" caption="" -%}
+      {%- include excalidraw.html file="17-keda-http" alt="Why the HTTP scaler goes on the gateway and not on the canaried order-service: matching the scaler to the workload" caption="" -%}
+      {%- include excalidraw.html file="17-three-signals" alt="The three signals: metrics, traces, and logs, and the question each answers about a request crossing products" caption="" -%}
+      {%- include excalidraw.html file="17-observability-stack" alt="The observability stack: sidecars emit, Prometheus scrapes metrics, Tempo stores spans, Grafana correlates them, Kiali shows the live topology" caption="" -%}
+      {%- include excalidraw.html file="17-reference-data-mesh-architecture" alt="A reference data-mesh architecture: products, planes, and the observability that spans them" caption="" -%}
     </div>
   </div>
 </section>
