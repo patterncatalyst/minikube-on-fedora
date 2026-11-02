@@ -15,11 +15,17 @@ the way a CI pipeline running on the cluster itself would.
 cd examples/appendix-patterns
 ./scripts/setup-patterns-profile.sh
 minikube -p mof-patterns image build \
-  -f ../17-capstone/services/shipping-service/Containerfile \
+  -f Containerfile \
   -t shipping-service:v1 \
   ../17-capstone/services/shipping-service
 minikube -p mof-patterns image ls | grep shipping-service
 ```
+
+`-f Containerfile` is the file's name *inside the build context*, not a path
+on the host: `minikube image build` tars the context directory, unpacks it on
+the node, and resolves `-f` against that unpacked copy, so a host-relative
+path like `../17-capstone/.../Containerfile` would point at a file that does
+not exist on the node and the build would fail.
 
 No `docker build` ran on the host at all. `minikube image build` ships the
 build context to the node and runs the build there, using the same container

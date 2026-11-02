@@ -38,7 +38,7 @@ Create it and confirm the running Pod is unaffected by its mere existence:
 ```bash
 kubectl --context mof-patterns apply -n patterns -f immutable-configuration/03-configmap-v2.yaml
 POD=$(kubectl --context mof-patterns get pod -n patterns -l app.kubernetes.io/name=graphql-gateway -o jsonpath='{.items[0].metadata.name}')
-kubectl --context mof-patterns exec -n patterns "$POD" -- env | grep ORDER_REST_URL
+kubectl --context mof-patterns exec -n patterns "$POD" -- env | grep order_rest_url
 ```
 
 Still `http://order-service`. Now roll the Deployment onto the new
@@ -55,7 +55,7 @@ Pods, the old ones terminated once the new ones are ready.
 
 ```bash
 NEWPOD=$(kubectl --context mof-patterns get pod -n patterns -l app.kubernetes.io/name=graphql-gateway -o jsonpath='{.items[0].metadata.name}')
-kubectl --context mof-patterns exec -n patterns "$NEWPOD" -- env | grep ORDER_REST_URL
+kubectl --context mof-patterns exec -n patterns "$NEWPOD" -- env | grep order_rest_url
 ```
 
 Now `http://order-service-v2`. Confirm the old ConfigMap can be deleted once

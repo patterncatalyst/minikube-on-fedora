@@ -122,6 +122,20 @@ func childName(policy *shippingv1alpha1.ShippingPolicy) string {
 	return policy.Name
 }
 
+// labelsFor is the common label set every child object this policy owns
+// carries, so `kubectl get deployment,configmap -l
+// shipping.patterncatalyst.io/policy=<name>` lists both children, not just the
+// Deployment, and so an operator (or a human) can find everything a given
+// ShippingPolicy produced with one selector.
+func labelsFor(policy *shippingv1alpha1.ShippingPolicy) map[string]string {
+	return map[string]string{
+		"app.kubernetes.io/name":             "shipping-service",
+		"app.kubernetes.io/part-of":          "shipping-policy",
+		"app.kubernetes.io/managed-by":       "shipping-policy-operator",
+		"shipping.patterncatalyst.io/policy": policy.Name,
+	}
+}
+
 // reconcileConfigMap creates or updates the ConfigMap carrying this policy's
 // carrier and SLA, the shape shipping-service's SERVICE_SCHEMA-style
 // configuration reads (chapter 18, Env Var Configuration) applied to a
@@ -135,6 +149,7 @@ func (r *ShippingPolicyReconciler) reconcileConfigMap(ctx context.Context, polic
 	}
 
 	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, cm, func() error {
+		cm.Labels = labelsFor(policy)
 		if cm.Data == nil {
 			cm.Data = map[string]string{}
 		}
@@ -157,12 +172,7 @@ func (r *ShippingPolicyReconciler) reconcileDeployment(ctx context.Context, poli
 		},
 	}
 
-	labels := map[string]string{
-		"app.kubernetes.io/name":             "shipping-service",
-		"app.kubernetes.io/part-of":          "shipping-policy",
-		"app.kubernetes.io/managed-by":       "shipping-policy-operator",
-		"shipping.patterncatalyst.io/policy": policy.Name,
-	}
+	labels := labelsFor(policy)
 
 	_, err := controllerutil.CreateOrUpdate(ctx, r.Client, deploy, func() error {
 		deploy.Labels = labels

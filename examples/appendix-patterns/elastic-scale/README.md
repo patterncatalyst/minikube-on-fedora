@@ -43,7 +43,8 @@ kubectl --context mof-patterns delete pod load-generator -n patterns
 
 ### VPA: recommendations, not automatic changes
 
-VPA needs its own components, not bundled with any minikube addon:
+VPA needs its own components, not bundled with any minikube addon. Either the
+upstream install script from the autoscaler repo:
 
 ```bash
 git clone https://github.com/kubernetes/autoscaler.git /tmp/autoscaler
@@ -51,9 +52,17 @@ cd /tmp/autoscaler/vertical-pod-autoscaler
 KUBECONFIG=<path-from-'kubectl config view --minify --raw'> ./hack/vpa-up.sh
 ```
 
-(or the official Helm chart, `vertical-pod-autoscaler-chart`, pinned at
-`0.15.0` at the time of writing, either installs the same three components:
-recommender, updater, admission controller). With VPA running:
+or the community Helm chart:
+
+```bash
+helm repo add fairwinds-stable https://charts.fairwinds.com/stable
+helm repo update fairwinds-stable
+helm install --kube-context mof-patterns vpa fairwinds-stable/vpa \
+  --version 5.1.0 -n vpa --create-namespace --wait
+```
+
+Either installs the same three components (recommender, updater, admission
+controller). With VPA running:
 
 ```bash
 kubectl --context mof-patterns apply -n patterns -f elastic-scale/03-vpa.yaml
@@ -143,6 +152,7 @@ kubectl --context mof-patterns delete -n patterns -f elastic-scale/04-gateway-de
 helm uninstall --kube-context mof-patterns keda-add-ons-http -n keda
 helm uninstall --kube-context mof-patterns keda -n keda
 kubectl --context mof-patterns delete -n patterns -f elastic-scale/03-vpa.yaml --ignore-not-found
+helm uninstall --kube-context mof-patterns vpa -n vpa   # if installed via the Helm chart; otherwise ./hack/vpa-down.sh
 kubectl --context mof-patterns delete -n patterns -f elastic-scale/02-hpa.yaml
 kubectl --context mof-patterns delete -n patterns -f elastic-scale/01-deployment.yaml
 kubectl --context mof-patterns delete -n patterns -f elastic-scale/00-postgres.yaml

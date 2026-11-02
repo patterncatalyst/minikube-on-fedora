@@ -31,23 +31,23 @@ POD=$(kubectl --context mof-patterns get pod -n patterns -l app.kubernetes.io/na
 kubectl --context mof-patterns exec -n patterns "$POD" -- env | grep -E '^(service_schema|pg_host|pg_port|pg_user|pg_password|pg_database)='
 ```
 
-Check the event the kubelet raised for the key `envFrom` skipped:
-
-```bash
-kubectl --context mof-patterns describe pod -n patterns "$POD" | grep -A3 Events:
-```
-
-A Warning event names `payment-service.conf` as an invalid environment
-variable name: the ConfigMap key reached the container as a file instead,
-exactly as intended. Confirm the file and its permissions:
+`payment-service.conf` is not a valid environment variable name (it
+contains a dot), so `envFrom` silently skips that key — current kubelet
+versions don't raise an event for it, so there's nothing to see in `kubectl
+describe pod`'s Events beyond the usual Scheduled/Pulled/Created/Started.
+The key reaches the container as a file instead, exactly as intended.
+Confirm the file and its permissions:
 
 ```bash
 kubectl --context mof-patterns exec -n patterns "$POD" -- cat /config/app/payment-service.conf
 kubectl --context mof-patterns exec -n patterns "$POD" -- ls -l /config/app/payment-service.conf /config/secrets/pg_password
 ```
 
-Both files show mode `-r--------` (0400): readable only by the file's
-owning UID, not world- or group-readable.
+Both files show mode `-r--r-----` (0440): readable by the owning root user
+and by group 0, which is also this container's group — not 0400, since a
+projected volume's files are always owned by root:root and this container
+never runs as root, so a stricter 0400 would make the file unreadable by
+the app itself. Still not world- or other-group-readable.
 
 Now edit the ConfigMap's file-shaped key and watch the mounted file update on
 its own, no restart required:

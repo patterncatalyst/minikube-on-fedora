@@ -55,16 +55,21 @@ own scheduled firings), so both manual Jobs run; wait a few scheduled
 firings and `successfulJobsHistoryLimit: 3` caps how many completed Jobs the
 CronJob controller keeps before garbage-collecting the oldest.
 
-Confirm each run wrote its own file:
+Confirm each run wrote its own file. A completed Job's Pods reach
+`Succeeded` the moment their container exits, and Kubernetes never allows
+`kubectl exec` into a container that isn't running, so use a separate,
+long-lived Pod mounting the same PVC instead:
 
 ```bash
-POD=$(kubectl --context mof-patterns get pods -n patterns -l app.kubernetes.io/name=shipping-report -o jsonpath='{.items[0].metadata.name}')
-kubectl --context mof-patterns exec -n patterns "$POD" -- ls -la /var/lib/shipping-reports
+kubectl --context mof-patterns apply -n patterns -f periodic-job/04-report-viewer.yaml
+kubectl --context mof-patterns wait --for=condition=Ready pod/shipping-report-viewer -n patterns --timeout=60s
+kubectl --context mof-patterns exec -n patterns shipping-report-viewer -- ls -la /var/lib/shipping-reports
 ```
 
 ## Cleanup
 
 ```bash
+kubectl --context mof-patterns delete -n patterns -f periodic-job/04-report-viewer.yaml
 kubectl --context mof-patterns delete -n patterns -f periodic-job/03-cronjob.yaml
 kubectl --context mof-patterns delete jobs -n patterns -l app.kubernetes.io/name=shipping-report
 kubectl --context mof-patterns delete -n patterns -f periodic-job/02-seed-job.yaml
