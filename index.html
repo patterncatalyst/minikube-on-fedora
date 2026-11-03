@@ -27,8 +27,50 @@ title: Home
       cover Istio service mesh and (optionally) KEDA HTTP-driven
       autoscaling: reference material for using those tools against
       a local cluster. All container images are UBI-based and do not
-      require Red Hat subscription registration.
+      require Red Hat subscription registration. The guide finishes with
+      two larger builds you can run end to end: a data-mesh final project
+      and a Kubernetes design-patterns and CKAD appendix, each worked with
+      the tutorial's own shipping services.
     </p>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <h2 class="section-heading">Two bigger builds</h2>
+    <p class="section-sub">
+      Beyond the core chapters, the guide carries two self-contained sets you
+      can read and run on their own.
+    </p>
+    <div class="cards">
+      <a class="card" href="{{ '/capstone/data-mesh/' | relative_url }}">
+        <div class="card__eyebrow">Final project</div>
+        <h3 class="card__title">A data mesh on minikube</h3>
+        <p class="card__desc">
+          Every building block from the core chapters wired into one running
+          system: services across REST, gRPC, GraphQL, and Kafka, deployed with
+          helm, with contracts, a catalog, progressive delivery, autoscaling,
+          and full observability.
+        </p>
+        <div class="card__meta"><span>Start the final project →</span></div>
+      </a>
+      <a class="card" href="{{ '/appendix/k8s-patterns/' | relative_url }}">
+        <div class="card__eyebrow">Appendix</div>
+        <h3 class="card__title">Kubernetes patterns &amp; CKAD</h3>
+        <p class="card__desc">
+          A chapter per pattern across the six families of cloud-native
+          Kubernetes design, each worked with the tutorial's shipping services
+          and cross-referenced to where it lands on the CKAD exam.
+        </p>
+        <div class="card__meta"><span>Open the appendix →</span></div>
+      </a>
+    </div>
+  </div>
+</section>
+
+<section class="section">
+  <div class="container">
+    <h2 class="section-heading">All chapters</h2>
 
     {%- comment -%}
       Section cards are auto-generated from the _docs collection sorted
